@@ -14,6 +14,7 @@ const gameTitles = {
 localStorage.setItem(sessionKey, sessionId);
 
 if (slug) {
+  injectPhotoHint();
   sendJson("/api/game-open", { sessionId, slug });
   heartbeat();
   setInterval(heartbeat, 10000);
@@ -103,4 +104,74 @@ function showToast(message) {
   });
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 1800);
+}
+
+function injectPhotoHint() {
+  if (document.querySelector("[data-photo-key-hint]")) return;
+
+  const hint = document.createElement("aside");
+  hint.dataset.photoKeyHint = "true";
+  hint.setAttribute("aria-label", "Fotoğraf çekme tuşu");
+  hint.innerHTML = `
+    <span>Foto çek</span>
+    <strong>Ö</strong>
+    <small>Resim siteye eklenir</small>
+  `;
+
+  const style = document.createElement("style");
+  style.textContent = `
+    [data-photo-key-hint] {
+      position: fixed;
+      right: 14px;
+      bottom: 14px;
+      z-index: 9998;
+      display: grid;
+      gap: 2px;
+      min-width: 118px;
+      padding: 10px 12px;
+      border: 1px solid rgba(53, 210, 255, 0.45);
+      border-radius: 10px;
+      color: #f7f4ea;
+      background: rgba(11, 13, 16, 0.82);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(12px);
+      font-family: system-ui, sans-serif;
+      text-align: center;
+      pointer-events: none;
+    }
+    [data-photo-key-hint] span {
+      color: #8fff6a;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    [data-photo-key-hint] strong {
+      color: #35d2ff;
+      font-size: 26px;
+      line-height: 1;
+    }
+    [data-photo-key-hint] small {
+      color: #b8c2c0;
+      font-size: 11px;
+      line-height: 1.2;
+    }
+    @media (max-width: 620px) {
+      [data-photo-key-hint] {
+        right: 10px;
+        bottom: 10px;
+        min-width: 96px;
+        padding: 8px 9px;
+      }
+      [data-photo-key-hint] strong {
+        font-size: 22px;
+      }
+      [data-photo-key-hint] small {
+        display: none;
+      }
+    }
+  `;
+
+  document.head.appendChild(style);
+  document.body.appendChild(hint);
 }

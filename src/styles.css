@@ -240,6 +240,13 @@ h3 {
   margin-bottom: 30px;
 }
 
+.section-note {
+  max-width: 720px;
+  margin: 14px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
 .intro-section {
   background: #0e1115;
 }

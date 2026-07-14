@@ -308,7 +308,8 @@ document.querySelector("#app").innerHTML = `
     <section class="section photos-section" id="fotolar" aria-labelledby="photos-title">
       <div class="section-heading">
         <p class="eyebrow">Oyun fotoğrafları</p>
-        <h2 id="photos-title">Oyunlarda Ö tuşuna basınca burada görünür.</h2>
+        <h2 id="photos-title">Oyunlarda fotoğraf çekme tuşu: Ö.</h2>
+        <p class="section-note">Oyun ekranının sağ altındaki rozet sana tuşu hatırlatır; çekilen fotoğraflar burada ve oyun detayında görünür.</p>
       </div>
       <div class="photo-grid" data-photo-grid>
         ${renderEmptyPhotos()}
@@ -419,6 +420,7 @@ function renderModal(game) {
           <li>Şu an oyunda: ${gameStats.playing ?? 0}</li>
           <li>Toplam açılış: ${gameStats.opens ?? 0}</li>
           <li>Kontrol: ${game.controls}</li>
+          <li>Fotoğraf çekme tuşu: Ö</li>
         </ul>
       </section>
       <section class="modal-section">
