@@ -58,6 +58,7 @@ hakanumutbey/
 - Oyunlarda `Ö` tuşu ile fotoğraf alınır; fotoğraflar canlı sitede oyunların altında görünür.
 - Site açık kişi, oyunda kişi ve oyun borsa grafikleri canlı API ile güncellenir.
 - Oyunlara yıldız puanı, ziyaretçi defteri, rozetler, haberler, ses efektleri ve galeri filtresi eklidir.
+- Haberler bölümünde şifreli duyuru formu vardır; duyurular `/api/announcements` ile yayınlanır.
 - Site `hakorocks.akadal.tr` üzerinden herkese açık bir oyun vitrini olarak çalışır.
 
 ## Geliştirme

@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
 import { createReadStream } from "node:fs";
+import { createHash } from "node:crypto";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -8,6 +9,9 @@ const root = resolve(fileURLToPath(new URL(".", import.meta.url)));
 const distRoot = join(root, "dist");
 const dataRoot = process.env.DATA_DIR || join(root, ".data");
 const port = Number(process.env.PORT || 3000);
+const announcementPasswordHash =
+  process.env.ANNOUNCEMENT_PASSWORD_HASH ||
+  "ed7131195cfb7baf313567082394af98a2215e972720fa0b0853505b575b5fa4";
 const sessions = new Map();
 const games = ["annenden-kac", "bardak", "essiz-zindan", "skeleton-wars", "vale", "robot-avcisi"];
 const baseValues = {
@@ -49,6 +53,7 @@ let ratings = await readJson("ratings.json", {
   games: Object.fromEntries(games.map((slug) => [slug, { total: 0, count: 0 }])),
 });
 let guestbook = await readJson("guestbook.json", []);
+let announcements = await readJson("announcements.json", []);
 
 createServer(async (request, response) => {
   try {
@@ -81,6 +86,10 @@ async function handleApi(request, response) {
   }
   if (request.method === "GET" && url.pathname === "/api/guestbook") {
     sendJson(response, guestbook.slice(0, 30));
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/announcements") {
+    sendJson(response, announcements.slice(0, 20));
     return;
   }
   if (request.method === "POST" && url.pathname === "/api/heartbeat") {
@@ -165,6 +174,32 @@ async function handleApi(request, response) {
     guestbook = [entry, ...guestbook].slice(0, 60);
     await writeJson("guestbook.json", guestbook);
     sendJson(response, guestbook.slice(0, 30));
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/announcements") {
+    const body = await readBody(request, 64_000);
+    const password = safeText(body.password, 256);
+    if (passwordHash(password) !== announcementPasswordHash) {
+      response.writeHead(401, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "invalid-password" }));
+      return;
+    }
+    const title = safeText(body.title, 60) || "Duyuru";
+    const message = safeText(body.message, 240);
+    if (message.length < 2) {
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "invalid-announcement" }));
+      return;
+    }
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      title,
+      message,
+      createdAt: new Date().toISOString(),
+    };
+    announcements = [entry, ...announcements].slice(0, 40);
+    await writeJson("announcements.json", announcements);
+    sendJson(response, announcements.slice(0, 20));
     return;
   }
   response.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
@@ -329,4 +364,8 @@ function sendJson(response, payload) {
 
 function safeText(value, maxLength) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
+function passwordHash(value) {
+  return createHash("sha256").update(value || "", "utf8").digest("hex");
 }

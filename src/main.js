@@ -137,7 +137,7 @@ const newsItems = [
   },
   {
     date: "Studio",
-    title: "Steam tarzı oyun ekranı",
+    title: "+team tarzı oyun ekranı",
     description: "Oyun kartına basınca detay, başarımlar, notlar, fotoğraflar ve puanlama açılır.",
   },
 ];
@@ -200,6 +200,7 @@ let latestStats = createFallbackStats();
 let latestPhotos = [];
 let latestRatings = createFallbackRatings();
 let latestGuestbook = [];
+let latestAnnouncements = [];
 let selectedGame = games[0];
 let selectedPhotoFilter = "all";
 let soundEnabled = localStorage.getItem("hakorocks-sound") !== "off";
@@ -319,9 +320,39 @@ document.querySelector("#app").innerHTML = `
       <div class="section-heading">
         <p class="eyebrow">Hakorocks Haberleri</p>
         <h2 id="news-title">Stüdyodaki son gelişmeler.</h2>
+        <p class="section-note">Sol tarafta otomatik haber kartları, sağ tarafta şifreli duyuru alanı var.</p>
       </div>
-      <div class="news-grid">
-        ${newsItems.map(renderNewsItem).join("")}
+      <div class="news-layout">
+        <div class="news-grid">
+          ${newsItems.map(renderNewsItem).join("")}
+        </div>
+        <div class="announcement-panel">
+          <div class="announcement-editor">
+            <div class="announcement-lock">
+              <span>Şifreli alan</span>
+              <strong>Duyuru yayınla</strong>
+            </div>
+            <form class="announcement-form" data-announcement-form>
+              <label>
+                Şifre
+                <input name="password" type="password" autocomplete="current-password" placeholder="Duyuru şifresi" required />
+              </label>
+              <label>
+                Başlık
+                <input name="title" maxlength="60" placeholder="Duyuru başlığı" required />
+              </label>
+              <label>
+                Duyuru
+                <textarea name="message" maxlength="240" placeholder="Arkadaşlarına göstermek istediğin mesaj" required></textarea>
+              </label>
+              <button class="button primary" type="submit">Duyuru yayınla</button>
+              <p class="form-status" data-announcement-status aria-live="polite"></p>
+            </form>
+          </div>
+          <div class="announcement-feed" data-announcement-list>
+            ${renderAnnouncements()}
+          </div>
+        </div>
       </div>
     </section>
 
@@ -406,7 +437,7 @@ document.querySelector("#app").innerHTML = `
     <section class="section games-section" id="oyunlar" aria-labelledby="games-title">
       <div class="section-heading">
         <p class="eyebrow">Oyun vitrini</p>
-        <h2 id="games-title">Oyunun üstüne bas, Steam tarzı detay ekranı açılsın.</h2>
+        <h2 id="games-title">Oyunun üstüne bas, +team tarzı detay ekranı açılsın.</h2>
       </div>
       <div class="game-grid">
         ${games.map(renderGameCard).join("")}
@@ -532,6 +563,29 @@ function renderNewsItem(item) {
       <p>${item.description}</p>
     </article>
   `;
+}
+
+function renderAnnouncementCard(item) {
+  return `
+    <article class="announcement-card">
+      <span>${formatDate(item.createdAt) || "Bugün"}</span>
+      <h3>${escapeHtml(item.title || "Duyuru")}</h3>
+      <p>${escapeHtml(item.message || "")}</p>
+    </article>
+  `;
+}
+
+function renderAnnouncements() {
+  if (!latestAnnouncements.length) {
+    return `
+      <article class="announcement-card empty">
+        <span>Hazır</span>
+        <h3>İlk duyurunu bekliyor</h3>
+        <p>Duyuru şifresini girip ilk mesajı yayınladığında burada görünecek.</p>
+      </article>
+    `;
+  }
+  return latestAnnouncements.slice(0, 6).map(renderAnnouncementCard).join("");
 }
 
 function renderBadges() {
@@ -669,6 +723,11 @@ function renderGuestbook() {
       <small>${formatDate(entry.createdAt)}</small>
     </article>
   `).join("");
+}
+
+function renderAnnouncementFeed() {
+  const list = document.querySelector("[data-announcement-list]");
+  if (list) list.innerHTML = renderAnnouncements();
 }
 
 function renderEmptyPhotos() {
@@ -845,6 +904,7 @@ function bindGameCards() {
   });
   document.querySelector("[data-sound-toggle]")?.addEventListener("click", toggleSound);
   document.querySelector("[data-guestbook-form]")?.addEventListener("submit", submitGuestbook);
+  document.querySelector("[data-announcement-form]")?.addEventListener("submit", submitAnnouncement);
 }
 
 function openGameModal(slug) {
@@ -943,6 +1003,36 @@ function renderGuestbookList() {
   if (list) list.innerHTML = renderGuestbook();
 }
 
+async function submitAnnouncement(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const status = document.querySelector("[data-announcement-status]");
+  const formData = new FormData(form);
+  const payload = {
+    password: formData.get("password"),
+    title: formData.get("title"),
+    message: formData.get("message"),
+  };
+  status.textContent = "Kontrol ediliyor...";
+  try {
+    const response = await fetch("/api/announcements", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "announcement-failed");
+    latestAnnouncements = data;
+    form.reset();
+    status.textContent = "Duyuru yayımlandı.";
+    renderAnnouncementFeed();
+  } catch (error) {
+    status.textContent = error?.message === "invalid-password"
+      ? "Şifre yanlış."
+      : "Duyuru yayımlanamadı. Tekrar dene.";
+  }
+}
+
 function toggleSound() {
   soundEnabled = !soundEnabled;
   localStorage.setItem("hakorocks-sound", soundEnabled ? "on" : "off");
@@ -1018,21 +1108,24 @@ async function refreshLiveData() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    const [statsResponse, photosResponse, ratingsResponse, guestbookResponse] = await Promise.all([
+    const [statsResponse, photosResponse, ratingsResponse, guestbookResponse, announcementsResponse] = await Promise.all([
       fetch("/api/stats"),
       fetch("/api/photos"),
       fetch("/api/ratings"),
       fetch("/api/guestbook"),
+      fetch("/api/announcements"),
     ]);
     latestStats = await statsResponse.json();
     latestPhotos = await photosResponse.json();
     latestRatings = await ratingsResponse.json();
     latestGuestbook = await guestbookResponse.json();
+    latestAnnouncements = await announcementsResponse.json();
   } catch {
     latestStats = createFallbackStats();
   }
 
   renderLiveData();
+  renderAnnouncementFeed();
   if (!document.querySelector("[data-game-modal]").hidden) {
     document.querySelector("[data-modal-content]").innerHTML = renderModal(selectedGame);
   }
@@ -1059,5 +1152,6 @@ bindGameCards();
 bindTrailer();
 updateSoundButton();
 renderBadgeGrid();
+renderAnnouncementFeed();
 refreshLiveData();
 setInterval(refreshLiveData, 10000);

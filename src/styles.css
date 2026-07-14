@@ -366,6 +366,13 @@ h3 {
   gap: 16px;
 }
 
+.news-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 18px;
+  align-items: start;
+}
+
 .news-card,
 .badge-card,
 .guestbook-entry {
@@ -379,6 +386,106 @@ h3 {
 .news-card {
   display: grid;
   gap: 12px;
+}
+
+.announcement-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.announcement-editor {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid rgba(53, 210, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.announcement-lock {
+  display: grid;
+  gap: 8px;
+}
+
+.announcement-lock span {
+  width: fit-content;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: #071012;
+  background: var(--gold);
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.announcement-form {
+  display: grid;
+  gap: 12px;
+}
+
+.announcement-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.announcement-form input,
+.announcement-form textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.22);
+  font: inherit;
+}
+
+.announcement-form input {
+  min-height: 42px;
+  padding: 0 12px;
+}
+
+.announcement-form textarea {
+  min-height: 140px;
+  padding: 12px;
+  resize: vertical;
+}
+
+.announcement-feed {
+  display: grid;
+  gap: 14px;
+}
+
+.announcement-card {
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(53, 210, 255, 0.08), transparent),
+    rgba(255, 255, 255, 0.055);
+}
+
+.announcement-card.empty {
+  border-style: dashed;
+}
+
+.announcement-card span {
+  width: fit-content;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: #071012;
+  background: var(--cyan);
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.announcement-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
 }
 
 .news-card p,
@@ -1243,6 +1350,7 @@ h3 {
   .game-grid,
   .project-grid,
   .news-grid,
+  .news-layout,
   .badge-grid,
   .resume-grid,
   .trailer-layout,
