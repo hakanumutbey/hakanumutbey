@@ -1,0 +1,19 @@
+{
+  "name": "robot-avcisi",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Laboratuvarda robot avlama ve parti modu oyunu.",
+  "scripts": {
+    "build:kod": "node scripts/build-kod.mjs",
+    "check:kod": "node scripts/build-kod.mjs --check",
+    "start": "node minik/server.js",
+    "test": "npm run check:kod && node tests/config-integrity.mjs && node tests/game-regression.mjs && node tests/party-server.mjs && node tests/party-browser.mjs"
+  },
+  "dependencies": {
+    "babylonjs": "^9.16.1",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.61.1"
+  }
+}

@@ -1,0 +1,4 @@
+{
+  "weapons": ["pistol", "scrapRifle", "ionBlaster"],
+  "cosmetics": ["none", "cap", "helmet", "armor", "robotSkin"]
+}

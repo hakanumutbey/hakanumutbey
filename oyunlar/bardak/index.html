@@ -1,0 +1,2289 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3D Bardak Oyunu</title>
+  <style>
+    :root {
+      --bg: #d8d2c7;
+      --panel: rgba(255, 252, 244, 0.90);
+      --panel-border: rgba(83, 72, 62, 0.18);
+      --text: #25221f;
+      --muted: #645c54;
+      --accent: #5a8f6b;
+      --accent-dark: #3f6f54;
+      --danger: #f05d5d;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    #renderCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+      outline: none;
+    }
+
+    .hud {
+      position: fixed;
+      left: 18px;
+      right: 18px;
+      top: 16px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .panel {
+      pointer-events: auto;
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      background: var(--panel);
+      box-shadow: 0 14px 34px rgba(44, 36, 28, 0.16);
+      backdrop-filter: blur(8px);
+    }
+
+    .status {
+      min-width: min(560px, calc(100vw - 36px));
+      padding: 14px 16px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: clamp(24px, 4vw, 38px);
+      letter-spacing: 0;
+    }
+
+    #message {
+      min-height: 24px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.35;
+    }
+
+    .score {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .score span {
+      padding: 7px 9px;
+      border-radius: 7px;
+      background: rgba(91, 78, 63, 0.08);
+    }
+
+    .controls {
+      width: min(340px, calc(100vw - 36px));
+      padding: 12px;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 0;
+      border-radius: 8px;
+      min-height: 40px;
+      padding: 10px 13px;
+      color: var(--text);
+      background: rgba(91, 78, 63, 0.10);
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    button:hover:not(:disabled) {
+      background: rgba(91, 78, 63, 0.16);
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: default;
+    }
+
+    #startButton {
+      flex: 1 1 120px;
+      color: #f7fff8;
+      background: var(--accent);
+    }
+
+    #startButton:hover:not(:disabled) {
+      background: #6da37d;
+    }
+
+    .mode {
+      flex: 1 1 86px;
+    }
+
+    .mode.active {
+      color: #f7fff8;
+      background: var(--accent-dark);
+      box-shadow: inset 0 0 0 1px rgba(63, 111, 84, 0.72);
+    }
+
+    .tip {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .loading {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: var(--text);
+      background: #d8d2c7;
+      z-index: 10;
+    }
+
+    .loading.hidden {
+      display: none;
+    }
+
+    .intro {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at 50% 30%, rgba(117, 246, 255, 0.12), transparent 28rem),
+        linear-gradient(180deg, #06080d, #10141c);
+      opacity: 1;
+      filter: brightness(1);
+      transition:
+        opacity 1900ms ease,
+        filter 1900ms ease;
+    }
+
+    .intro.hidden {
+      display: none;
+    }
+
+    .intro.outro {
+      opacity: 0;
+      filter: brightness(2.55);
+      pointer-events: none;
+    }
+
+    .intro-shell {
+      width: min(980px, 100%);
+      display: grid;
+      justify-items: center;
+      gap: 16px;
+      text-align: center;
+    }
+
+    .intro-logo {
+      width: min(820px, 92vw);
+      max-height: 48vh;
+      object-fit: contain;
+      border-radius: 10px;
+      box-shadow:
+        0 0 42px rgba(102, 241, 255, 0.24),
+        0 28px 90px rgba(0, 0, 0, 0.58);
+      opacity: 1;
+      transform: scale(1);
+      transition:
+        opacity 1900ms ease,
+        transform 1900ms ease,
+        filter 1900ms ease;
+    }
+
+    .intro-title {
+      margin: 0;
+      font-size: clamp(34px, 7vw, 76px);
+      font-weight: 900;
+      letter-spacing: 0;
+      color: #75f6ff;
+      text-shadow:
+        0 0 12px rgba(117, 246, 255, 0.88),
+        0 0 34px rgba(38, 208, 124, 0.38);
+      opacity: 1;
+      transform: scale(1);
+      transition:
+        opacity 1900ms ease,
+        transform 1900ms ease,
+        filter 1900ms ease;
+    }
+
+    .intro.outro .intro-logo,
+    .intro.outro .intro-title {
+      opacity: 0;
+      transform: scale(1.05);
+      filter: brightness(2.9) saturate(1.3);
+    }
+
+    .speech {
+      position: fixed;
+      left: 50%;
+      top: 42%;
+      z-index: 6;
+      max-width: min(320px, calc(100vw - 36px));
+      padding: 12px 14px;
+      border: 1px solid rgba(83, 72, 62, 0.18);
+      border-radius: 10px;
+      color: #2b2722;
+      background: rgba(255, 252, 244, 0.94);
+      box-shadow: 0 12px 28px rgba(44, 36, 28, 0.16);
+      opacity: 0;
+      transform: translate(-50%, 8px);
+      transition: opacity 220ms ease, transform 220ms ease;
+      pointer-events: none;
+      font-weight: 700;
+    }
+
+    .speech.visible {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    .shop-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(37, 34, 31, 0.36);
+    }
+
+    .shop-overlay.hidden {
+      display: none;
+    }
+
+    .shop-panel {
+      width: min(860px, calc(100vw - 40px));
+      max-height: min(720px, calc(100vh - 40px));
+      overflow: auto;
+      padding: 24px;
+      border: 1px solid rgba(83, 72, 62, 0.18);
+      border-radius: 10px;
+      color: #2b2722;
+      background: rgba(255, 252, 244, 0.96);
+      box-shadow: 0 14px 34px rgba(44, 36, 28, 0.18);
+    }
+
+    .shop-panel h2 {
+      margin: 0;
+      font-size: clamp(28px, 5vw, 46px);
+      text-align: center;
+    }
+
+    .shop-balance {
+      margin: 8px 0 18px;
+      text-align: center;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .shop-section {
+      margin-top: 18px;
+    }
+
+    .shop-section h3 {
+      margin: 0 0 10px;
+      font-size: 20px;
+    }
+
+    .shop-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+    }
+
+    .shop-card {
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid rgba(83, 72, 62, 0.16);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.46);
+    }
+
+    .shop-card.active {
+      border-color: rgba(63, 111, 84, 0.72);
+      box-shadow: inset 0 0 0 1px rgba(63, 111, 84, 0.36);
+    }
+
+    .shop-preview {
+      height: 62px;
+      border-radius: 8px;
+      border: 1px solid rgba(83, 72, 62, 0.16);
+      background: var(--preview);
+    }
+
+    .shop-name {
+      font-weight: 800;
+    }
+
+    .shop-price {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .shop-card button {
+      width: 100%;
+      min-height: 36px;
+      padding: 8px 10px;
+    }
+
+    .close-shop {
+      display: block;
+      margin: 20px auto 0;
+      width: 58px;
+      height: 58px;
+      min-height: 58px;
+      padding: 0;
+      border-radius: 50%;
+      font-size: 34px;
+      line-height: 1;
+      color: #f7fff8;
+      background: var(--accent-dark);
+    }
+
+    .admin-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 32;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(37, 34, 31, 0.42);
+    }
+
+    .admin-overlay.hidden {
+      display: none;
+    }
+
+    .admin-panel {
+      width: min(520px, calc(100vw - 40px));
+      padding: 18px;
+      border: 1px solid rgba(83, 72, 62, 0.18);
+      border-radius: 10px;
+      color: #2b2722;
+      background: rgba(255, 252, 244, 0.97);
+      box-shadow: 0 14px 34px rgba(44, 36, 28, 0.20);
+    }
+
+    .admin-panel h2 {
+      margin: 0 0 12px;
+      text-align: center;
+      font-size: 28px;
+    }
+
+    .admin-field {
+      display: grid;
+      gap: 6px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .admin-field input {
+      width: 100%;
+      min-height: 40px;
+      padding: 9px 10px;
+      border: 1px solid rgba(83, 72, 62, 0.22);
+      border-radius: 8px;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.72);
+      font: inherit;
+    }
+
+    .admin-actions,
+    .admin-toggles {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .admin-toggles label {
+      flex: 1 1 190px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px;
+      border-radius: 8px;
+      background: rgba(91, 78, 63, 0.08);
+      font-weight: 800;
+    }
+
+    .admin-message {
+      min-height: 22px;
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-weight: 700;
+      text-align: center;
+    }
+
+    @media (max-width: 760px) {
+      .hud {
+        flex-direction: column;
+      }
+
+      .status,
+      .controls {
+        width: 100%;
+        min-width: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="renderCanvas"></canvas>
+
+  <div class="hud">
+    <section class="panel status">
+      <h1>3D Bardak Oyunu</h1>
+      <p id="message">Başlat'a bas. Top gösterilecek, bardaklar karışacak, sonra doğru bardağı seç.</p>
+      <div class="score">
+        <span>Puan: <strong id="points">0</strong></span>
+        <span>Süre: <strong id="timer">--</strong></span>
+      </div>
+    </section>
+
+    <section class="panel controls">
+      <div class="row">
+        <button id="startButton" type="button">Başlat</button>
+        <button id="raceButton" type="button">Yarışma Modu</button>
+        <button id="shopButton" type="button">Dükkan</button>
+        <button id="adminButton" type="button">Yönetici</button>
+      </div>
+      <div class="row" style="margin-top: 8px;">
+        <button class="mode" type="button" data-mode="easy">Kolay</button>
+        <button class="mode active" type="button" data-mode="hard">Zor</button>
+        <button class="mode" type="button" data-mode="impossible">İmkansız</button>
+      </div>
+      <p class="tip">Karıştırma bitince bardağa tıkla.</p>
+    </section>
+  </div>
+
+  <div class="loading" id="loading">Babylon.js yükleniyor...</div>
+  <div class="speech" id="speechBubble"></div>
+  <div class="shop-overlay hidden" id="shopPanel">
+    <div class="shop-panel">
+      <h2>Dükkan</h2>
+      <div class="shop-balance">Puan: <strong id="shopPoints">0</strong></div>
+      <div id="shopItems"></div>
+      <button class="close-shop" id="closeShopButton" type="button" aria-label="Dükkanı kapat">×</button>
+    </div>
+  </div>
+
+  <div class="admin-overlay hidden" id="adminPanel">
+    <div class="admin-panel">
+      <h2>Yönetici Bölmesi</h2>
+      <div id="adminLogin">
+        <label class="admin-field">
+          Şifre
+          <input id="adminPassword" type="password" autocomplete="off">
+        </label>
+        <div class="admin-actions">
+          <button id="adminLoginButton" type="button">Giriş</button>
+          <button id="closeAdminButton" type="button">Kapat</button>
+        </div>
+      </div>
+      <div id="adminControls" class="hidden">
+        <label class="admin-field">
+          Puan
+          <input id="adminPointsInput" type="number" min="0" step="1" value="100">
+        </label>
+        <div class="admin-actions">
+          <button id="adminSetPointsButton" type="button">Puanı Yap</button>
+          <button id="adminAddPointsButton" type="button">Puan Ekle</button>
+        </div>
+        <div class="admin-toggles">
+          <label><input id="adminForceCorrect" type="checkbox"> Yanlış seçsem de doğru</label>
+          <label><input id="adminOwnAll" type="checkbox"> Dükkandaki her şeye sahip ol</label>
+        </div>
+        <div class="admin-actions">
+          <button id="closeAdminControlsButton" type="button">Kapat</button>
+        </div>
+      </div>
+      <p class="admin-message" id="adminMessage"></p>
+    </div>
+  </div>
+
+  <div class="intro" id="introScreen">
+    <div class="intro-shell">
+      <img class="intro-logo" id="introLogo" src="./assets/hakorocks_studios.png?v=2" alt="Hakorocks Studios">
+      <h2 class="intro-title">HAKOROCKS STUDIOS</h2>
+    </div>
+  </div>
+
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  <script>
+    const canvas = document.querySelector("#renderCanvas");
+    const loading = document.querySelector("#loading");
+    const introScreen = document.querySelector("#introScreen");
+    const introLogo = document.querySelector("#introLogo");
+    const speechBubble = document.querySelector("#speechBubble");
+    const message = document.querySelector("#message");
+    const startButton = document.querySelector("#startButton");
+    const raceButton = document.querySelector("#raceButton");
+    const shopButton = document.querySelector("#shopButton");
+    const shopPanel = document.querySelector("#shopPanel");
+    const shopItems = document.querySelector("#shopItems");
+    const shopPoints = document.querySelector("#shopPoints");
+    const closeShopButton = document.querySelector("#closeShopButton");
+    const adminButton = document.querySelector("#adminButton");
+    const adminPanel = document.querySelector("#adminPanel");
+    const adminLogin = document.querySelector("#adminLogin");
+    const adminControls = document.querySelector("#adminControls");
+    const adminPassword = document.querySelector("#adminPassword");
+    const adminLoginButton = document.querySelector("#adminLoginButton");
+    const closeAdminButton = document.querySelector("#closeAdminButton");
+    const closeAdminControlsButton = document.querySelector("#closeAdminControlsButton");
+    const adminPointsInput = document.querySelector("#adminPointsInput");
+    const adminSetPointsButton = document.querySelector("#adminSetPointsButton");
+    const adminAddPointsButton = document.querySelector("#adminAddPointsButton");
+    const adminForceCorrect = document.querySelector("#adminForceCorrect");
+    const adminOwnAll = document.querySelector("#adminOwnAll");
+    const adminMessage = document.querySelector("#adminMessage");
+    const pointsLabel = document.querySelector("#points");
+    const timerLabel = document.querySelector("#timer");
+    const modeButtons = Array.from(document.querySelectorAll(".mode"));
+
+    const difficulty = {
+      easy: { label: "Kolay", swaps: [8, 12], moveMs: 560, revealMs: 1300 },
+      hard: { label: "Zor", swaps: [13, 18], moveMs: 390, revealMs: 1050 },
+      impossible: { label: "İmkansız", swaps: [22, 31], moveMs: 220, revealMs: 760 }
+    };
+
+    const shopCategories = [
+      { key: "background", label: "Arka Planlar" },
+      { key: "ball", label: "Toplar" },
+      { key: "cup", label: "Bardaklar" },
+      { key: "costume", label: "Kostümler" }
+    ];
+
+    const shopCatalog = {
+      background: [
+        {
+          id: "classic",
+          name: "Klasik Masa",
+          price: 0,
+          preview: "linear-gradient(135deg, #d8d2c7, #8a6f58)",
+          colors: { clear: "#d8d2c7ff", page: "#d8d2c7", table: "#705844", tableTop: "#8a6f58", wall: "#c9c0b4", floor: "#beb4a6" }
+        },
+        {
+          id: "circus",
+          name: "Palyaço Sirki",
+          price: 6,
+          preview: "repeating-linear-gradient(135deg, #ff5d73 0 16px, #fff3c4 16px 32px)",
+          colors: { clear: "#fff3c4ff", page: "#fff3c4", table: "#d84358", tableTop: "#ff7589", wall: "#ffe08a", floor: "#f5b85b" }
+        },
+        {
+          id: "cat_room",
+          name: "Kedi Odası",
+          price: 10,
+          preview: "linear-gradient(135deg, #ffd5e5, #ffb36b 55%, #8fdcff)",
+          colors: { clear: "#ffd5e5ff", page: "#ffd5e5", table: "#9b6b4c", tableTop: "#c98d62", wall: "#ffe9f1", floor: "#f0b56f" }
+        },
+        {
+          id: "pirate_cave",
+          name: "Korsan Mağarası",
+          price: 14,
+          preview: "linear-gradient(135deg, #2a1b14, #8c5b2d 55%, #ffd35a)",
+          colors: { clear: "#2a1b14ff", page: "#2a1b14", table: "#5e321c", tableTop: "#8c5b2d", wall: "#3a251b", floor: "#6a452c" }
+        },
+        {
+          id: "space",
+          name: "Uzay İstasyonu",
+          price: 18,
+          preview: "linear-gradient(135deg, #0b1020, #5a6cff 55%, #8fdcff)",
+          colors: { clear: "#0b1020ff", page: "#0b1020", table: "#252b46", tableTop: "#343b63", wall: "#111832", floor: "#1d2440" }
+        }
+      ],
+      ball: [
+        { id: "blue", name: "Açık Mavi Top", price: 0, preview: "linear-gradient(135deg, #8fdcff, #d9f5ff)", color: "#8fdcff", glow: "#0b2d3a" },
+        { id: "clown_nose", name: "Palyaço Burnu", price: 5, preview: "radial-gradient(circle, #ff3d4f 0 36%, #fff3c4 38% 100%)", color: "#ff3d4f", glow: "#4a0b0b" },
+        { id: "yarn", name: "Kedi Yumağı", price: 9, preview: "repeating-linear-gradient(45deg, #ff8fc7 0 9px, #ffd5e5 9px 18px)", color: "#ff8fc7", glow: "#4a1232" },
+        { id: "gold_fish", name: "Altın Balık Topu", price: 12, preview: "linear-gradient(135deg, #ff9f1c, #ffe08a)", color: "#ff9f1c", glow: "#4a2a00" },
+        { id: "planet", name: "Gezegen Topu", price: 16, preview: "linear-gradient(135deg, #5a6cff, #8fdcff 55%, #ffd35a)", color: "#5a6cff", glow: "#121a54" }
+      ],
+      cup: [
+        { id: "cream", name: "Krem", price: 0, preview: "linear-gradient(135deg, #e6e0d7, #f6f1e8)", body: "#e6e0d7", rim: "#f6f1e8", shadow: "#8f887d" },
+        { id: "clown_cup", name: "Palyaço Bardağı", price: 7, preview: "repeating-linear-gradient(90deg, #ff3d4f 0 14px, #fff3c4 14px 28px)", body: "#ff3d4f", rim: "#fff3c4", shadow: "#8f2630" },
+        { id: "cat_paw", name: "Kedi Patisi", price: 11, preview: "linear-gradient(135deg, #ff8fc7, #fff0f7)", body: "#ff8fc7", rim: "#fff0f7", shadow: "#a75a82" },
+        { id: "pirate_barrel", name: "Korsan Fıçısı", price: 15, preview: "linear-gradient(135deg, #6b3d22, #d2a36b)", body: "#6b3d22", rim: "#d2a36b", shadow: "#3d2417" },
+        { id: "space_cup", name: "Uzay Bardağı", price: 19, preview: "linear-gradient(135deg, #1d2433, #64fff4)", body: "#1d2433", rim: "#64fff4", shadow: "#0e141f" }
+      ],
+      costume: [
+        { id: "dealer", name: "Klasik", price: 0, preview: "linear-gradient(135deg, #6f7e72, #56675c)", body: "#6f7e72", shirt: "#56675c", pants: "#4d5660", shoes: "#3d3833", hair: "#2c2b31" },
+        { id: "clown", name: "Palyaço", price: 8, preview: "linear-gradient(135deg, #ff3d4f, #fff3c4 45%, #3fa7ff)", body: "#ff3d4f", shirt: "#fff3c4", pants: "#3fa7ff", shoes: "#25221f", hair: "#ff8a00", accessory: "clown" },
+        { id: "cat", name: "Kedi", price: 13, preview: "linear-gradient(135deg, #2c2b31, #ff8fc7)", body: "#3d3a42", shirt: "#2c2b31", pants: "#4f4755", shoes: "#25221f", hair: "#2c2b31", accessory: "cat" },
+        { id: "pirate", name: "Korsan", price: 17, preview: "linear-gradient(135deg, #3d2417, #ffd35a)", body: "#6b241f", shirt: "#3d2417", pants: "#2d3239", shoes: "#181512", hair: "#1f1b17", accessory: "pirate" },
+        { id: "astronaut", name: "Astronot", price: 22, preview: "linear-gradient(135deg, #eef2f5, #55d6ff)", body: "#eef2f5", shirt: "#c7d1db", pants: "#8b98a8", shoes: "#596371", hair: "#39424e", accessory: "space" }
+      ]
+    };
+
+    const playerWinLines = [
+      "Tüh be...",
+      "Şeyy ama sen hile yaptın.",
+      "Şeyyyy sen yanlış görmüşsün, ben kazandım.",
+      "Ne? Ağlamıyorum."
+    ];
+
+    const dealerWinLines = [
+      "Onu nasıl göremiyorsun, kör müsün?",
+      "Onu bebek bile doğru bilir.",
+      "Sen göz doktoruna git.",
+      "Çok güldüm ya."
+    ];
+
+    const slotX = [-3.2, 0, 3.2];
+    const cupNodes = [];
+    const materialRefs = {
+      cupBodies: [],
+      cupRims: [],
+      cupShadows: [],
+      ball: null,
+      table: null,
+      tableTop: null,
+      wall: null,
+      floor: null,
+      costume: null
+    };
+    const scoreStorageKey = "hakorocks-bardak-score";
+    const shopStorageKey = "hakorocks-bardak-shop";
+    const adminStorageKey = "hakorocks-bardak-admin";
+    const adminPasswordValue = "YÖNETİCİBÖLMEŞİ3696793401";
+    let engine;
+    let scene;
+    let camera;
+    let ball;
+    let discoBalls = [];
+    let playerRig;
+    let tablePlayButton;
+    let handRig;
+    let characterParts;
+    let selectedMode = "hard";
+    let positions = [0, 1, 2];
+    let ballCup = 0;
+    let isChoosing = false;
+    let isRoundRunning = false;
+    let raceActive = false;
+    let raceTimerSlow = false;
+    let raceTimeLeft = 60;
+    let raceInterval;
+    let score = loadScore();
+    let shopState = loadShopState();
+    let adminState = loadAdminState();
+    let characterMood = "idle";
+
+    function loadScore() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(scoreStorageKey));
+        if (!saved || typeof saved.points !== "number") {
+          return { wins: 0, losses: 0, points: 0 };
+        }
+
+        return {
+          wins: typeof saved.wins === "number" ? saved.wins : 0,
+          losses: typeof saved.losses === "number" ? saved.losses : 0,
+          points: saved.points
+        };
+      } catch (error) {
+        return { wins: 0, losses: 0, points: 0 };
+      }
+    }
+
+    function saveScore() {
+      localStorage.setItem(scoreStorageKey, JSON.stringify(score));
+    }
+
+    function defaultShopState() {
+      return {
+        owned: {
+          background: ["classic"],
+          ball: ["blue"],
+          cup: ["cream"],
+          costume: ["dealer"]
+        },
+        equipped: {
+          background: "classic",
+          ball: "blue",
+          cup: "cream",
+          costume: "dealer"
+        }
+      };
+    }
+
+    function loadShopState() {
+      const fallback = defaultShopState();
+
+      try {
+        const saved = JSON.parse(localStorage.getItem(shopStorageKey));
+        if (!saved || !saved.owned || !saved.equipped) {
+          return fallback;
+        }
+
+        shopCategories.forEach(category => {
+          const key = category.key;
+          const validIds = shopCatalog[key].map(item => item.id);
+          if (!Array.isArray(saved.owned[key])) {
+            saved.owned[key] = fallback.owned[key].slice();
+          }
+          saved.owned[key] = saved.owned[key].filter(id => validIds.includes(id));
+          if (validIds.includes(fallback.equipped[key]) && !saved.owned[key].includes(fallback.equipped[key])) {
+            saved.owned[key].push(fallback.equipped[key]);
+          }
+          if (!validIds.includes(saved.equipped[key]) || !saved.owned[key].includes(saved.equipped[key])) {
+            saved.equipped[key] = fallback.equipped[key];
+          }
+        });
+
+        return saved;
+      } catch (error) {
+        return fallback;
+      }
+    }
+
+    function saveShopState() {
+      localStorage.setItem(shopStorageKey, JSON.stringify(shopState));
+    }
+
+    function loadAdminState() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(adminStorageKey));
+        if (!saved) {
+          return { forceCorrect: false, ownAll: false };
+        }
+
+        return {
+          forceCorrect: saved.forceCorrect === true,
+          ownAll: saved.ownAll === true
+        };
+      } catch (error) {
+        return { forceCorrect: false, ownAll: false };
+      }
+    }
+
+    function saveAdminState() {
+      localStorage.setItem(adminStorageKey, JSON.stringify(adminState));
+    }
+
+    function wait(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function randomInt(max) {
+      return Math.floor(Math.random() * max);
+    }
+
+    function makeResultLine(kind) {
+      if (kind === "playerWin") {
+        return playerWinLines[randomInt(playerWinLines.length)];
+      }
+
+      return dealerWinLines[randomInt(dealerWinLines.length)];
+    }
+
+    function showSpeech(text) {
+      if (introScreen && !introScreen.classList.contains("hidden")) {
+        return;
+      }
+
+      speechBubble.textContent = text;
+      speechBubble.classList.add("visible");
+
+      if (characterParts && characterParts.mouth) {
+        characterParts.mouth.scaling.y = 0.72;
+        setTimeout(() => {
+          if (characterParts && characterParts.mouth) {
+            characterParts.mouth.scaling.y = 0.32;
+          }
+        }, 360);
+      }
+
+      clearTimeout(showSpeech.hideTimer);
+      showSpeech.hideTimer = setTimeout(() => {
+        speechBubble.classList.remove("visible");
+      }, 6500);
+    }
+
+    function getShopItem(category, id) {
+      return shopCatalog[category].find(item => item.id === id) || shopCatalog[category][0];
+    }
+
+    function ownsShopItem(category, id) {
+      return adminState.ownAll || shopState.owned[category].includes(id);
+    }
+
+    function syncEquippedItemsToOwned() {
+      shopCategories.forEach(category => {
+        const key = category.key;
+        if (!shopState.equipped[key]) {
+          return;
+        }
+        if (!shopState.owned[key].includes(shopState.equipped[key])) {
+          shopState.equipped[key] = defaultShopState().equipped[key];
+        }
+      });
+      saveShopState();
+    }
+
+    function renderShop() {
+      shopPoints.textContent = score.points;
+      shopItems.innerHTML = "";
+
+      shopCategories.forEach(category => {
+        const section = document.createElement("section");
+        section.className = "shop-section";
+
+        const title = document.createElement("h3");
+        title.textContent = category.label;
+        section.appendChild(title);
+
+        const grid = document.createElement("div");
+        grid.className = "shop-grid";
+
+        shopCatalog[category.key].forEach(item => {
+          const owned = ownsShopItem(category.key, item.id);
+          const equipped = shopState.equipped[category.key] === item.id;
+
+          const card = document.createElement("article");
+          card.className = `shop-card${equipped ? " active" : ""}`;
+
+          const preview = document.createElement("div");
+          preview.className = "shop-preview";
+          preview.style.setProperty("--preview", item.preview);
+
+          const name = document.createElement("div");
+          name.className = "shop-name";
+          name.textContent = item.name;
+
+          const price = document.createElement("div");
+          price.className = "shop-price";
+          price.textContent = item.price === 0 ? "Ücretsiz" : `${item.price} puan`;
+
+          const action = document.createElement("button");
+          action.type = "button";
+
+          if (equipped) {
+            action.textContent = "Seçili";
+            action.disabled = true;
+          } else if (owned) {
+            action.textContent = "Seç";
+            action.addEventListener("click", () => equipShopItem(category.key, item.id));
+          } else {
+            action.textContent = score.points >= item.price ? "Al" : "Puan yetmez";
+            action.disabled = score.points < item.price;
+            action.addEventListener("click", () => buyShopItem(category.key, item.id));
+          }
+
+          card.append(preview, name, price, action);
+          grid.appendChild(card);
+        });
+
+        section.appendChild(grid);
+        shopItems.appendChild(section);
+      });
+    }
+
+    function buyShopItem(category, id) {
+      const item = getShopItem(category, id);
+      if (ownsShopItem(category, id) || score.points < item.price) {
+        return;
+      }
+
+      score.points -= item.price;
+      shopState.owned[category].push(id);
+      shopState.equipped[category] = id;
+      saveShopState();
+      updateScoreLabels();
+      applyEquippedThemes();
+      renderShop();
+    }
+
+    function equipShopItem(category, id) {
+      if (!ownsShopItem(category, id)) {
+        return;
+      }
+
+      shopState.equipped[category] = id;
+      saveShopState();
+      applyEquippedThemes();
+      renderShop();
+    }
+
+    function openAdminPanel() {
+      adminPanel.classList.remove("hidden");
+      adminMessage.textContent = "";
+      adminPassword.value = "";
+      adminLogin.classList.remove("hidden");
+      adminControls.classList.add("hidden");
+      adminPassword.focus();
+    }
+
+    function closeAdminPanel() {
+      adminPanel.classList.add("hidden");
+    }
+
+    function showAdminControls() {
+      adminLogin.classList.add("hidden");
+      adminControls.classList.remove("hidden");
+      adminForceCorrect.checked = adminState.forceCorrect;
+      adminOwnAll.checked = adminState.ownAll;
+      adminPointsInput.value = Math.max(0, score.points);
+      adminMessage.textContent = "Yönetici özellikleri açık.";
+    }
+
+    function loginAdmin() {
+      if (adminPassword.value !== adminPasswordValue) {
+        adminMessage.textContent = "Şifre yanlış.";
+        return;
+      }
+
+      showAdminControls();
+    }
+
+    function setAdminPoints() {
+      const value = Math.max(0, Math.floor(Number(adminPointsInput.value) || 0));
+      score.points = value;
+      updateScoreLabels();
+      renderShop();
+      adminMessage.textContent = `Puan ${value} yapıldı.`;
+    }
+
+    function addAdminPoints() {
+      const value = Math.max(0, Math.floor(Number(adminPointsInput.value) || 0));
+      score.points += value;
+      updateScoreLabels();
+      renderShop();
+      adminMessage.textContent = `${value} puan eklendi.`;
+    }
+
+    function setAdminForceCorrect(enabled) {
+      adminState.forceCorrect = enabled;
+      saveAdminState();
+      adminMessage.textContent = enabled ? "Yanlış seçimler doğru sayılacak." : "Yanlış seçimler artık yanlış sayılacak.";
+    }
+
+    function setAdminOwnAll(enabled) {
+      adminState.ownAll = enabled;
+      if (!enabled) {
+        syncEquippedItemsToOwned();
+      }
+      saveAdminState();
+      applyEquippedThemes();
+      renderShop();
+      adminMessage.textContent = enabled ? "Dükkandaki her şey açıldı." : "Dükkan sahipliği normale döndü.";
+    }
+
+    function setMaterialColor(material, color, emissiveColor) {
+      if (!material) {
+        return;
+      }
+
+      material.albedoColor = BABYLON.Color3.FromHexString(color);
+      material.emissiveColor = emissiveColor ? BABYLON.Color3.FromHexString(emissiveColor) : BABYLON.Color3.Black();
+    }
+
+    function applyEquippedThemes() {
+      if (!scene) {
+        return;
+      }
+
+      const background = getShopItem("background", shopState.equipped.background);
+      const ballTheme = getShopItem("ball", shopState.equipped.ball);
+      const cupTheme = getShopItem("cup", shopState.equipped.cup);
+      const costume = getShopItem("costume", shopState.equipped.costume);
+
+      scene.clearColor = BABYLON.Color4.FromHexString(background.colors.clear);
+      document.body.style.background = background.colors.page;
+      setMaterialColor(materialRefs.table, background.colors.table);
+      setMaterialColor(materialRefs.tableTop, background.colors.tableTop);
+      setMaterialColor(materialRefs.wall, background.colors.wall);
+      setMaterialColor(materialRefs.floor, background.colors.floor);
+
+      setMaterialColor(materialRefs.ball, ballTheme.color, ballTheme.glow);
+
+      materialRefs.cupBodies.forEach(material => setMaterialColor(material, cupTheme.body));
+      materialRefs.cupRims.forEach(material => setMaterialColor(material, cupTheme.rim));
+      materialRefs.cupShadows.forEach(material => {
+        setMaterialColor(material, cupTheme.shadow);
+        material.alpha = 0.20;
+      });
+
+      if (materialRefs.costume) {
+        setMaterialColor(materialRefs.costume.body, costume.body);
+        setMaterialColor(materialRefs.costume.shirt, costume.shirt);
+        setMaterialColor(materialRefs.costume.pants, costume.pants);
+        setMaterialColor(materialRefs.costume.shoes, costume.shoes);
+        setMaterialColor(materialRefs.costume.hair, costume.hair);
+        materialRefs.costume.skin.albedoColor = BABYLON.Color3.FromHexString("#d8a686");
+        materialRefs.costume.skin.emissiveColor = BABYLON.Color3.Black();
+
+        if (materialRefs.costume.accessories) {
+          Object.values(materialRefs.costume.accessories).flat().forEach(mesh => {
+            mesh.setEnabled(false);
+          });
+
+          if (costume.accessory && materialRefs.costume.accessories[costume.accessory]) {
+            materialRefs.costume.accessories[costume.accessory].forEach(mesh => {
+              mesh.setEnabled(true);
+            });
+          }
+        }
+      }
+    }
+
+    function createMaterial(name, color, roughness = 0.55, metallic = 0) {
+      const material = new BABYLON.PBRMaterial(name, scene);
+      material.albedoColor = BABYLON.Color3.FromHexString(color);
+      material.roughness = roughness;
+      material.metallic = metallic;
+      return material;
+    }
+
+    function createDiscoBall(name, side) {
+      const root = new BABYLON.TransformNode(name, scene);
+      root.position = new BABYLON.Vector3(side * 6.2, 3.45, -0.25);
+
+      const discoMat = createMaterial(`${name}Mat`, "#dfe8ef", 0.18, 0.55);
+      discoMat.emissiveColor = BABYLON.Color3.FromHexString("#bdefff");
+
+      const sphere = BABYLON.MeshBuilder.CreateSphere(`${name}Sphere`, {
+        diameter: 0.62,
+        segments: 12
+      }, scene);
+      sphere.parent = root;
+      sphere.material = discoMat;
+
+      const bandMat = createMaterial(`${name}BandMat`, "#7aa8b8", 0.22, 0.35);
+      [-0.18, 0, 0.18].forEach((y, index) => {
+        const band = BABYLON.MeshBuilder.CreateTorus(`${name}Band${index}`, {
+          diameter: 0.64,
+          thickness: 0.018,
+          tessellation: 36
+        }, scene);
+        band.parent = root;
+        band.position.y = y;
+        band.rotation.x = Math.PI / 2;
+        band.material = bandMat;
+      });
+
+      const colors = ["#ff3d4f", "#ffd35a", "#60d394", "#55d6ff", "#9b6bff", "#ff8fc7"];
+      colors.forEach((color, index) => {
+        const lightMat = createMaterial(`${name}ColorMat${index}`, color, 0.28, 0.15);
+        lightMat.emissiveColor = BABYLON.Color3.FromHexString(color);
+        const dot = BABYLON.MeshBuilder.CreateSphere(`${name}ColorDot${index}`, {
+          diameter: 0.105,
+          segments: 12
+        }, scene);
+        const angle = index / colors.length * Math.PI * 2;
+        dot.parent = root;
+        dot.position = new BABYLON.Vector3(Math.cos(angle) * 0.32, Math.sin(angle * 2) * 0.16, Math.sin(angle) * 0.32);
+        dot.material = lightMat;
+      });
+
+      const light = new BABYLON.PointLight(`${name}Light`, new BABYLON.Vector3(side * 1.6, 2.7, -0.5), scene);
+      light.diffuse = side < 0 ? BABYLON.Color3.FromHexString("#ff5d73") : BABYLON.Color3.FromHexString("#55d6ff");
+      light.specular = light.diffuse;
+      light.intensity = 0;
+      light.range = 5.2;
+      root.metadata = { side, light };
+      root.setEnabled(false);
+      return root;
+    }
+
+    function createDiscoBalls() {
+      return [
+        createDiscoBall("leftDiscoBall", -1),
+        createDiscoBall("rightDiscoBall", 1)
+      ];
+    }
+
+    function createTablePlayButton() {
+      const root = new BABYLON.TransformNode("tablePlayButtonRoot", scene);
+      root.position = new BABYLON.Vector3(0, 0.12, -1.35);
+
+      const baseMat = createMaterial("tablePlayButtonMat", "#4f8bd9", 0.42, 0);
+      baseMat.emissiveColor = BABYLON.Color3.FromHexString("#0c2341");
+      const button = BABYLON.MeshBuilder.CreateBox("tablePlayButton", {
+        width: 1.08,
+        height: 0.16,
+        depth: 0.50
+      }, scene);
+      button.parent = root;
+      button.material = baseMat;
+      button.metadata = { playButton: true };
+
+      const labelTexture = new BABYLON.DynamicTexture("playButtonLabelTexture", { width: 512, height: 256 }, scene, true);
+      labelTexture.drawText("OYNA", null, 154, "bold 92px Arial", "#ffffff", "transparent", true);
+      const labelMat = new BABYLON.StandardMaterial("playButtonLabelMat", scene);
+      labelMat.diffuseTexture = labelTexture;
+      labelMat.emissiveTexture = labelTexture;
+      labelMat.specularColor = BABYLON.Color3.Black();
+      const label = BABYLON.MeshBuilder.CreatePlane("tablePlayButtonLabel", {
+        width: 0.92,
+        height: 0.34
+      }, scene);
+      label.parent = root;
+      label.position = new BABYLON.Vector3(0, 0.091, -0.01);
+      label.rotation.x = Math.PI / 2;
+      label.material = labelMat;
+      label.metadata = { playButton: true };
+
+      return root;
+    }
+
+    function createPlayerRig(skinMat) {
+      const home = new BABYLON.Vector3(5.10, 0.86, -2.62);
+      const shoulderHome = new BABYLON.Vector3(5.58, 1.18, -2.70);
+      const sleeveMat = createMaterial("playerSleeveMat", "#4f8bd9", 0.72, 0);
+      const shoulder = BABYLON.MeshBuilder.CreateSphere("playerShoulder", {
+        diameter: 0.26,
+        segments: 18
+      }, scene);
+      shoulder.position = shoulderHome.clone();
+      shoulder.material = sleeveMat;
+
+      const elbow = BABYLON.MeshBuilder.CreateSphere("playerElbow", {
+        diameter: 0.22,
+        segments: 18
+      }, scene);
+      elbow.position = new BABYLON.Vector3(4.70, 1.02, -2.58);
+      elbow.material = skinMat;
+
+      const upperArm = BABYLON.MeshBuilder.CreateCylinder("playerUpperArm", {
+        height: 1,
+        diameter: 0.18,
+        tessellation: 24
+      }, scene);
+      upperArm.material = sleeveMat;
+      upperArm.rotationQuaternion = new BABYLON.Quaternion();
+
+      const forearm = BABYLON.MeshBuilder.CreateCylinder("playerForearm", {
+        height: 1,
+        diameter: 0.16,
+        tessellation: 24
+      }, scene);
+      forearm.material = skinMat;
+      forearm.rotationQuaternion = new BABYLON.Quaternion();
+
+      const hand = BABYLON.MeshBuilder.CreateSphere("playerHand", {
+        diameter: 0.30,
+        segments: 24
+      }, scene);
+      hand.position = home.clone();
+      hand.scaling = new BABYLON.Vector3(1.14, 0.74, 0.92);
+      hand.material = skinMat;
+
+      const rig = { home, shoulder, elbow, upperArm, forearm, hand };
+      scene.registerBeforeRender(() => {
+        const middle = rig.shoulder.position.add(rig.hand.position).scale(0.5);
+        rig.elbow.position = middle.add(new BABYLON.Vector3(0.36, 0.18, -0.10));
+        alignCylinderBetween(rig.upperArm, rig.shoulder.position, rig.elbow.position);
+        alignCylinderBetween(rig.forearm, rig.elbow.position, rig.hand.position);
+      });
+      return rig;
+    }
+
+    function movePlayerHandTo(position, duration) {
+      return animateVector(playerRig.hand, "position", position, duration);
+    }
+
+    async function resetPlayerHand(duration = 220) {
+      if (!playerRig) {
+        return;
+      }
+      await movePlayerHandTo(playerRig.home, duration);
+    }
+
+    async function pressTablePlayButton() {
+      if (!playerRig || !tablePlayButton) {
+        return;
+      }
+
+      const target = tablePlayButton.position;
+      await movePlayerHandTo(new BABYLON.Vector3(target.x, 0.86, target.z - 0.38), 180);
+      await Promise.all([
+        movePlayerHandTo(new BABYLON.Vector3(target.x, 0.34, target.z - 0.12), 140),
+        animateVector(tablePlayButton, "position", new BABYLON.Vector3(target.x, 0.05, target.z), 140)
+      ]);
+      await Promise.all([
+        movePlayerHandTo(new BABYLON.Vector3(target.x, 0.86, target.z - 0.38), 160),
+        animateVector(tablePlayButton, "position", new BABYLON.Vector3(target.x, 0.12, target.z), 160)
+      ]);
+      await resetPlayerHand(180);
+    }
+
+    function playerCupHoldPosition(cupIndex, lift) {
+      const cup = cupNodes[cupIndex];
+      return new BABYLON.Vector3(cup.position.x, lift ? 1.92 : 1.58, lift ? -0.88 : -0.72);
+    }
+
+    async function playerLiftCup(cupIndex, lift) {
+      const cup = cupNodes[cupIndex];
+      const startHigh = !lift && cup.position.y > 0.4;
+      await movePlayerHandTo(playerCupHoldPosition(cupIndex, startHigh), 170);
+      await Promise.all([
+        animateVector(cup, "position", cupLiftTarget(cupIndex, lift), 260),
+        movePlayerHandTo(playerCupHoldPosition(cupIndex, lift), 260)
+      ]);
+    }
+
+    function animateVector(target, property, to, duration, easingMode = BABYLON.EasingFunction.EASINGMODE_EASEINOUT) {
+      return new Promise(resolve => {
+        const animation = new BABYLON.Animation(
+          `${target.name}-${property}`,
+          property,
+          60,
+          BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
+          BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+        );
+        const easing = new BABYLON.CubicEase();
+        easing.setEasingMode(easingMode);
+        animation.setEasingFunction(easing);
+        animation.setKeys([
+          { frame: 0, value: target[property].clone() },
+          { frame: Math.max(1, Math.round(duration / 1000 * 60)), value: to.clone() }
+        ]);
+        scene.beginDirectAnimation(target, [animation], 0, Math.max(1, Math.round(duration / 1000 * 60)), false, 1, resolve);
+      });
+    }
+
+    function animateFloat(target, property, to, duration) {
+      return new Promise(resolve => {
+        const animation = new BABYLON.Animation(
+          `${target.name}-${property}`,
+          property,
+          60,
+          BABYLON.Animation.ANIMATIONTYPE_FLOAT,
+          BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT
+        );
+        const easing = new BABYLON.CubicEase();
+        easing.setEasingMode(BABYLON.EasingFunction.EASINGMODE_EASEINOUT);
+        animation.setEasingFunction(easing);
+        animation.setKeys([
+          { frame: 0, value: target[property] },
+          { frame: Math.max(1, Math.round(duration / 1000 * 60)), value: to }
+        ]);
+        scene.beginDirectAnimation(target, [animation], 0, Math.max(1, Math.round(duration / 1000 * 60)), false, 1, resolve);
+      });
+    }
+
+    function createCup(index, x) {
+      const root = new BABYLON.TransformNode(`cupRoot${index}`, scene);
+      root.position = new BABYLON.Vector3(x, 0, 0);
+      root.metadata = { cupIndex: index };
+
+      const cupMat = createMaterial(`cupMat${index}`, "#e6e0d7", 0.72, 0);
+      cupMat.metallic = 0;
+      cupMat.emissiveColor = new BABYLON.Color3(0, 0, 0);
+
+      const darkMat = createMaterial(`cupDark${index}`, "#8f887d", 0.78, 0);
+      const rimMat = createMaterial(`rimMat${index}`, "#f6f1e8", 0.62, 0);
+      materialRefs.cupBodies[index] = cupMat;
+      materialRefs.cupRims[index] = rimMat;
+      materialRefs.cupShadows[index] = darkMat;
+
+      const body = BABYLON.MeshBuilder.CreateCylinder(`cupBody${index}`, {
+        height: 1.55,
+        diameterTop: 0.82,
+        diameterBottom: 1.28,
+        tessellation: 64
+      }, scene);
+      body.parent = root;
+      body.position.y = 0.86;
+      body.material = cupMat;
+      body.metadata = { cupIndex: index };
+
+      const rim = BABYLON.MeshBuilder.CreateTorus(`cupRim${index}`, {
+        diameter: 1.31,
+        thickness: 0.075,
+        tessellation: 72
+      }, scene);
+      rim.parent = root;
+      rim.position.y = 0.08;
+      rim.rotation.x = Math.PI / 2;
+      rim.material = rimMat;
+      rim.metadata = { cupIndex: index };
+
+      const topCap = BABYLON.MeshBuilder.CreateCylinder(`cupTop${index}`, {
+        height: 0.075,
+        diameter: 0.82,
+        tessellation: 64
+      }, scene);
+      topCap.parent = root;
+      topCap.position.y = 1.66;
+      topCap.material = rimMat;
+      topCap.metadata = { cupIndex: index };
+
+      const highlight = BABYLON.MeshBuilder.CreateBox(`cupHighlight${index}`, {
+        width: 0.07,
+        height: 1.18,
+        depth: 0.025
+      }, scene);
+      highlight.parent = root;
+      highlight.position = new BABYLON.Vector3(-0.33, 0.88, -0.61);
+      highlight.rotation.z = -0.10;
+      highlight.material = createMaterial(`cupHighlightMat${index}`, "#ffffff", 0.2, 0);
+      highlight.material.alpha = 0.22;
+      highlight.metadata = { cupIndex: index };
+
+      const baseShadow = BABYLON.MeshBuilder.CreateDisc(`cupShadow${index}`, {
+        radius: 0.75,
+        tessellation: 64
+      }, scene);
+      baseShadow.parent = root;
+      baseShadow.position.y = 0.012;
+      baseShadow.rotation.x = Math.PI / 2;
+      baseShadow.scaling.z = 0.54;
+      baseShadow.material = darkMat;
+      baseShadow.material.alpha = 0.20;
+      baseShadow.isPickable = false;
+
+      return root;
+    }
+
+    function createCostumeAccessories(characterRoot, hairMat) {
+      const redMat = createMaterial("clownNoseMat", "#ff2f48", 0.42, 0);
+      const yellowMat = createMaterial("clownHatMat", "#ffd35a", 0.50, 0);
+      const catMat = createMaterial("catAccessoryMat", "#2c2b31", 0.68, 0);
+      const catInnerMat = createMaterial("catInnerMat", "#ff8fc7", 0.56, 0);
+      const blackMat = createMaterial("pirateBlackMat", "#15120f", 0.70, 0);
+      const spaceMat = createMaterial("spaceAccessoryMat", "#55d6ff", 0.38, 0);
+
+      const add = (mesh, group) => {
+        mesh.parent = characterRoot;
+        mesh.setEnabled(false);
+        group.push(mesh);
+        return mesh;
+      };
+
+      const clown = [];
+      const clownNose = add(BABYLON.MeshBuilder.CreateSphere("clownNose", { diameter: 0.16, segments: 20 }, scene), clown);
+      clownNose.position = new BABYLON.Vector3(0, 2.70, 2.18);
+      clownNose.material = redMat;
+
+      const clownHat = add(BABYLON.MeshBuilder.CreateCylinder("clownHat", {
+        height: 0.50,
+        diameterTop: 0.04,
+        diameterBottom: 0.42,
+        tessellation: 28
+      }, scene), clown);
+      clownHat.position = new BABYLON.Vector3(0, 3.28, 2.68);
+      clownHat.material = yellowMat;
+
+      const clownTop = add(BABYLON.MeshBuilder.CreateSphere("clownHatTop", { diameter: 0.13, segments: 16 }, scene), clown);
+      clownTop.position = new BABYLON.Vector3(0, 3.56, 2.68);
+      clownTop.material = redMat;
+
+      const cat = [];
+      [-0.25, 0.25].forEach((x, index) => {
+        const ear = add(BABYLON.MeshBuilder.CreateCylinder(`catEar${index}`, {
+          height: 0.34,
+          diameterTop: 0.02,
+          diameterBottom: 0.24,
+          tessellation: 3
+        }, scene), cat);
+        ear.position = new BABYLON.Vector3(x, 3.20, 2.67);
+        ear.rotation.z = x < 0 ? 0.22 : -0.22;
+        ear.material = catMat;
+
+        const inner = add(BABYLON.MeshBuilder.CreateCylinder(`catEarInner${index}`, {
+          height: 0.22,
+          diameterTop: 0.01,
+          diameterBottom: 0.13,
+          tessellation: 3
+        }, scene), cat);
+        inner.position = new BABYLON.Vector3(x, 3.20, 2.54);
+        inner.rotation.z = ear.rotation.z;
+        inner.material = catInnerMat;
+      });
+
+      [-1, 1].forEach(side => {
+        [-0.05, 0.05].forEach((yOffset, index) => {
+          const whisker = add(BABYLON.MeshBuilder.CreateBox(`catWhisker${side}-${index}`, {
+            width: 0.34,
+            height: 0.018,
+            depth: 0.018
+          }, scene), cat);
+          whisker.position = new BABYLON.Vector3(side * 0.27, 2.63 + yOffset, 2.17);
+          whisker.rotation.z = side * (index === 0 ? 0.15 : -0.10);
+          whisker.material = catMat;
+        });
+      });
+
+      const pirate = [];
+      const eyePatch = add(BABYLON.MeshBuilder.CreateBox("pirateEyePatch", {
+        width: 0.18,
+        height: 0.12,
+        depth: 0.03
+      }, scene), pirate);
+      eyePatch.position = new BABYLON.Vector3(-0.16, 2.76, 2.17);
+      eyePatch.material = blackMat;
+
+      const eyeBand = add(BABYLON.MeshBuilder.CreateBox("pirateEyeBand", {
+        width: 0.64,
+        height: 0.025,
+        depth: 0.03
+      }, scene), pirate);
+      eyeBand.position = new BABYLON.Vector3(0, 2.79, 2.16);
+      eyeBand.rotation.z = -0.10;
+      eyeBand.material = blackMat;
+
+      const space = [];
+      const antenna = add(BABYLON.MeshBuilder.CreateCylinder("spaceAntenna", {
+        height: 0.42,
+        diameter: 0.035,
+        tessellation: 16
+      }, scene), space);
+      antenna.position = new BABYLON.Vector3(0, 3.30, 2.68);
+      antenna.material = spaceMat;
+
+      const antennaTop = add(BABYLON.MeshBuilder.CreateSphere("spaceAntennaTop", { diameter: 0.13, segments: 16 }, scene), space);
+      antennaTop.position = new BABYLON.Vector3(0, 3.55, 2.68);
+      antennaTop.material = spaceMat;
+
+      return { clown, cat, pirate, space };
+    }
+
+    function createCharacter() {
+      const bodyMat = createMaterial("bodyMat", "#6f7e72", 0.78, 0);
+      const shirtDark = createMaterial("shirtDark", "#56675c", 0.80, 0);
+      const pantsMat = createMaterial("pantsMat", "#4d5660", 0.82, 0);
+      const shoeMat = createMaterial("shoeMat", "#3d3833", 0.82, 0);
+      const skinMat = createMaterial("skinMat", "#d8a686", 0.68, 0);
+      const hairMat = createMaterial("hairMat", "#2c2b31", 0.84, 0);
+      const characterRoot = new BABYLON.TransformNode("dealerCharacter", scene);
+      materialRefs.costume = {
+        body: bodyMat,
+        shirt: shirtDark,
+        pants: pantsMat,
+        shoes: shoeMat,
+        hair: hairMat,
+        skin: skinMat
+      };
+
+      const body = BABYLON.MeshBuilder.CreateBox("dealerBody", {
+        width: 1.28,
+        height: 1.45,
+        depth: 0.54
+      }, scene);
+      body.parent = characterRoot;
+      body.position = new BABYLON.Vector3(0, 1.45, 2.72);
+      body.material = bodyMat;
+
+      const chest = BABYLON.MeshBuilder.CreateBox("dealerChest", {
+        width: 1.38,
+        height: 0.34,
+        depth: 0.58
+      }, scene);
+      chest.parent = characterRoot;
+      chest.position = new BABYLON.Vector3(0, 2.05, 2.70);
+      chest.material = shirtDark;
+
+      const neck = BABYLON.MeshBuilder.CreateCylinder("dealerNeck", {
+        height: 0.24,
+        diameter: 0.30,
+        tessellation: 32
+      }, scene);
+      neck.parent = characterRoot;
+      neck.position = new BABYLON.Vector3(0, 2.32, 2.70);
+      neck.material = skinMat;
+
+      const head = BABYLON.MeshBuilder.CreateSphere("dealerHead", {
+        diameter: 0.70,
+        segments: 32
+      }, scene);
+      head.parent = characterRoot;
+      head.position = new BABYLON.Vector3(0, 2.74, 2.69);
+      head.scaling.y = 1.08;
+      head.material = skinMat;
+
+      const hair = BABYLON.MeshBuilder.CreateSphere("dealerHair", {
+        diameter: 0.74,
+        segments: 32
+      }, scene);
+      hair.parent = characterRoot;
+      hair.position = new BABYLON.Vector3(0, 2.90, 2.68);
+      hair.scaling = new BABYLON.Vector3(1, 0.45, 0.92);
+      hair.material = hairMat;
+
+      const eyeMat = createMaterial("eyeMat", "#15171c", 0.25, 0);
+      [-0.16, 0.16].forEach((x, i) => {
+        const eye = BABYLON.MeshBuilder.CreateSphere(`eye${i}`, { diameter: 0.055, segments: 16 }, scene);
+        eye.parent = characterRoot;
+        eye.position = new BABYLON.Vector3(x, 2.76, 2.35);
+        eye.material = eyeMat;
+      });
+
+      const mouth = BABYLON.MeshBuilder.CreateTorus("dealerMouth", {
+        diameter: 0.16,
+        thickness: 0.012,
+        tessellation: 32
+      }, scene);
+      mouth.parent = characterRoot;
+      mouth.position = new BABYLON.Vector3(0, 2.62, 2.35);
+      mouth.scaling.y = 0.32;
+      mouth.material = createMaterial("mouthMat", "#8a4e3d", 0.48, 0);
+      materialRefs.costume.accessories = createCostumeAccessories(characterRoot, hairMat);
+
+      const tearMat = createMaterial("tearMat", "#63c8ff", 0.25, 0);
+      tearMat.emissiveColor = BABYLON.Color3.FromHexString("#1b79a8");
+      const tears = [-0.15, 0.15].map((x, index) => {
+        const tear = BABYLON.MeshBuilder.CreateSphere(`tear${index}`, {
+          diameter: 0.075,
+          segments: 16
+        }, scene);
+        tear.parent = characterRoot;
+        tear.position = new BABYLON.Vector3(x, 2.60, 2.32);
+        tear.scaling.y = 1.7;
+        tear.material = tearMat;
+        tear.setEnabled(false);
+        return tear;
+      });
+
+      [-0.30, 0.30].forEach((x, index) => {
+        const leg = BABYLON.MeshBuilder.CreateCylinder(`leg${index}`, {
+          height: 1.02,
+          diameter: 0.24,
+          tessellation: 24
+        }, scene);
+        leg.parent = characterRoot;
+        leg.position = new BABYLON.Vector3(x, 0.42, 2.72);
+        leg.material = pantsMat;
+
+        const foot = BABYLON.MeshBuilder.CreateBox(`foot${index}`, {
+          width: 0.34,
+          height: 0.14,
+          depth: 0.48
+        }, scene);
+        foot.parent = characterRoot;
+        foot.position = new BABYLON.Vector3(x, -0.13, 2.52);
+        foot.material = shoeMat;
+      });
+
+      handRig = {
+        left: createArm("left", new BABYLON.Vector3(-0.74, 2.03, 2.65), skinMat, shirtDark, -1),
+        right: createArm("right", new BABYLON.Vector3(0.74, 2.03, 2.65), skinMat, shirtDark, 1)
+      };
+      playerRig = createPlayerRig(skinMat);
+
+      characterParts = { root: characterRoot, head, body, chest, mouth, tears };
+
+      scene.registerBeforeRender(() => {
+        const t = performance.now() * 0.001;
+        const dancing = isChoosing || characterMood === "dance";
+        const crying = characterMood === "cry";
+
+        characterRoot.position.y = dancing ? Math.abs(Math.sin(t * 8.5)) * 0.085 : Math.sin(t * 1.7) * 0.025;
+        body.rotation.z = dancing ? Math.sin(t * 7.5) * 0.10 : 0;
+        chest.rotation.z = dancing ? Math.sin(t * 7.5) * 0.12 : 0;
+        head.rotation.y = dancing ? Math.sin(t * 8.5) * 0.18 : Math.sin(t * 0.85) * 0.08;
+        head.rotation.z = crying ? -0.10 : (dancing ? Math.sin(t * 9.5) * 0.15 : 0);
+        if (crying) {
+          mouth.scaling.y = 0.92;
+        }
+        tears.forEach((tear, index) => {
+          tear.setEnabled(crying);
+          if (crying) {
+            tear.position.y = 2.58 - ((t * 0.55 + index * 0.12) % 0.18);
+          }
+        });
+
+        if (crying && handRig) {
+          handRig.left.hand.position.x = -0.22;
+          handRig.left.hand.position.y = 2.70;
+          handRig.left.hand.position.z = 2.20;
+          handRig.right.hand.position.x = 0.22;
+          handRig.right.hand.position.y = 2.70;
+          handRig.right.hand.position.z = 2.20;
+        } else if (dancing && handRig) {
+          handRig.left.hand.position.x = -1.05 + Math.sin(t * 7.4) * 0.24;
+          handRig.left.hand.position.y = 2.35 + Math.sin(t * 9.2) * 0.12;
+          handRig.left.hand.position.z = -0.38;
+          handRig.right.hand.position.x = 1.05 + Math.sin(t * 7.4 + Math.PI) * 0.24;
+          handRig.right.hand.position.y = 2.35 + Math.sin(t * 9.2 + Math.PI) * 0.12;
+          handRig.right.hand.position.z = -0.38;
+        }
+
+        discoBalls.forEach((disco, index) => {
+          if (!disco.isEnabled()) {
+            return;
+          }
+
+          disco.rotation.y += 0.035 + index * 0.01;
+          if (disco.metadata && disco.metadata.light) {
+            disco.metadata.light.position.x = disco.position.x + Math.sin(t * 3.2 + index) * 1.2;
+            disco.metadata.light.position.y = disco.position.y + Math.cos(t * 2.4 + index) * 0.5;
+            disco.metadata.light.intensity = 1.3 + Math.sin(t * 5 + index) * 0.45;
+          }
+        });
+
+        updateConnectedArm(handRig.left);
+        updateConnectedArm(handRig.right);
+      });
+    }
+
+    function createArm(side, shoulder, skinMat, sleeveMat, bendSide) {
+      const upper = BABYLON.MeshBuilder.CreateCylinder(`${side}UpperArm`, {
+        height: 1,
+        diameter: 0.18,
+        tessellation: 24
+      }, scene);
+      upper.material = sleeveMat;
+      upper.rotationQuaternion = new BABYLON.Quaternion();
+
+      const lower = BABYLON.MeshBuilder.CreateCylinder(`${side}Forearm`, {
+        height: 1,
+        diameter: 0.14,
+        tessellation: 24
+      }, scene);
+      lower.material = skinMat;
+      lower.rotationQuaternion = new BABYLON.Quaternion();
+
+      const shoulderBall = BABYLON.MeshBuilder.CreateSphere(`${side}Shoulder`, {
+        diameter: 0.24,
+        segments: 20
+      }, scene);
+      shoulderBall.position = shoulder.clone();
+      shoulderBall.material = sleeveMat;
+
+      const hand = BABYLON.MeshBuilder.CreateSphere(`${side}Hand`, {
+        diameter: 0.28,
+        segments: 24
+      }, scene);
+      hand.position = shoulder.add(new BABYLON.Vector3(bendSide * 0.55, -0.22, -0.92));
+      hand.scaling = new BABYLON.Vector3(1.18, 0.72, 0.9);
+      hand.material = skinMat;
+
+      return { side, baseShoulder: shoulder, bendSide, upper, lower, shoulderBall, hand };
+    }
+
+    function setHandTargets(leftSlot, rightSlot, active) {
+      const leftTarget = handTargetPosition(leftSlot, active);
+      const rightTarget = handTargetPosition(rightSlot, active);
+      handRig.left.hand.position = leftTarget;
+      handRig.right.hand.position = rightTarget;
+      updateConnectedArm(handRig.left);
+      updateConnectedArm(handRig.right);
+    }
+
+    function handTargetPosition(slot, active) {
+      const z = active ? -0.58 : -0.15;
+      const y = active ? 2.10 : 2.28;
+      return new BABYLON.Vector3(slotX[slot], y, z);
+    }
+
+    function orderedSlots(firstSlot, secondSlot) {
+      return firstSlot <= secondSlot ? [firstSlot, secondSlot] : [secondSlot, firstSlot];
+    }
+
+    function moveHandsTo(leftSlot, rightSlot, active, duration) {
+      const slots = orderedSlots(leftSlot, rightSlot);
+      return Promise.all([
+        animateVector(handRig.left.hand, "position", handTargetPosition(slots[0], active), duration),
+        animateVector(handRig.right.hand, "position", handTargetPosition(slots[1], active), duration)
+      ]);
+    }
+
+    function updateConnectedArm(arm) {
+      const hand = arm.hand.position;
+      const rootOffset = characterParts ? characterParts.root.position : BABYLON.Vector3.Zero();
+      const shoulder = arm.baseShoulder.add(rootOffset);
+      const middle = shoulder.add(hand).scale(0.5);
+      const elbow = middle.add(new BABYLON.Vector3(arm.bendSide * 0.24, -0.18, 0.10));
+
+      arm.shoulderBall.position = shoulder;
+      alignCylinderBetween(arm.upper, shoulder, elbow);
+      alignCylinderBetween(arm.lower, elbow, hand);
+    }
+
+    function alignCylinderBetween(mesh, start, end) {
+      const direction = end.subtract(start);
+      const length = Math.max(direction.length(), 0.001);
+      const normalized = direction.normalize();
+      mesh.position = start.add(end).scale(0.5);
+      mesh.scaling.y = length;
+      BABYLON.Quaternion.FromUnitVectorsToRef(BABYLON.Axis.Y, normalized, mesh.rotationQuaternion);
+    }
+
+    function setCharacterMood(mood) {
+      characterMood = mood;
+
+      if (!characterParts) {
+        return;
+      }
+
+      if (mood !== "cry") {
+        characterParts.mouth.scaling.y = 0.32;
+        characterParts.tears.forEach(tear => tear.setEnabled(false));
+      }
+
+      if (mood === "idle") {
+        characterParts.body.rotation.z = 0;
+        characterParts.chest.rotation.z = 0;
+        characterParts.head.rotation.z = 0;
+      }
+    }
+
+    function stopResultEffects() {
+      setCharacterMood("idle");
+      discoBalls.forEach(disco => {
+        if (disco.metadata && disco.metadata.light) {
+          disco.metadata.light.intensity = 0;
+        }
+        disco.setEnabled(false);
+        disco.position = new BABYLON.Vector3(disco.metadata.side * 6.2, 3.45, -0.25);
+      });
+    }
+
+    async function startDiscoResultDance() {
+      if (discoBalls.length === 0) {
+        return;
+      }
+
+      setCharacterMood("dance");
+      discoBalls.forEach(disco => {
+        disco.setEnabled(true);
+        disco.position = new BABYLON.Vector3(disco.metadata.side * 6.2, 3.45, -0.25);
+        if (disco.metadata.light) {
+          disco.metadata.light.intensity = 1.2;
+        }
+      });
+      await Promise.all(discoBalls.map(disco => {
+        return animateVector(disco, "position", new BABYLON.Vector3(disco.metadata.side * 2.25, 3.55, -0.25), 520);
+      }));
+    }
+
+    function startCryResult() {
+      setCharacterMood("cry");
+    }
+
+    function createScene() {
+      scene = new BABYLON.Scene(engine);
+      scene.clearColor = BABYLON.Color4.FromHexString("#d8d2c7ff");
+      scene.environmentIntensity = 0.28;
+
+      camera = new BABYLON.ArcRotateCamera("camera", -Math.PI / 2, Math.PI / 2.75, 8.4, new BABYLON.Vector3(0, 1.15, 0), scene);
+      camera.lowerRadiusLimit = 5.8;
+      camera.upperRadiusLimit = 10.5;
+      camera.lowerBetaLimit = 0.72;
+      camera.upperBetaLimit = 1.38;
+      camera.wheelPrecision = 55;
+
+      const hemi = new BABYLON.HemisphericLight("hemi", new BABYLON.Vector3(0, 1, 0), scene);
+      hemi.intensity = 0.86;
+      hemi.groundColor = BABYLON.Color3.FromHexString("#b7ac9e");
+
+      const key = new BABYLON.DirectionalLight("key", new BABYLON.Vector3(-0.35, -0.85, -0.45), scene);
+      key.position = new BABYLON.Vector3(4, 7, 4);
+      key.intensity = 0.62;
+
+      const tableMat = createMaterial("tableMat", "#705844", 0.80, 0);
+      materialRefs.table = tableMat;
+      const table = BABYLON.MeshBuilder.CreateBox("table", {
+        width: 9.6,
+        height: 0.28,
+        depth: 4.3
+      }, scene);
+      table.position = new BABYLON.Vector3(0, -0.13, 0);
+      table.material = tableMat;
+
+      const tableTop = BABYLON.MeshBuilder.CreateBox("tableTopLight", {
+        width: 9.6,
+        height: 0.035,
+        depth: 4.3
+      }, scene);
+      tableTop.position = new BABYLON.Vector3(0, 0.035, 0);
+      tableTop.material = createMaterial("tableTopMat", "#8a6f58", 0.78, 0);
+      materialRefs.tableTop = tableTop.material;
+
+      const backPanel = BABYLON.MeshBuilder.CreateBox("backWall", {
+        width: 10.4,
+        height: 5.1,
+        depth: 0.10
+      }, scene);
+      backPanel.position = new BABYLON.Vector3(0, 2.05, 3.06);
+      backPanel.material = createMaterial("backWallMat", "#c9c0b4", 0.90, 0);
+      materialRefs.wall = backPanel.material;
+      backPanel.isPickable = false;
+
+      const floor = BABYLON.MeshBuilder.CreateGround("floor", {
+        width: 12,
+        height: 8
+      }, scene);
+      floor.position = new BABYLON.Vector3(0, -0.30, 0.2);
+      floor.material = createMaterial("floorMat", "#beb4a6", 0.88, 0);
+      materialRefs.floor = floor.material;
+      floor.isPickable = false;
+
+      ball = BABYLON.MeshBuilder.CreateSphere("ball", { diameter: 0.46, segments: 32 }, scene);
+      ball.position = new BABYLON.Vector3(0, 0.27, 0);
+      const ballMat = createMaterial("ballMat", "#8fdcff", 0.42, 0);
+      ballMat.emissiveColor = BABYLON.Color3.FromHexString("#0b2d3a");
+      ball.material = ballMat;
+      materialRefs.ball = ballMat;
+      ball.setEnabled(false);
+
+      createCharacter();
+      discoBalls = createDiscoBalls();
+      tablePlayButton = createTablePlayButton();
+
+      for (let i = 0; i < 3; i += 1) {
+        cupNodes.push(createCup(i, slotX[i]));
+      }
+
+      scene.onPointerObservable.add(pointerInfo => {
+        if (pointerInfo.type !== BABYLON.PointerEventTypes.POINTERPICK) {
+          return;
+        }
+        const picked = pointerInfo.pickInfo && pointerInfo.pickInfo.pickedMesh;
+        if (picked && picked.metadata && picked.metadata.playButton) {
+          startRound();
+          return;
+        }
+
+        if (!isChoosing) {
+          return;
+        }
+        const cupIndex = picked && picked.metadata ? picked.metadata.cupIndex : undefined;
+        if (typeof cupIndex === "number") {
+          chooseCup(cupIndex);
+        }
+      });
+
+      return scene;
+    }
+
+    function setControlsDisabled(disabled) {
+      startButton.disabled = disabled;
+      raceButton.disabled = disabled && !raceActive;
+      modeButtons.forEach(button => {
+        button.disabled = disabled;
+      });
+    }
+
+    function setMode(mode) {
+      if (startButton.disabled || isChoosing) {
+        return;
+      }
+
+      selectedMode = mode;
+      modeButtons.forEach(button => {
+        button.classList.toggle("active", button.dataset.mode === mode);
+      });
+    }
+
+    function updateScoreLabels() {
+      pointsLabel.textContent = score.points;
+      shopPoints.textContent = score.points;
+      saveScore();
+    }
+
+    function updateTimerLabel() {
+      timerLabel.textContent = raceActive ? `${Math.ceil(raceTimeLeft)}s` : "--";
+    }
+
+    async function startRaceMode() {
+      if (raceActive || isRoundRunning || isChoosing) {
+        return;
+      }
+
+      raceActive = true;
+      raceTimeLeft = 60;
+      startButton.disabled = true;
+      raceButton.disabled = true;
+      modeButtons.forEach(button => {
+        button.disabled = true;
+      });
+      updateTimerLabel();
+      message.textContent = "Yarışma modu başladı. 1 dakikada en çok puanı topla.";
+
+      raceInterval = setInterval(() => {
+        const tickCost = raceTimerSlow ? 0.35 : 1;
+        raceTimeLeft = Math.max(0, raceTimeLeft - tickCost);
+        updateTimerLabel();
+
+        if (raceTimeLeft <= 0) {
+          finishRaceMode();
+        }
+      }, 1000);
+
+      await playRound();
+    }
+
+    function finishRaceMode() {
+      if (!raceActive) {
+        return;
+      }
+
+      raceActive = false;
+      raceTimerSlow = false;
+      clearInterval(raceInterval);
+      updateTimerLabel();
+      isChoosing = false;
+      message.textContent = `Süre bitti. Toplam puanın: ${score.points}`;
+      setControlsDisabled(false);
+      raceButton.disabled = false;
+      startButton.disabled = false;
+    }
+
+    function renderCupPositions() {
+      cupNodes.forEach((node, index) => {
+        node.position.x = slotX[positions[index]];
+        node.position.y = 0;
+      });
+    }
+
+    function pickTwoPositions() {
+      const first = randomInt(3);
+      let second = randomInt(3);
+      while (second === first) {
+        second = randomInt(3);
+      }
+      return [first, second];
+    }
+
+    function pairKey(pair) {
+      return pair.slice().sort().join("-");
+    }
+
+    function swapPositionOwners(a, b) {
+      const firstCup = positions.indexOf(a);
+      const secondCup = positions.indexOf(b);
+      positions[firstCup] = b;
+      positions[secondCup] = a;
+    }
+
+    async function liftCup(cupIndex, lift) {
+      const node = cupNodes[cupIndex];
+      const target = new BABYLON.Vector3(node.position.x, lift ? 0.82 : 0, lift ? -0.14 : 0);
+      await animateVector(node, "position", target, 260);
+    }
+
+    function syncBallToCup() {
+      const cup = cupNodes[ballCup];
+      ball.position = new BABYLON.Vector3(cup.position.x, 0.27, 0);
+    }
+
+    function cupLiftTarget(cupIndex, lift) {
+      const node = cupNodes[cupIndex];
+      return new BABYLON.Vector3(node.position.x, lift ? 0.82 : 0, lift ? -0.14 : 0);
+    }
+
+    function cupHoldPosition(cupIndex, sideOffset, lift) {
+      const target = cupLiftTarget(cupIndex, lift);
+      return new BABYLON.Vector3(target.x + sideOffset, lift ? 2.42 : 2.08, lift ? -0.72 : -0.58);
+    }
+
+    function moveHandsToCup(cupIndex, lift, duration) {
+      return Promise.all([
+        animateVector(handRig.left.hand, "position", cupHoldPosition(cupIndex, -0.34, lift), duration),
+        animateVector(handRig.right.hand, "position", cupHoldPosition(cupIndex, 0.34, lift), duration)
+      ]);
+    }
+
+    function shuffleHandPosition(x, sideOffset) {
+      return new BABYLON.Vector3(x + sideOffset, 2.08, -0.58);
+    }
+
+    async function shufflePairWithHands(firstCup, secondCup, duration) {
+      const firstTargetX = slotX[positions[firstCup]];
+      const secondTargetX = slotX[positions[secondCup]];
+      const leftCup = firstTargetX < secondTargetX ? firstCup : secondCup;
+      const rightCup = leftCup === firstCup ? secondCup : firstCup;
+      const moves = [
+        animateVector(cupNodes[firstCup], "position", new BABYLON.Vector3(firstTargetX, 0, 0), duration),
+        animateVector(cupNodes[secondCup], "position", new BABYLON.Vector3(secondTargetX, 0, 0), duration),
+        animateVector(handRig.left.hand, "position", shuffleHandPosition(slotX[positions[leftCup]], -0.30), duration),
+        animateVector(handRig.right.hand, "position", shuffleHandPosition(slotX[positions[rightCup]], 0.30), duration)
+      ];
+
+      cupNodes.forEach((node, cupIndex) => {
+        if (cupIndex === firstCup || cupIndex === secondCup) {
+          return;
+        }
+        moves.push(animateVector(node, "position", new BABYLON.Vector3(slotX[positions[cupIndex]], 0, 0), duration));
+      });
+
+      await Promise.all(moves);
+    }
+
+    async function liftCupWithHands(cupIndex, lift) {
+      const node = cupNodes[cupIndex];
+      const handsShouldStartHigh = !lift && node.position.y > 0.4;
+      await moveHandsToCup(cupIndex, handsShouldStartHigh, 160);
+      await Promise.all([
+        animateVector(node, "position", cupLiftTarget(cupIndex, lift), 260),
+        animateVector(handRig.left.hand, "position", cupHoldPosition(cupIndex, -0.34, lift), 260),
+        animateVector(handRig.right.hand, "position", cupHoldPosition(cupIndex, 0.34, lift), 260)
+      ]);
+    }
+
+    async function liftTwoCupsWithHands(firstCup, secondCup) {
+      if (firstCup === secondCup) {
+        await liftCupWithHands(firstCup, true);
+        return;
+      }
+
+      const ordered = [firstCup, secondCup].sort((a, b) => cupNodes[a].position.x - cupNodes[b].position.x);
+      const leftCup = ordered[0];
+      const rightCup = ordered[1];
+
+      await Promise.all([
+        animateVector(handRig.left.hand, "position", cupHoldPosition(leftCup, -0.28, false), 180),
+        animateVector(handRig.right.hand, "position", cupHoldPosition(rightCup, 0.28, false), 180)
+      ]);
+
+      await Promise.all([
+        animateVector(cupNodes[leftCup], "position", cupLiftTarget(leftCup, true), 260),
+        animateVector(cupNodes[rightCup], "position", cupLiftTarget(rightCup, true), 260),
+        animateVector(handRig.left.hand, "position", cupHoldPosition(leftCup, -0.28, true), 260),
+        animateVector(handRig.right.hand, "position", cupHoldPosition(rightCup, 0.28, true), 260)
+      ]);
+    }
+
+    async function lowerAllCups() {
+      await Promise.all(cupNodes.map(node => {
+        return animateVector(node, "position", new BABYLON.Vector3(node.position.x, 0, 0), 180);
+      }));
+      syncBallToCup();
+    }
+
+    async function playRound() {
+      stopResultEffects();
+      isChoosing = false;
+      isRoundRunning = true;
+      const roundIsRace = raceActive;
+      setControlsDisabled(true);
+      message.textContent = "";
+      await lowerAllCups();
+
+      positions = [0, 1, 2];
+      ballCup = randomInt(3);
+      renderCupPositions();
+      syncBallToCup();
+      ball.setEnabled(true);
+
+      const config = difficulty[selectedMode];
+      message.textContent = `${config.label} mod: topun yerini izle.`;
+
+      await liftCupWithHands(ballCup, true);
+      await wait(config.revealMs);
+      await liftCupWithHands(ballCup, false);
+      ball.setEnabled(false);
+
+      message.textContent = "Bardaklar karıştırılıyor...";
+      const totalSwaps = config.swaps[0] + randomInt(config.swaps[1] - config.swaps[0] + 1);
+      let lastPair = "";
+      raceTimerSlow = roundIsRace;
+
+      for (let i = 0; i < totalSwaps; i += 1) {
+        if (roundIsRace && !raceActive) {
+          break;
+        }
+
+        let pair = pickTwoPositions();
+        if (pairKey(pair) === lastPair) {
+          pair = pickTwoPositions();
+        }
+        lastPair = pairKey(pair);
+
+        await moveHandsTo(pair[0], pair[1], true, Math.min(230, Math.max(120, config.moveMs * 0.45)));
+        const beforeSwap = positions.slice();
+        swapPositionOwners(pair[0], pair[1]);
+        const firstCup = beforeSwap.indexOf(pair[0]);
+        const secondCup = beforeSwap.indexOf(pair[1]);
+
+        await shufflePairWithHands(firstCup, secondCup, config.moveMs);
+        syncBallToCup();
+      }
+
+      raceTimerSlow = false;
+      if (roundIsRace && !raceActive) {
+        isRoundRunning = false;
+        return;
+      }
+
+      await moveHandsTo(0, 2, false, 260);
+      syncBallToCup();
+      message.textContent = "Sence top hangi bardağın altında?";
+      isChoosing = true;
+      isRoundRunning = false;
+    }
+
+    async function startRound() {
+      if (isRoundRunning || isChoosing || raceActive) {
+        return;
+      }
+
+      isRoundRunning = true;
+      setControlsDisabled(true);
+      await pressTablePlayButton();
+      await playRound();
+    }
+
+    async function chooseCup(cupIndex) {
+      if (!isChoosing) {
+        return;
+      }
+
+      isChoosing = false;
+      isRoundRunning = true;
+      setCharacterMood("idle");
+      if (adminState.forceCorrect) {
+        ballCup = cupIndex;
+      }
+      syncBallToCup();
+      ball.setEnabled(true);
+
+      if (cupIndex === ballCup) {
+        score.wins += 1;
+        score.points += 1;
+        await playerLiftCup(ballCup, true);
+        message.textContent = "Kazandın! Topu buldun.";
+        showSpeech(makeResultLine("playerWin"));
+        startCryResult();
+      } else {
+        score.losses += 1;
+        score.points -= 1;
+        await Promise.all([
+          playerLiftCup(cupIndex, true),
+          liftCupWithHands(ballCup, true)
+        ]);
+        message.textContent = "Kaybettin. Top başka bardaktaydı.";
+        showSpeech(makeResultLine("dealerWin"));
+        await animateFloat(cupNodes[cupIndex], "rotation.y", cupNodes[cupIndex].rotation.y + Math.PI * 0.12, 140);
+        await animateFloat(cupNodes[cupIndex], "rotation.y", 0, 140);
+        await startDiscoResultDance();
+      }
+
+      updateScoreLabels();
+      startButton.textContent = "Tekrar Oyna";
+      isRoundRunning = false;
+
+      if (raceActive && raceTimeLeft > 0) {
+        await wait(420);
+        if (raceActive && raceTimeLeft > 0) {
+          await playRound();
+        }
+        return;
+      }
+
+      setControlsDisabled(false);
+    }
+
+    function startIntroSequence() {
+      const beginFade = () => {
+        setTimeout(() => {
+          introScreen.classList.add("outro");
+          setTimeout(() => {
+            introScreen.classList.add("hidden");
+          }, 2100);
+        }, 1700);
+      };
+
+      if (introLogo.complete) {
+        beginFade();
+        return;
+      }
+
+      introLogo.addEventListener("load", beginFade, { once: true });
+      introLogo.addEventListener("error", beginFade, { once: true });
+    }
+
+    async function boot() {
+      if (!window.BABYLON) {
+        loading.textContent = "Babylon.js yüklenemedi. İnternet bağlantısını kontrol et.";
+        return;
+      }
+
+      engine = new BABYLON.Engine(canvas, true, {
+        preserveDrawingBuffer: true,
+        stencil: true,
+        antialias: true
+      });
+
+      scene = createScene();
+      renderCupPositions();
+      setHandTargets(0, 2, false);
+      if (!adminState.ownAll) {
+        syncEquippedItemsToOwned();
+      }
+      updateScoreLabels();
+      updateTimerLabel();
+      applyEquippedThemes();
+      renderShop();
+
+      engine.runRenderLoop(() => {
+        scene.render();
+      });
+
+      window.addEventListener("resize", () => {
+        engine.resize();
+      });
+
+      startButton.addEventListener("click", startRound);
+      raceButton.addEventListener("click", startRaceMode);
+      shopButton.addEventListener("click", () => {
+        renderShop();
+        shopPanel.classList.remove("hidden");
+      });
+      closeShopButton.addEventListener("click", () => {
+        shopPanel.classList.add("hidden");
+      });
+      adminButton.addEventListener("click", openAdminPanel);
+      adminLoginButton.addEventListener("click", loginAdmin);
+      adminPassword.addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+          loginAdmin();
+        }
+      });
+      closeAdminButton.addEventListener("click", closeAdminPanel);
+      closeAdminControlsButton.addEventListener("click", closeAdminPanel);
+      adminSetPointsButton.addEventListener("click", setAdminPoints);
+      adminAddPointsButton.addEventListener("click", addAdminPoints);
+      adminForceCorrect.addEventListener("change", () => setAdminForceCorrect(adminForceCorrect.checked));
+      adminOwnAll.addEventListener("change", () => setAdminOwnAll(adminOwnAll.checked));
+      modeButtons.forEach(button => {
+        button.addEventListener("click", () => setMode(button.dataset.mode));
+      });
+
+      loading.classList.add("hidden");
+      startIntroSequence();
+    }
+
+    boot();
+  </script>
+</body>
+</html>

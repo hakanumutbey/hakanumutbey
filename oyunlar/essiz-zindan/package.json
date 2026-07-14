@@ -1,0 +1,13 @@
+{
+  "name": "essiz-zindan-macerasi",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check src/main.js && node --check src/babylon-game.js",
+    "serve": "python3 dev_server.py"
+  },
+  "devDependencies": {
+    "playwright": "^1.61.1"
+  }
+}

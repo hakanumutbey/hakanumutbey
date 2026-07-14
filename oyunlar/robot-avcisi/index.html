@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Robot Avcisi</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <section class="main-menu" id="mainMenu" aria-label="Ana sayfa">
+      <div class="menu-panel">
+        <h1>Robot Avcisi</h1>
+        <p>Laboratuvardan kac, robotlari parcalara ayir, hurdalarla silahini guclendir.</p>
+        <div class="menu-actions">
+          <button id="newGameBtn" type="button">Yeni Oyun</button>
+          <button id="continueBtn" type="button">Devam</button>
+          <button id="settingsBtn" type="button">Ayarlar</button>
+          <button id="exitBtn" type="button">Cik</button>
+        </div>
+        <div class="settings-panel hidden" id="settingsPanel">
+          <div class="settings-tabs" aria-label="Ayar bolumleri">
+            <button type="button" data-settings-tab="game">Oyun</button>
+            <button type="button" data-settings-tab="audio">Ses</button>
+            <button type="button" data-settings-tab="graphics">Grafik</button>
+            <button type="button" data-settings-tab="controls">Kontroller</button>
+            <button type="button" data-settings-tab="party">Party</button>
+            <button type="button" data-settings-tab="language">Dil</button>
+            <button type="button" data-settings-tab="accessibility">Erisim</button>
+            <button type="button" data-settings-tab="about">Hakkinda</button>
+          </div>
+
+          <div class="settings-section" data-settings-section="game">
+            <label>Zorluk
+              <select id="difficultySelect">
+                <option value="easy">Kolay</option>
+                <option value="normal" selected>Normal</option>
+                <option value="hard">Zor</option>
+              </select>
+            </label>
+            <label class="check-row"><input id="crosshairToggle" type="checkbox" checked /> Nisangah Ac/Kapat</label>
+            <label>Kamera hassasiyeti <input id="sensitivityInput" type="range" min="900" max="2800" step="100" value="1800" /></label>
+            <label>Gorus acisi (FOV) <input id="fovInput" type="range" min="55" max="100" step="1" value="75" /></label>
+          </div>
+
+          <div class="settings-section hidden" data-settings-section="audio">
+            <label>Ana ses seviyesi <input id="volumeInput" type="range" min="0" max="100" step="5" value="80" /></label>
+            <label>Muzik sesi <input id="musicVolumeInput" type="range" min="0" max="100" step="5" value="70" /></label>
+            <label>Efekt sesleri <input id="sfxVolumeInput" type="range" min="0" max="100" step="5" value="85" /></label>
+            <label>Sesli sohbet seviyesi <input id="voiceVolumeInput" type="range" min="0" max="100" step="5" value="80" /></label>
+            <button id="micTestBtn" type="button">Mikrofon testi</button>
+            <label class="check-row"><input id="microphoneToggle" type="checkbox" /> Mikrofon Ac/Kapat</label>
+            <label class="check-row"><input id="pushToTalkToggle" type="checkbox" /> Push-to-Talk Ac/Kapat</label>
+          </div>
+
+          <div class="settings-section hidden" data-settings-section="graphics">
+            <label>Cozunurluk
+              <select id="resolutionSelect">
+                <option value="auto" selected>Otomatik</option>
+                <option value="1280x720">1280x720</option>
+                <option value="1600x900">1600x900</option>
+                <option value="1920x1080">1920x1080</option>
+              </select>
+            </label>
+            <label class="check-row"><input id="fullscreenToggle" type="checkbox" /> Tam ekran / Pencere</label>
+            <label>Grafik kalitesi
+              <select id="qualitySelect">
+                <option value="low">Dusuk</option>
+                <option value="medium" selected>Orta</option>
+                <option value="high">Yuksek</option>
+                <option value="ultra">Ultra</option>
+              </select>
+            </label>
+            <label>FPS siniri
+              <select id="fpsLimitSelect">
+                <option value="30">30</option>
+                <option value="60" selected>60</option>
+                <option value="120">120</option>
+                <option value="0">Sinirsiz</option>
+              </select>
+            </label>
+            <label class="check-row"><input id="vsyncToggle" type="checkbox" checked /> V-Sync</label>
+          </div>
+
+          <div class="settings-section hidden" data-settings-section="controls">
+            <div class="key-grid">
+              <label>Ileri <input data-keybind="forward" value="W" maxlength="12" /></label>
+              <label>Geri <input data-keybind="backward" value="S" maxlength="12" /></label>
+              <label>Sol <input data-keybind="left" value="A" maxlength="12" /></label>
+              <label>Sag <input data-keybind="right" value="D" maxlength="12" /></label>
+              <label>Gizlice yuru <input data-keybind="sneak" value="C" maxlength="12" /></label>
+              <label>Etkilesim <input data-keybind="interact" value="E" maxlength="12" /></label>
+              <label>Yardimci robot <input data-keybind="place" value="F" maxlength="12" /></label>
+              <label>Yardimci turu <input data-keybind="cycleHelper" value="G" maxlength="12" /></label>
+              <label>Silah uret <input data-keybind="craftWeapon" value="R" maxlength="12" /></label>
+              <label>Tezgahi bosalt <input data-keybind="reclaimBench" value="T" maxlength="12" /></label>
+              <label>Cantadan birak <input data-keybind="dropItem" value="V" maxlength="12" /></label>
+              <label>Push-to-Talk <input data-keybind="pushToTalkKey" value="X" maxlength="12" /></label>
+              <label>El feneri <input data-keybind="flashlight" value="Q" maxlength="12" /></label>
+            </div>
+            <label>Fare hassasiyeti <input id="mouseSensitivityInput" type="range" min="900" max="2800" step="100" value="1800" /></label>
+            <label class="check-row"><input id="invertYToggle" type="checkbox" /> Y eksenini ters cevirme</label>
+          </div>
+
+          <div class="settings-section hidden" data-settings-section="party">
+            <label class="check-row"><input id="autoVoiceToggle" type="checkbox" /> Sesli sohbeti otomatik ac</label>
+            <label>Oyuncu ses seviyeleri <input id="playerVoiceVolumeInput" type="range" min="0" max="100" step="5" value="80" /></label>
+          </div>
+
+          <div class="settings-section hidden" data-settings-section="language">
+            <label>Dil
+              <select id="languageSelect">
+                <option value="tr" selected>Turkce</option>
+                <option value="en">English</option>
+                <option value="el">Ελληνικά</option>
+                <option value="ar">العربية</option>
+                <option value="ko">한국어</option>
+                <option value="computer">Bilgisayar Dili</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="settings-section hidden" data-settings-section="accessibility">
+            <label class="check-row"><input id="subtitlesToggle" type="checkbox" checked /> Altyazilar</label>
+            <label class="check-row"><input id="largeTextToggle" type="checkbox" /> Buyuk yazilar</label>
+            <label class="check-row"><input id="colorBlindToggle" type="checkbox" /> Renk koru modu</label>
+            <label class="check-row"><input id="reduceShakeToggle" type="checkbox" /> Kamera sallanmasini azalt</label>
+          </div>
+
+          <div class="settings-section hidden" data-settings-section="about">
+            <p><b>Oyun surumu:</b> 0.1.0</p>
+            <div class="credits-list">
+              <h3>Emeği Geçenler</h3>
+              <p><b>Oyun Geliştiricisi</b></p>
+              <ul>
+                <li>Hakan Umut Akadal</li>
+              </ul>
+              <p><b>Editörler</b></p>
+              <ul>
+                <li>Emre Akadal</li>
+                <li>İnayet Akadal</li>
+              </ul>
+              <p><b>Müzikler ve Ses Efektleri</b></p>
+              <ul>
+                <li>Daha sonra eklenecek.</li>
+              </ul>
+              <p><b>3D Modeller ve Asset'ler</b></p>
+              <ul>
+                <li>Daha sonra eklenecek.</li>
+              </ul>
+              <p><b>Çeviri</b></p>
+              <ul>
+                <li>Daha sonra eklenecek.</li>
+              </ul>
+              <p><b>Özel Teşekkürler</b></p>
+              <ul>
+                <li>Oyuna katkıda bulunan ve destek olan herkese teşekkür ederiz.</li>
+              </ul>
+              <p><b>Not</b></p>
+              <ul>
+                <li>Bu oyunun geliştirme sürecinde yapay zekâ destekli araçlardan yararlanılmıştır.</li>
+              </ul>
+              <p><b>Robot Avcısı'nı oynadığınız için teşekkür ederiz!</b></p>
+            </div>
+            <p><b>Lisanslar:</b> Babylon.js ve ws paketleri kullanildi.</p>
+          </div>
+        </div>
+        <p class="menu-note" id="menuNote">Cik dugmesi tarayici izin verirse siteyi kapatir.</p>
+      </div>
+    </section>
+
+    <section class="confirm-dialog hidden" id="languageConfirm" role="dialog" aria-label="Dil degistirme onayi">
+      <div>
+        <p>Dili degistirmek istediginize emin misiniz?</p>
+        <button id="confirmLanguageYes" type="button">Evet</button>
+        <button id="confirmLanguageNo" type="button">Hayir</button>
+      </div>
+    </section>
+
+    <canvas id="renderCanvas" aria-label="Robot Avcisi birinci sahis oyun alani"></canvas>
+
+    <div class="crosshair" aria-hidden="true"></div>
+
+    <section class="hud" aria-live="polite">
+      <div><strong>Can</strong><span id="hpText">100</span></div>
+      <div><strong>Oda</strong><span id="roomText">1</span></div>
+      <div><strong>Hurda</strong><span id="scrapText">0/20</span></div>
+      <div><strong>Parca</strong><span id="robotPartText">0</span></div>
+      <div><strong>Canta</strong><span id="backpackText">0/20</span></div>
+      <div><strong>Fener</strong><span id="batteryText">100%</span></div>
+      <div class="wide backpack-panel"><strong>Icerik</strong><span id="backpackItems"></span></div>
+      <div><strong>Elektrik</strong><span id="powerText">Acik</span></div>
+      <div><strong>Silah</strong><span id="weaponText">Tabanca</span></div>
+      <div><strong>Robot</strong><span id="robotText">0</span></div>
+      <div><strong>Gorev</strong><span id="questText">5 robotu yok et</span></div>
+      <div><strong>Kozmetik</strong><span id="cosmeticText">Yok</span></div>
+      <div><strong>Gizlilik</strong><span id="stealthText">Normal</span></div>
+      <div class="wide"><strong>Gorunum</strong><span id="cosmeticButtons"></span></div>
+      <div class="wide"><strong>Basarimlar</strong><span id="achievementList"></span></div>
+    </section>
+
+    <section class="prompt" id="promptText">Baslamak icin ekrana tikla</section>
+
+    <section class="log" id="eventLog"></section>
+
+    <section class="terminal hidden" id="computerPanel" role="dialog" aria-label="Laboratuvar bilgisayari">
+      <div class="terminal-window">
+        <header>
+          <div>
+            <h1>Laboratuvar Bilgisayari</h1>
+            <p>Parti kodu buradan olusturulur veya girilir.</p>
+          </div>
+          <button id="closeComputerBtn" type="button">Kapat</button>
+        </header>
+
+        <div class="terminal-grid">
+          <label>
+            Ismin
+            <input id="nameInput" maxlength="14" value="Hakan" />
+          </label>
+          <label>
+            Parti kodu
+            <input id="partyCodeInput" maxlength="6" placeholder="ABCD" />
+          </label>
+        </div>
+
+        <div class="terminal-actions">
+          <button id="createPartyBtn" type="button">Parti olustur</button>
+          <button id="joinPartyBtn" type="button">Koda katil</button>
+          <button id="readyBtn" type="button" disabled>Hazirim</button>
+          <button id="startPartyBtn" type="button" disabled>Oyunu baslat</button>
+          <button id="leavePartyBtn" type="button" disabled>Partiden cik</button>
+          <button id="voiceBtn" type="button"><span class="voice-icon" aria-hidden="true"></span> Ses</button>
+        </div>
+
+        <p id="partyStatus">Sunucuya bagli degil.</p>
+        <div id="playersList" class="players-list"></div>
+
+        <div class="chat">
+          <div id="chatLog" class="chat-log"></div>
+          <form id="chatForm">
+            <input id="chatInput" maxlength="120" placeholder="Parti sohbeti veya /dans" />
+            <button type="submit">Gonder</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <script src="./vendor/babylon.js"></script>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,10 @@
+node_modules
+dist
+.git
+.codex
+.agents
+**/node_modules
+**/.git
+**/.codex
+**/.agents
+npm-debug.log*

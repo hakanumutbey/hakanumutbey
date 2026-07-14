@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Eşsiz Zindan Macerası</title>
+    <link rel="stylesheet" href="./styles.css?v=21" />
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  </head>
+  <body>
+    <main class="game-shell" aria-label="Eşsiz Zindan Macerası">
+      <canvas id="game" tabindex="0"></canvas>
+      <section id="hud" class="hud" aria-live="polite">
+        <div class="topbar">
+          <div class="left-status">
+            <div class="hearts" data-hearts></div>
+            <div class="rage-meter" aria-label="Öfke gücü">
+              <div class="rage-fill" data-rage-fill></div>
+              <span data-rage-text>Öfke 0%</span>
+            </div>
+          </div>
+          <div class="top-actions">
+            <button class="hud-button" type="button" data-music-toggle>Müzik</button>
+            <button class="hud-button" type="button" data-fullscreen>Tam ekran</button>
+            <div class="room-badge" data-room>Oda 1/20</div>
+          </div>
+        </div>
+        <div class="message">
+          <h1 data-message-title></h1>
+          <p data-message-body></p>
+          <span data-message-action></span>
+        </div>
+        <div class="hint" data-hint>WASD / gamepad hareket - Space / A saldırı - E öfke</div>
+      </section>
+    </main>
+    <script type="module" src="./src/main.js?v=21"></script>
+  </body>
+</html>

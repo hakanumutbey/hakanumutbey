@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Annemden Kac</title>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="game"></canvas>
+
+      <div class="hud" aria-live="polite">
+        <div class="hud__line">
+          <span id="levelLabel">Seviye 1</span>
+          <span id="keyLabel">Anahtar: 0/3</span>
+          <span id="fartLabel">Osuruk: Hazir</span>
+          <span id="rewindLabel">Zaman: Kilitli</span>
+          <span id="statusLabel">Ev sessiz.</span>
+        </div>
+        <div class="hint" id="hintLabel">Baslamak icin ekrana tikla. WASD ile hareket, fare ile bak.</div>
+      </div>
+
+      <button class="level-button" id="levelButton" type="button">Leveller</button>
+
+      <div class="reticle" aria-hidden="true"></div>
+
+      <div class="touch" aria-hidden="true">
+        <button data-move="forward">▲</button>
+        <div>
+          <button data-move="left">◀</button>
+          <button data-move="backward">▼</button>
+          <button data-move="right">▶</button>
+        </div>
+        <button class="touch__fart" id="touchFartButton" type="button">V</button>
+        <button class="touch__rewind" id="touchRewindButton" type="button">T</button>
+      </div>
+
+      <div class="overlay" id="overlay">
+        <div class="overlay__panel">
+          <h1>Annemden Kac</h1>
+          <p>Once nasil oynayacagini sec, sonra acik levellerden birini baslat.</p>
+          <div class="mode-select" id="deviceChoices">
+            <button type="button" data-device="keyboard">Bilgisayar</button>
+            <button type="button" data-device="touch">Mobil</button>
+          </div>
+          <div class="level-select" id="levelSelect" aria-label="Leveller"></div>
+          <button id="startButton">Oyuna Basla</button>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

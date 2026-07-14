@@ -1,0 +1,260 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #101414;
+  color: #f7f3e8;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+}
+
+#game {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.hud {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 14px clamp(12px, 4vw, 32px);
+  pointer-events: none;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.8);
+}
+
+@media (min-width: 700px) {
+  .hud {
+    padding-right: 150px;
+  }
+}
+
+.hud__line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.hud__line span {
+  min-height: 32px;
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px;
+  background: rgba(10, 14, 14, 0.54);
+  backdrop-filter: blur(8px);
+}
+
+.hint {
+  width: min(620px, 100%);
+  margin-top: 10px;
+  color: #fff8ca;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.reticle {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.level-button {
+  position: fixed;
+  top: 14px;
+  right: clamp(12px, 4vw, 32px);
+  z-index: 4;
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(10, 14, 14, 0.62);
+  color: #fff;
+  backdrop-filter: blur(8px);
+}
+
+.reticle::before,
+.reticle::after {
+  content: "";
+  position: absolute;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.reticle::before {
+  left: 8px;
+  top: 2px;
+  width: 2px;
+  height: 14px;
+}
+
+.reticle::after {
+  left: 2px;
+  top: 8px;
+  width: 14px;
+  height: 2px;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    linear-gradient(rgba(16, 20, 20, 0.4), rgba(16, 20, 20, 0.9)),
+    radial-gradient(circle at 50% 35%, rgba(238, 194, 88, 0.2), transparent 34%);
+}
+
+.overlay[hidden] {
+  display: none;
+}
+
+.overlay__panel {
+  width: min(460px, 100%);
+  padding: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 8px;
+  background: rgba(19, 27, 26, 0.88);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  text-align: center;
+}
+
+.overlay h1 {
+  margin: 0 0 10px;
+  font-size: clamp(32px, 9vw, 58px);
+  line-height: 0.98;
+}
+
+.overlay p {
+  margin: 0 0 22px;
+  color: #e7dfcb;
+  font-size: 17px;
+  line-height: 1.45;
+}
+
+button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 8px;
+  background: #f0bd4f;
+  color: #1a1510;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+#startButton {
+  width: 100%;
+  padding: 12px 18px;
+}
+
+.mode-select {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.mode-select button,
+.level-select button {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.11);
+  color: #fff;
+}
+
+.mode-select button.is-selected,
+.level-select button.is-selected {
+  background: #f0bd4f;
+  color: #1a1510;
+}
+
+.level-select {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.level-select button {
+  min-width: 0;
+  padding: 0 8px;
+}
+
+.level-select button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.touch {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  display: none;
+  gap: 5px;
+  flex-direction: column;
+  align-items: center;
+}
+
+.touch div {
+  display: flex;
+  gap: 5px;
+}
+
+.touch button {
+  width: 48px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  backdrop-filter: blur(8px);
+}
+
+.touch__fart,
+.touch__rewind {
+  margin-top: 8px;
+  background: rgba(240, 189, 79, 0.88) !important;
+  color: #1a1510 !important;
+}
+
+.touch__rewind {
+  background: rgba(116, 205, 255, 0.88) !important;
+}
+
+body[data-input="touch"] .touch {
+  display: flex;
+}
+
+body[data-input="keyboard"] .touch {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .hint {
+    width: min(430px, 70vw);
+  }
+
+  .level-button {
+    top: auto;
+    right: 16px;
+    bottom: 16px;
+  }
+
+  body[data-input="touch"] .level-button {
+    bottom: 196px;
+  }
+}

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vale</title>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <div class="hud" aria-live="polite">
+      <div class="brand">Vale</div>
+      <div class="stat">
+        <span>Cüzdan</span>
+        <strong id="money">₺120</strong>
+      </div>
+      <div class="stat">
+        <span>Tur</span>
+        <strong id="round">1</strong>
+      </div>
+      <div class="stat">
+        <span>Hasar</span>
+        <strong id="damage">0</strong>
+      </div>
+      <div class="stat">
+        <span>Kat</span>
+        <strong id="floor">1/10</strong>
+      </div>
+      <div class="stat">
+        <span>Hız</span>
+        <strong id="speedLevel">1</strong>
+      </div>
+      <div class="stat">
+        <span>Araba</span>
+        <strong id="carCount">0/100</strong>
+      </div>
+    </div>
+    <div class="mission" aria-live="polite">
+      <span id="owner">Sahip bekleniyor</span>
+      <strong id="missionCar">Görev arabası</strong>
+      <p id="missionText">Müşteri doğru arabayı söyleyecek.</p>
+      <div id="prompt">E: etkileşim</div>
+    </div>
+    <div class="status" id="status">Araç teslim alındı</div>
+    <div class="meter" aria-hidden="true">
+      <div id="parkMeter"></div>
+    </div>
+    <div class="shop" id="shop" aria-live="polite">
+      <strong>Market</strong>
+      <button id="buySpeed" type="button">1 Hız</button>
+      <button id="buyFloor" type="button">2 Kat</button>
+      <button id="closeShop" type="button">Kapat</button>
+      <span id="shopInfo">M: market</span>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

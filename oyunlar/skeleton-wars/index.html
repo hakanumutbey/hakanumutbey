@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="cache-control" content="no-store">
+    <title>Skeleton Wars</title>
+    <link rel="stylesheet" href="styles.css?v=finale-son-2">
+  </head>
+  <body>
+    <main class="game-shell" aria-label="Skeleton Wars oyunu">
+      <header class="topbar">
+        <div>
+          <h1>Skeleton Wars</h1>
+          <p>Haritada ilerle, kardesini kurtarmaya git.</p>
+        </div>
+        <div class="topbar-actions">
+          <button id="exportIntroButton" type="button">Videoyu Kaydet</button>
+          <button id="restartButton" type="button">Yeniden Baslat</button>
+        </div>
+      </header>
+
+      <section class="hud" aria-label="Oyun bilgileri">
+        <div>
+          <span>Can</span>
+          <strong id="healthText">100</strong>
+        </div>
+        <div>
+          <span>Yol</span>
+          <strong id="waveText">1</strong>
+        </div>
+        <div>
+          <span>Skor</span>
+          <strong id="scoreText">0</strong>
+        </div>
+        <div>
+          <span>Oklar</span>
+          <strong id="arrowText">12</strong>
+        </div>
+      </section>
+
+      <section class="viewport">
+        <canvas id="gameCanvas" width="960" height="540" aria-label="Oyun alani"></canvas>
+
+        <section id="introOverlay" class="video-overlay hidden" aria-label="Hikaye videosu">
+          <video id="introVideo" playsinline preload="auto" autoplay controls></video>
+          <button id="startIntroButton" class="start-video-button" type="button">Videoyu Baslat</button>
+          <button id="skipIntroButton" type="button">Videoyu Gec</button>
+        </section>
+      </section>
+
+      <footer class="controls">
+        <span>Hareket: WASD / ok tuslari</span>
+        <span>Yay: sol tik / bosluk</span>
+        <span>Atesli ok: F</span>
+        <span>Kilic: sag tik / E / J</span>
+        <span>Demlik: T</span>
+        <span>Nisan: fare</span>
+      </footer>
+    </main>
+
+    <script src="game.js?v=finale-son-2"></script>
+  </body>
+</html>
