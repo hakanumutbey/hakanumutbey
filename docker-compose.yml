@@ -1,7 +1,6 @@
 services:
   hakorocks-studio:
     build: .
-    container_name: hakorocks-studio
     restart: unless-stopped
-    ports:
-      - "3000:80"
+    expose:
+      - "80"
