@@ -11,7 +11,7 @@ const dataRoot = process.env.DATA_DIR || join(root, ".data");
 const port = Number(process.env.PORT || 3000);
 const announcementPasswordHash =
   process.env.ANNOUNCEMENT_PASSWORD_HASH ||
-  "ed7131195cfb7baf313567082394af98a2215e972720fa0b0853505b575b5fa4";
+  "7241bb00842e01487a32ea059136a43484969ae967f2dfd50e8ac15a4234d257";
 const sessions = new Map();
 const games = ["annenden-kac", "bardak", "essiz-zindan", "skeleton-wars", "vale", "robot-avcisi"];
 const baseValues = {
