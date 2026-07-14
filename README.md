@@ -57,6 +57,8 @@ hakanumutbey/
 - `main` branch'e push sonrası site yeniden build edilip yayına alınır.
 - Oyunlarda `Ö` tuşu ile fotoğraf alınır; fotoğraflar canlı sitede oyunların altında görünür.
 - Site açık kişi, oyunda kişi ve oyun borsa grafikleri canlı API ile güncellenir.
+- Oyunlara yıldız puanı, ziyaretçi defteri, rozetler, haberler, ses efektleri ve galeri filtresi eklidir.
+- Site `hakorocks.akadal.tr` üzerinden herkese açık bir oyun vitrini olarak çalışır.
 
 ## Geliştirme
 

@@ -124,11 +124,86 @@ const projects = [
   },
 ];
 
+const newsItems = [
+  {
+    date: "Bugün",
+    title: "Fotoğraf tuşu görünür oldu",
+    description: "Oyun ekranlarının sağ altına Ö tuşunu hatırlatan fotoğraf rozeti eklendi.",
+  },
+  {
+    date: "Yeni",
+    title: "Canlı oyun borsası yayında",
+    description: "Site açık kişi, aktif oyuncu ve oyun ilgisi artık canlı panoda hareket ediyor.",
+  },
+  {
+    date: "Studio",
+    title: "Steam tarzı oyun ekranı",
+    description: "Oyun kartına basınca detay, başarımlar, notlar, fotoğraflar ve puanlama açılır.",
+  },
+];
+
+const badgeDefinitions = [
+  {
+    id: "visitor",
+    title: "İlk Ziyaret",
+    description: "Hakorocks Studio ana üssünü açtın.",
+    isUnlocked: (state) => Boolean(state.visitedAt),
+  },
+  {
+    id: "explorer",
+    title: "Oyun Kaşifi",
+    description: "Bir oyun detay ekranı açtın.",
+    isUnlocked: (state) => Boolean(state.openedGame),
+  },
+  {
+    id: "player",
+    title: "Oyuncu",
+    description: "Bir oyunu başlattın veya oyun sayfasına girdin.",
+    isUnlocked: (state) => state.playedGames.length > 0,
+  },
+  {
+    id: "skeleton",
+    title: "Skeleton Savaşçısı",
+    description: "Skeleton Wars oynadın.",
+    isUnlocked: (state) => state.playedGames.includes("skeleton-wars"),
+  },
+  {
+    id: "photographer",
+    title: "Fotoğrafçı",
+    description: "Ö tuşuyla oyun fotoğrafı çektin.",
+    isUnlocked: (state) => state.photoCount > 0,
+  },
+  {
+    id: "critic",
+    title: "Oyun Eleştirmeni",
+    description: "Bir oyuna yıldız puanı verdin.",
+    isUnlocked: (state) => state.ratedGames.length > 0,
+  },
+  {
+    id: "guest",
+    title: "Ziyaretçi Defteri",
+    description: "Deftere kısa bir mesaj bıraktın.",
+    isUnlocked: (state) => Boolean(state.guestbook),
+  },
+  {
+    id: "trailer",
+    title: "Fragman Pilot",
+    description: "HAKO ROCKS fragmanını baştan oynattın.",
+    isUnlocked: (state) => Boolean(state.trailerPlayed),
+  },
+];
+
 const sessionId = getSessionId();
 const gameMap = new Map(games.map((game) => [game.slug, game]));
+let badgeState = ensureBadgeState();
 let latestStats = createFallbackStats();
 let latestPhotos = [];
+let latestRatings = createFallbackRatings();
+let latestGuestbook = [];
 let selectedGame = games[0];
+let selectedPhotoFilter = "all";
+let soundEnabled = localStorage.getItem("hakorocks-sound") !== "off";
+let audioContext;
 
 document.querySelector("#app").innerHTML = `
   <header class="site-header" data-header>
@@ -142,8 +217,14 @@ document.querySelector("#app").innerHTML = `
       <a href="#fragman">Fragman</a>
       <a href="#oyunlar">Oyunlar</a>
       <a href="#canli">Canlı</a>
+      <a href="#haberler">Haberler</a>
+      <a href="#rozetler">Rozetler</a>
       <a href="#yakinda">Yakında</a>
+      <a href="#defter">Defter</a>
     </nav>
+    <button class="nav-sound" type="button" data-sound-toggle aria-pressed="${soundEnabled ? "true" : "false"}">
+      Ses: ${soundEnabled ? "Açık" : "Kapalı"}
+    </button>
   </header>
 
   <main id="top">
@@ -183,6 +264,13 @@ document.querySelector("#app").innerHTML = `
             değişiklikler Coolify üzerinden otomatik yayına çıkacak şekilde hazırlandı.
           </p>
         </article>
+        <aside class="profile-card" aria-label="Mini profil">
+          <span>Mini profil</span>
+          <h3>Hakan Umut</h3>
+          <p>9 yaşında oyun geliştirici. Oyun, proje ve teknoloji keşiflerini burada topluyor.</p>
+          <strong>Herkese açık</strong>
+          <small>hakorocks.akadal.tr</small>
+        </aside>
         <div class="stats-grid" aria-label="Stüdyo bilgileri">
           <div><strong>9</strong><span>yaşında geliştirici</span></div>
           <div><strong>3D</strong><span>Babylon.js oyunları</span></div>
@@ -224,6 +312,16 @@ document.querySelector("#app").innerHTML = `
             <li>Büyükşehir İlkokulu "Ben Artık Okuyorum Yazıyorum" Belgesi (2023-2024).</li>
           </ul>
         </article>
+      </div>
+    </section>
+
+    <section class="section news-section" id="haberler" aria-labelledby="news-title">
+      <div class="section-heading">
+        <p class="eyebrow">Hakorocks Haberleri</p>
+        <h2 id="news-title">Stüdyodaki son gelişmeler.</h2>
+      </div>
+      <div class="news-grid">
+        ${newsItems.map(renderNewsItem).join("")}
       </div>
     </section>
 
@@ -295,6 +393,16 @@ document.querySelector("#app").innerHTML = `
       </div>
     </section>
 
+    <section class="section badges-section" id="rozetler" aria-labelledby="badges-title">
+      <div class="section-heading">
+        <p class="eyebrow">Görevler ve rozetler</p>
+        <h2 id="badges-title">Siteyi kullandıkça rozetler açılır.</h2>
+      </div>
+      <div class="badge-grid" data-badge-grid>
+        ${renderBadges()}
+      </div>
+    </section>
+
     <section class="section games-section" id="oyunlar" aria-labelledby="games-title">
       <div class="section-heading">
         <p class="eyebrow">Oyun vitrini</p>
@@ -311,8 +419,36 @@ document.querySelector("#app").innerHTML = `
         <h2 id="photos-title">Oyunlarda fotoğraf çekme tuşu: Ö.</h2>
         <p class="section-note">Oyun ekranının sağ altındaki rozet sana tuşu hatırlatır; çekilen fotoğraflar burada ve oyun detayında görünür.</p>
       </div>
+      <div class="filter-bar" aria-label="Fotoğraf filtreleri">
+        ${renderPhotoFilters()}
+      </div>
       <div class="photo-grid" data-photo-grid>
-        ${renderEmptyPhotos()}
+        ${renderPhotoGallery()}
+      </div>
+    </section>
+
+    <section class="section guestbook-section" id="defter" aria-labelledby="guestbook-title">
+      <div class="section-heading">
+        <p class="eyebrow">Ziyaretçi defteri</p>
+        <h2 id="guestbook-title">Arkadaşların kısa mesaj bırakabilir.</h2>
+        <p class="section-note">Mesajlar herkese açık görünür; kısa, nazik ve oyunlarla ilgili yazmak en iyisi.</p>
+      </div>
+      <div class="guestbook-layout">
+        <form class="guestbook-form" data-guestbook-form>
+          <label>
+            İsim
+            <input name="name" maxlength="32" placeholder="Adın" autocomplete="name" />
+          </label>
+          <label>
+            Mesaj
+            <textarea name="message" maxlength="180" required placeholder="Site veya oyunlar hakkında kısa mesaj"></textarea>
+          </label>
+          <button class="button primary" type="submit">Deftere ekle</button>
+          <p class="form-status" data-guestbook-status aria-live="polite"></p>
+        </form>
+        <div class="guestbook-list" data-guestbook-list>
+          ${renderGuestbook()}
+        </div>
       </div>
     </section>
 
@@ -388,6 +524,69 @@ function renderProjectCard(project) {
   `;
 }
 
+function renderNewsItem(item) {
+  return `
+    <article class="news-card">
+      <span>${item.date}</span>
+      <h3>${item.title}</h3>
+      <p>${item.description}</p>
+    </article>
+  `;
+}
+
+function renderBadges() {
+  return badgeDefinitions.map((badge) => {
+    const unlocked = badge.isUnlocked(badgeState);
+    return `
+      <article class="badge-card ${unlocked ? "is-unlocked" : ""}">
+        <span>${unlocked ? "Açıldı" : "Kilitli"}</span>
+        <h3>${badge.title}</h3>
+        <p>${badge.description}</p>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderPhotoFilters() {
+  const filterItems = [{ slug: "all", title: "Tümü" }, ...games];
+  return filterItems.map((item) => `
+    <button class="${selectedPhotoFilter === item.slug ? "is-active" : ""}" type="button" data-photo-filter="${item.slug}">
+      ${item.title}
+    </button>
+  `).join("");
+}
+
+function renderPhotoGallery() {
+  const photos = selectedPhotoFilter === "all"
+    ? latestPhotos
+    : latestPhotos.filter((photo) => photo.slug === selectedPhotoFilter);
+  if (photos.length) return photos.slice(0, 12).map(renderPhoto).join("");
+  if (selectedPhotoFilter !== "all") {
+    const game = gameMap.get(selectedPhotoFilter);
+    return game ? renderScreenshotPlaceholders(game) : renderEmptyPhotos();
+  }
+  return renderEmptyPhotos();
+}
+
+function renderRating(game) {
+  const rating = latestRatings.games?.[game.slug] ?? { average: 0, count: 0 };
+  const personalRated = badgeState.ratedGames.includes(game.slug);
+  return `
+    <div class="rating-box">
+      <div class="rating-stars" aria-label="${game.title} puanlama">
+        ${[1, 2, 3, 4, 5].map((value) => `
+          <button type="button" data-rate-game="${game.slug}" data-rate-value="${value}" aria-label="${value} yıldız ver">★</button>
+        `).join("")}
+      </div>
+      <p>
+        Ortalama: <strong>${rating.average ? `${rating.average}/5` : "Henüz yok"}</strong>
+        <span>${rating.count} oy</span>
+      </p>
+      <small>${personalRated ? "Bu tarayıcıdan puan verdin." : "Puan verince Oyun Eleştirmeni rozeti açılır."}</small>
+    </div>
+  `;
+}
+
 function renderModal(game) {
   const gameStats = latestStats.games?.[game.slug] ?? createGameStat(game, 0);
   const photos = latestPhotos.filter((photo) => photo.slug === game.slug).slice(0, 4);
@@ -424,6 +623,10 @@ function renderModal(game) {
         </ul>
       </section>
       <section class="modal-section">
+        <h3>Oyunu puanla</h3>
+        ${renderRating(game)}
+      </section>
+      <section class="modal-section">
         <h3>Başarımlar</h3>
         <ul class="clean-list">${game.achievements.map((item) => `<li>${item}</li>`).join("")}</ul>
       </section>
@@ -444,10 +647,28 @@ function renderModal(game) {
 function renderPhoto(photo) {
   return `
     <figure class="photo-card">
-      <img src="${photo.dataUrl}" alt="${photo.title || "Oyun fotoğrafı"}" loading="lazy" />
-      <figcaption>${photo.gameTitle || photo.title || "Oyun fotoğrafı"}</figcaption>
+      <img src="${photo.dataUrl}" alt="${escapeHtml(photo.title || "Oyun fotoğrafı")}" loading="lazy" />
+      <figcaption>${escapeHtml(photo.gameTitle || photo.title || "Oyun fotoğrafı")}</figcaption>
     </figure>
   `;
+}
+
+function renderGuestbook() {
+  if (!latestGuestbook.length) {
+    return `
+      <article class="guestbook-entry empty">
+        <span>İlk mesaj bekleniyor</span>
+        <p>Siteyi deneyen ilk arkadaş kısa bir yorum bırakabilir.</p>
+      </article>
+    `;
+  }
+  return latestGuestbook.slice(0, 8).map((entry) => `
+    <article class="guestbook-entry">
+      <span>${escapeHtml(entry.name || "Ziyaretçi")}</span>
+      <p>${escapeHtml(entry.message || "")}</p>
+      <small>${formatDate(entry.createdAt)}</small>
+    </article>
+  `).join("");
 }
 
 function renderEmptyPhotos() {
@@ -499,6 +720,65 @@ function createFallbackStats() {
   };
 }
 
+function createFallbackRatings() {
+  return {
+    games: Object.fromEntries(games.map((game) => [game.slug, { average: 0, count: 0 }])),
+  };
+}
+
+function ensureBadgeState() {
+  const fallback = {
+    visitedAt: new Date().toISOString(),
+    openedGame: false,
+    playedGames: [],
+    photoCount: 0,
+    ratedGames: [],
+    guestbook: false,
+    trailerPlayed: false,
+  };
+  try {
+    const stored = JSON.parse(localStorage.getItem("hakorocks-badge-state") || "{}");
+    const state = {
+      ...fallback,
+      ...stored,
+      playedGames: Array.isArray(stored.playedGames) ? stored.playedGames : [],
+      ratedGames: Array.isArray(stored.ratedGames) ? stored.ratedGames : [],
+      photoCount: Number(stored.photoCount) || 0,
+    };
+    localStorage.setItem("hakorocks-badge-state", JSON.stringify(state));
+    return state;
+  } catch {
+    localStorage.setItem("hakorocks-badge-state", JSON.stringify(fallback));
+    return fallback;
+  }
+}
+
+function updateBadgeState(mutator) {
+  const next = { ...badgeState, playedGames: [...badgeState.playedGames], ratedGames: [...badgeState.ratedGames] };
+  mutator(next);
+  badgeState = next;
+  localStorage.setItem("hakorocks-badge-state", JSON.stringify(badgeState));
+  renderBadgeGrid();
+}
+
+function addUnique(list, value) {
+  if (!list.includes(value)) list.push(value);
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function formatDate(value) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short" }).format(new Date(value));
+}
+
 function createGameStat(game, index) {
   const wave = Math.sin(Date.now() / 90000 + index) * 9;
   const value = Math.max(20, game.stockBase + wave);
@@ -539,11 +819,40 @@ function bindGameCards() {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closeGameModal();
   });
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    const soundTarget = target.closest?.("button, a");
+    if (soundTarget) playUiSound();
+
+    const ratingButton = target.closest?.("[data-rate-game]");
+    if (ratingButton) {
+      submitRating(ratingButton.dataset.rateGame, Number(ratingButton.dataset.rateValue));
+      return;
+    }
+
+    const filterButton = target.closest?.("[data-photo-filter]");
+    if (filterButton) {
+      selectedPhotoFilter = filterButton.dataset.photoFilter;
+      renderPhotoFilterBar();
+      renderPhotoGrid();
+      return;
+    }
+
+    const playLink = target.closest?.("[data-play-game]");
+    if (playLink) {
+      updateBadgeState((state) => addUnique(state.playedGames, playLink.dataset.playGame));
+    }
+  });
+  document.querySelector("[data-sound-toggle]")?.addEventListener("click", toggleSound);
+  document.querySelector("[data-guestbook-form]")?.addEventListener("submit", submitGuestbook);
 }
 
 function openGameModal(slug) {
   const game = gameMap.get(slug);
   if (!game) return;
+  updateBadgeState((state) => {
+    state.openedGame = true;
+  });
   selectedGame = game;
   document.querySelector("[data-modal-content]").innerHTML = renderModal(game);
   const modal = document.querySelector("[data-game-modal]");
@@ -563,9 +872,115 @@ function closeGameModal() {
   document.body.classList.remove("modal-open");
 }
 
+async function submitRating(slug, value) {
+  if (!gameMap.has(slug) || !Number.isInteger(value)) return;
+  try {
+    const response = await fetch("/api/rating", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId, slug, value }),
+    });
+    latestRatings = await response.json();
+    updateBadgeState((state) => addUnique(state.ratedGames, slug));
+  } catch {
+    latestRatings.games[slug] = {
+      average: value,
+      count: 1,
+    };
+    updateBadgeState((state) => addUnique(state.ratedGames, slug));
+  }
+  if (!document.querySelector("[data-game-modal]").hidden) {
+    document.querySelector("[data-modal-content]").innerHTML = renderModal(selectedGame);
+  }
+}
+
+async function submitGuestbook(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const status = document.querySelector("[data-guestbook-status]");
+  const formData = new FormData(form);
+  const payload = {
+    name: formData.get("name"),
+    message: formData.get("message"),
+  };
+  status.textContent = "Gönderiliyor...";
+  try {
+    const response = await fetch("/api/guestbook", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) throw new Error("guestbook-failed");
+    latestGuestbook = await response.json();
+    form.reset();
+    status.textContent = "Mesaj deftere eklendi.";
+    updateBadgeState((state) => {
+      state.guestbook = true;
+    });
+    renderGuestbookList();
+  } catch {
+    status.textContent = "Mesaj eklenemedi. Biraz sonra tekrar dene.";
+  }
+}
+
+function renderBadgeGrid() {
+  const grid = document.querySelector("[data-badge-grid]");
+  if (grid) grid.innerHTML = renderBadges();
+}
+
+function renderPhotoFilterBar() {
+  const bar = document.querySelector(".filter-bar");
+  if (bar) bar.innerHTML = renderPhotoFilters();
+}
+
+function renderPhotoGrid() {
+  const grid = document.querySelector("[data-photo-grid]");
+  if (grid) grid.innerHTML = renderPhotoGallery();
+}
+
+function renderGuestbookList() {
+  const list = document.querySelector("[data-guestbook-list]");
+  if (list) list.innerHTML = renderGuestbook();
+}
+
+function toggleSound() {
+  soundEnabled = !soundEnabled;
+  localStorage.setItem("hakorocks-sound", soundEnabled ? "on" : "off");
+  updateSoundButton();
+  playUiSound("toggle");
+}
+
+function updateSoundButton() {
+  const button = document.querySelector("[data-sound-toggle]");
+  if (!button) return;
+  button.textContent = `Ses: ${soundEnabled ? "Açık" : "Kapalı"}`;
+  button.setAttribute("aria-pressed", soundEnabled ? "true" : "false");
+}
+
+function playUiSound(type = "click") {
+  if (!soundEnabled) return;
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) return;
+  audioContext ??= new AudioContext();
+  const oscillator = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+  oscillator.type = "triangle";
+  oscillator.frequency.setValueAtTime(type === "toggle" ? 520 : 340, audioContext.currentTime);
+  oscillator.frequency.exponentialRampToValueAtTime(type === "toggle" ? 680 : 430, audioContext.currentTime + 0.08);
+  gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.05, audioContext.currentTime + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.11);
+  oscillator.connect(gain).connect(audioContext.destination);
+  oscillator.start();
+  oscillator.stop(audioContext.currentTime + 0.12);
+}
+
 function bindTrailer() {
   const stage = document.querySelector("[data-trailer-stage]");
   document.querySelector("[data-trailer-play]")?.addEventListener("click", () => {
+    updateBadgeState((state) => {
+      state.trailerPlayed = true;
+    });
     stage.classList.remove("is-playing");
     void stage.offsetWidth;
     stage.classList.add("is-playing");
@@ -603,12 +1018,16 @@ async function refreshLiveData() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    const [statsResponse, photosResponse] = await Promise.all([
+    const [statsResponse, photosResponse, ratingsResponse, guestbookResponse] = await Promise.all([
       fetch("/api/stats"),
       fetch("/api/photos"),
+      fetch("/api/ratings"),
+      fetch("/api/guestbook"),
     ]);
     latestStats = await statsResponse.json();
     latestPhotos = await photosResponse.json();
+    latestRatings = await ratingsResponse.json();
+    latestGuestbook = await guestbookResponse.json();
   } catch {
     latestStats = createFallbackStats();
   }
@@ -626,10 +1045,9 @@ function renderLiveData() {
   document.querySelector("[data-market-value]").textContent = Math.round(latestStats.marketValue ?? 0);
   document.querySelector("[data-market-chart]").innerHTML = renderSparkline(latestStats.marketHistory ?? createHistory(100));
 
-  const grid = document.querySelector("[data-photo-grid]");
-  if (latestPhotos.length) {
-    grid.innerHTML = latestPhotos.slice(0, 8).map(renderPhoto).join("");
-  }
+  renderPhotoGrid();
+  renderGuestbookList();
+  renderBadgeGrid();
 }
 
 const header = document.querySelector("[data-header]");
@@ -639,5 +1057,7 @@ window.addEventListener("scroll", () => {
 
 bindGameCards();
 bindTrailer();
+updateSoundButton();
+renderBadgeGrid();
 refreshLiveData();
 setInterval(refreshLiveData, 10000);

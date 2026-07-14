@@ -45,6 +45,10 @@ let stock = await readJson("stats.json", {
     history: createHistory(baseValues[slug]),
   }])),
 });
+let ratings = await readJson("ratings.json", {
+  games: Object.fromEntries(games.map((slug) => [slug, { total: 0, count: 0 }])),
+});
+let guestbook = await readJson("guestbook.json", []);
 
 createServer(async (request, response) => {
   try {
@@ -69,6 +73,14 @@ async function handleApi(request, response) {
   }
   if (request.method === "GET" && url.pathname === "/api/photos") {
     sendJson(response, photos.slice(0, 40));
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/ratings") {
+    sendJson(response, currentRatings());
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/guestbook") {
+    sendJson(response, guestbook.slice(0, 30));
     return;
   }
   if (request.method === "POST" && url.pathname === "/api/heartbeat") {
@@ -117,6 +129,42 @@ async function handleApi(request, response) {
     photos = [photo, ...photos].slice(0, 60);
     await writeJson("photos.json", photos);
     sendJson(response, photo);
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/rating") {
+    const body = await readBody(request, 64_000);
+    const slug = games.includes(body.slug) ? body.slug : "";
+    const value = Number(body.value);
+    if (!slug || !Number.isInteger(value) || value < 1 || value > 5) {
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "invalid-rating" }));
+      return;
+    }
+    const item = gameRating(slug);
+    item.total += value;
+    item.count += 1;
+    await writeJson("ratings.json", ratings);
+    sendJson(response, currentRatings());
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/guestbook") {
+    const body = await readBody(request, 64_000);
+    const name = safeText(body.name, 32) || "Hakorocks ziyaretçisi";
+    const message = safeText(body.message, 180);
+    if (message.length < 2) {
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "invalid-message" }));
+      return;
+    }
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      name,
+      message,
+      createdAt: new Date().toISOString(),
+    };
+    guestbook = [entry, ...guestbook].slice(0, 60);
+    await writeJson("guestbook.json", guestbook);
+    sendJson(response, guestbook.slice(0, 30));
     return;
   }
   response.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
@@ -206,6 +254,24 @@ function gameStock(slug) {
     history: createHistory(baseValues[slug]),
   };
   return stock.games[slug];
+}
+
+function currentRatings() {
+  return {
+    games: Object.fromEntries(games.map((slug) => {
+      const item = gameRating(slug);
+      return [slug, {
+        average: item.count ? Number((item.total / item.count).toFixed(2)) : 0,
+        count: item.count,
+      }];
+    })),
+  };
+}
+
+function gameRating(slug) {
+  ratings.games ??= {};
+  ratings.games[slug] ??= { total: 0, count: 0 };
+  return ratings.games[slug];
 }
 
 function cleanupSessions() {

@@ -14,6 +14,7 @@ const gameTitles = {
 localStorage.setItem(sessionKey, sessionId);
 
 if (slug) {
+  markPlayedGame(slug);
   injectPhotoHint();
   sendJson("/api/game-open", { sessionId, slug });
   heartbeat();
@@ -62,6 +63,7 @@ async function capturePhoto() {
       title: `${gameTitles[slug] || "Oyun"} fotoğrafı`,
       dataUrl,
     });
+    markPhotoCaptured();
     showToast("Resim aldınız");
   } catch {
     showToast("Bu sahnede resim alınamadı");
@@ -84,6 +86,38 @@ async function sendJson(url, payload) {
   } catch {
     // Static preview can run without the live API.
   }
+}
+
+function readBadgeState() {
+  try {
+    return JSON.parse(localStorage.getItem("hakorocks-badge-state") || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function writeBadgeState(state) {
+  localStorage.setItem("hakorocks-badge-state", JSON.stringify({
+    visitedAt: state.visitedAt || new Date().toISOString(),
+    openedGame: Boolean(state.openedGame),
+    playedGames: Array.isArray(state.playedGames) ? state.playedGames : [],
+    photoCount: Number(state.photoCount) || 0,
+    ratedGames: Array.isArray(state.ratedGames) ? state.ratedGames : [],
+    guestbook: Boolean(state.guestbook),
+    trailerPlayed: Boolean(state.trailerPlayed),
+  }));
+}
+
+function markPlayedGame(gameSlug) {
+  const state = readBadgeState();
+  const playedGames = Array.isArray(state.playedGames) ? state.playedGames : [];
+  if (!playedGames.includes(gameSlug)) playedGames.push(gameSlug);
+  writeBadgeState({ ...state, playedGames });
+}
+
+function markPhotoCaptured() {
+  const state = readBadgeState();
+  writeBadgeState({ ...state, photoCount: (Number(state.photoCount) || 0) + 1 });
 }
 
 function showToast(message) {

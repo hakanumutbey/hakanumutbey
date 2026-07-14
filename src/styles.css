@@ -102,6 +102,17 @@ a {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.nav-sound {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid rgba(53, 210, 255, 0.28);
+  border-radius: 8px;
+  color: var(--cyan);
+  background: rgba(53, 210, 255, 0.08);
+  font-weight: 900;
+  cursor: pointer;
+}
+
 .hero {
   position: relative;
   min-height: 92vh;
@@ -253,7 +264,7 @@ h3 {
 
 .about-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.82fr);
+  grid-template-columns: minmax(0, 1fr) minmax(230px, 0.45fr) minmax(320px, 0.82fr);
   gap: 28px;
   align-items: stretch;
 }
@@ -263,6 +274,47 @@ h3 {
   color: var(--muted);
   font-size: 1.05rem;
   line-height: 1.75;
+}
+
+.profile-card {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 22px;
+  border: 1px solid rgba(53, 210, 255, 0.25);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 80% 10%, rgba(53, 210, 255, 0.18), transparent 12rem),
+    rgba(255, 255, 255, 0.055);
+}
+
+.profile-card span,
+.news-card span,
+.badge-card span {
+  width: fit-content;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: #071012;
+  background: var(--cyan);
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.profile-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.profile-card strong {
+  color: var(--green);
+  font-size: 1.35rem;
+}
+
+.profile-card small {
+  color: var(--muted);
+  font-weight: 800;
 }
 
 .resume-section {
@@ -299,6 +351,60 @@ h3 {
   gap: 8px;
   margin: 14px 0 0;
   padding-left: 18px;
+}
+
+.news-section,
+.badges-section,
+.guestbook-section {
+  background: #0b0d10;
+}
+
+.news-grid,
+.badge-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.news-card,
+.badge-card,
+.guestbook-entry {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.news-card {
+  display: grid;
+  gap: 12px;
+}
+
+.news-card p,
+.badge-card p,
+.guestbook-entry p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.badge-card {
+  display: grid;
+  gap: 10px;
+  opacity: 0.62;
+}
+
+.badge-card.is-unlocked {
+  opacity: 1;
+  border-color: rgba(143, 255, 106, 0.32);
+  background:
+    linear-gradient(135deg, rgba(143, 255, 106, 0.12), transparent),
+    rgba(255, 255, 255, 0.055);
+}
+
+.badge-card.is-unlocked span {
+  background: var(--green);
 }
 
 .trailer-section {
@@ -708,6 +814,34 @@ h3 {
   background: #0b0d10;
 }
 
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -10px 0 22px;
+}
+
+.filter-bar button,
+.rating-stars button {
+  border: 1px solid var(--line);
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+
+.filter-bar button {
+  min-height: 36px;
+  padding: 0 11px;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.filter-bar button.is-active {
+  color: #071012;
+  border-color: transparent;
+  background: var(--green);
+}
+
 .photo-grid,
 .modal-photo-row {
   display: grid;
@@ -737,6 +871,76 @@ h3 {
   color: var(--muted);
   font-size: 0.86rem;
   line-height: 1.4;
+}
+
+.guestbook-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
+  gap: 18px;
+}
+
+.guestbook-form,
+.guestbook-list {
+  display: grid;
+  gap: 12px;
+}
+
+.guestbook-form {
+  align-content: start;
+  padding: 20px;
+  border: 1px solid rgba(53, 210, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.guestbook-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.guestbook-form input,
+.guestbook-form textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.22);
+  font: inherit;
+}
+
+.guestbook-form input {
+  min-height: 42px;
+  padding: 0 12px;
+}
+
+.guestbook-form textarea {
+  min-height: 120px;
+  padding: 12px;
+  resize: vertical;
+}
+
+.form-status,
+.guestbook-entry small {
+  margin: 0;
+  color: var(--green);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.guestbook-entry {
+  display: grid;
+  gap: 8px;
+}
+
+.guestbook-entry span {
+  color: var(--cyan);
+  font-weight: 900;
+}
+
+.guestbook-entry.empty {
+  border-style: dashed;
 }
 
 .game-modal[hidden] {
@@ -848,6 +1052,40 @@ h3 {
 
 .game-market.down span {
   color: var(--red);
+}
+
+.rating-box {
+  display: grid;
+  gap: 10px;
+}
+
+.rating-stars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.rating-stars button {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  color: var(--gold);
+  font-size: 1.25rem;
+}
+
+.rating-stars button:hover {
+  color: #071012;
+  background: var(--gold);
+}
+
+.rating-box p,
+.rating-box small {
+  margin: 0;
+  color: var(--muted);
+}
+
+.rating-box strong {
+  color: var(--cyan);
 }
 
 .modal-open {
@@ -1004,10 +1242,13 @@ h3 {
   .about-grid,
   .game-grid,
   .project-grid,
+  .news-grid,
+  .badge-grid,
   .resume-grid,
   .trailer-layout,
   .live-grid,
-  .modal-grid {
+  .modal-grid,
+  .guestbook-layout {
     grid-template-columns: 1fr;
   }
 
@@ -1041,6 +1282,10 @@ h3 {
     padding: 8px 9px;
     font-size: 0.78rem;
     white-space: nowrap;
+  }
+
+  .nav-sound {
+    align-self: stretch;
   }
 
   .hero {
@@ -1094,5 +1339,10 @@ h3 {
   .modal-section.full {
     margin: 0;
     padding: 12px;
+  }
+
+  .rating-stars button {
+    width: 36px;
+    height: 36px;
   }
 }
