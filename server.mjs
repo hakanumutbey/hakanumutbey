@@ -53,6 +53,7 @@ let ratings = await readJson("ratings.json", {
   games: Object.fromEntries(games.map((slug) => [slug, { total: 0, count: 0 }])),
 });
 let guestbook = await readJson("guestbook.json", []);
+let feedback = await readJson("feedback.json", []);
 let announcements = await readJson("announcements.json", []);
 
 createServer(async (request, response) => {
@@ -86,6 +87,10 @@ async function handleApi(request, response) {
   }
   if (request.method === "GET" && url.pathname === "/api/guestbook") {
     sendJson(response, guestbook.slice(0, 30));
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/feedback") {
+    sendJson(response, feedback.slice(0, 30));
     return;
   }
   if (request.method === "GET" && url.pathname === "/api/announcements") {
@@ -174,6 +179,30 @@ async function handleApi(request, response) {
     guestbook = [entry, ...guestbook].slice(0, 60);
     await writeJson("guestbook.json", guestbook);
     sendJson(response, guestbook.slice(0, 30));
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/feedback") {
+    const body = await readBody(request, 64_000);
+    const name = safeText(body.name, 32) || "Ziyaretçi";
+    const kind = ["Geri bildirim", "Talep", "Fikir"].includes(safeText(body.kind, 32))
+      ? safeText(body.kind, 32)
+      : "Geri bildirim";
+    const message = safeText(body.message, 220);
+    if (message.length < 2) {
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "invalid-feedback" }));
+      return;
+    }
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      name,
+      kind,
+      message,
+      createdAt: new Date().toISOString(),
+    };
+    feedback = [entry, ...feedback].slice(0, 60);
+    await writeJson("feedback.json", feedback);
+    sendJson(response, feedback.slice(0, 30));
     return;
   }
   if (request.method === "POST" && url.pathname === "/api/announcements") {

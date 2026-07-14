@@ -373,6 +373,11 @@ h3 {
   align-items: start;
 }
 
+.news-sidebar {
+  display: grid;
+  gap: 16px;
+}
+
 .news-card,
 .badge-card,
 .guestbook-entry {
@@ -391,6 +396,17 @@ h3 {
 .announcement-panel {
   display: grid;
   gap: 16px;
+}
+
+.feedback-panel {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid rgba(143, 255, 106, 0.2);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 80% 10%, rgba(143, 255, 106, 0.16), transparent 12rem),
+    rgba(255, 255, 255, 0.055);
 }
 
 .announcement-editor {
@@ -431,7 +447,10 @@ h3 {
 }
 
 .announcement-form input,
-.announcement-form textarea {
+.announcement-form textarea,
+.feedback-form input,
+.feedback-form textarea,
+.feedback-form select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -440,12 +459,15 @@ h3 {
   font: inherit;
 }
 
-.announcement-form input {
+.announcement-form input,
+.feedback-form input,
+.feedback-form select {
   min-height: 42px;
   padding: 0 12px;
 }
 
-.announcement-form textarea {
+.announcement-form textarea,
+.feedback-form textarea {
   min-height: 140px;
   padding: 12px;
   resize: vertical;
@@ -483,6 +505,56 @@ h3 {
 }
 
 .announcement-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.feedback-form {
+  display: grid;
+  gap: 12px;
+}
+
+.feedback-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.feedback-feed {
+  display: grid;
+  gap: 14px;
+}
+
+.feedback-card {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(143, 255, 106, 0.08), transparent),
+    rgba(255, 255, 255, 0.055);
+}
+
+.feedback-card.empty {
+  border-style: dashed;
+}
+
+.feedback-card span {
+  width: fit-content;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: #081006;
+  background: var(--green);
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.feedback-card p,
+.feedback-card small {
   margin: 0;
   color: var(--muted);
   line-height: 1.6;

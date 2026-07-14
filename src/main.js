@@ -200,6 +200,7 @@ let latestStats = createFallbackStats();
 let latestPhotos = [];
 let latestRatings = createFallbackRatings();
 let latestGuestbook = [];
+let latestFeedback = [];
 let latestAnnouncements = [];
 let selectedGame = games[0];
 let selectedPhotoFilter = "all";
@@ -320,13 +321,43 @@ document.querySelector("#app").innerHTML = `
       <div class="section-heading">
         <p class="eyebrow">Hakorocks Haberleri</p>
         <h2 id="news-title">Stüdyodaki son gelişmeler.</h2>
-        <p class="section-note">Sol tarafta otomatik haber kartları, sağ tarafta şifreli duyuru alanı var.</p>
+        <p class="section-note">Sol tarafta otomatik haber kartları, sağ tarafta public geri bildirim ve şifreli duyuru alanı var.</p>
       </div>
       <div class="news-layout">
         <div class="news-grid">
           ${newsItems.map(renderNewsItem).join("")}
         </div>
-        <div class="announcement-panel">
+        <div class="news-sidebar">
+          <div class="feedback-panel">
+            <div class="announcement-lock">
+              <span>Herkese açık</span>
+              <strong>Geri bildirim ve talepler</strong>
+            </div>
+            <form class="feedback-form" data-feedback-form>
+              <label>
+                İsim
+                <input name="name" maxlength="32" placeholder="İstersen adını yaz" />
+              </label>
+              <label>
+                Tür
+                <select name="kind">
+                  <option value="Geri bildirim">Geri bildirim</option>
+                  <option value="Talep">Talep</option>
+                  <option value="Fikir">Fikir</option>
+                </select>
+              </label>
+              <label>
+                Mesaj
+                <textarea name="message" maxlength="220" placeholder="Site veya oyunlar için kısa not" required></textarea>
+              </label>
+              <button class="button primary" type="submit">Gönder</button>
+              <p class="form-status" data-feedback-status aria-live="polite"></p>
+            </form>
+            <div class="feedback-feed" data-feedback-list>
+              ${renderFeedback()}
+            </div>
+          </div>
+          <div class="announcement-panel">
           <div class="announcement-editor">
             <div class="announcement-lock">
               <span>Şifreli alan</span>
@@ -351,6 +382,7 @@ document.querySelector("#app").innerHTML = `
           </div>
           <div class="announcement-feed" data-announcement-list>
             ${renderAnnouncements()}
+          </div>
           </div>
         </div>
       </div>
@@ -575,6 +607,17 @@ function renderAnnouncementCard(item) {
   `;
 }
 
+function renderFeedbackCard(item) {
+  return `
+    <article class="feedback-card">
+      <span>${escapeHtml(item.kind || "Geri bildirim")}</span>
+      <h3>${escapeHtml(item.name || "Ziyaretçi")}</h3>
+      <p>${escapeHtml(item.message || "")}</p>
+      <small>${formatDate(item.createdAt)}</small>
+    </article>
+  `;
+}
+
 function renderAnnouncements() {
   if (!latestAnnouncements.length) {
     return `
@@ -586,6 +629,19 @@ function renderAnnouncements() {
     `;
   }
   return latestAnnouncements.slice(0, 6).map(renderAnnouncementCard).join("");
+}
+
+function renderFeedback() {
+  if (!latestFeedback.length) {
+    return `
+      <article class="feedback-card empty">
+        <span>Hazır</span>
+        <h3>İlk geri bildirimi bekliyor</h3>
+        <p>Buraya site veya oyunlar için taleplerini yazabilirsin.</p>
+      </article>
+    `;
+  }
+  return latestFeedback.slice(0, 8).map(renderFeedbackCard).join("");
 }
 
 function renderBadges() {
@@ -904,6 +960,7 @@ function bindGameCards() {
   });
   document.querySelector("[data-sound-toggle]")?.addEventListener("click", toggleSound);
   document.querySelector("[data-guestbook-form]")?.addEventListener("submit", submitGuestbook);
+  document.querySelector("[data-feedback-form]")?.addEventListener("submit", submitFeedback);
   document.querySelector("[data-announcement-form]")?.addEventListener("submit", submitAnnouncement);
 }
 
@@ -983,6 +1040,34 @@ async function submitGuestbook(event) {
   }
 }
 
+async function submitFeedback(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const status = document.querySelector("[data-feedback-status]");
+  const formData = new FormData(form);
+  const payload = {
+    name: formData.get("name"),
+    kind: formData.get("kind"),
+    message: formData.get("message"),
+  };
+  status.textContent = "Gönderiliyor...";
+  try {
+    const response = await fetch("/api/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "feedback-failed");
+    latestFeedback = data;
+    form.reset();
+    status.textContent = "Geri bildirim gönderildi.";
+    renderFeedbackFeed();
+  } catch {
+    status.textContent = "Gönderim başarısız. Tekrar dene.";
+  }
+}
+
 function renderBadgeGrid() {
   const grid = document.querySelector("[data-badge-grid]");
   if (grid) grid.innerHTML = renderBadges();
@@ -1001,6 +1086,11 @@ function renderPhotoGrid() {
 function renderGuestbookList() {
   const list = document.querySelector("[data-guestbook-list]");
   if (list) list.innerHTML = renderGuestbook();
+}
+
+function renderFeedbackFeed() {
+  const list = document.querySelector("[data-feedback-list]");
+  if (list) list.innerHTML = renderFeedback();
 }
 
 async function submitAnnouncement(event) {
@@ -1108,17 +1198,19 @@ async function refreshLiveData() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    const [statsResponse, photosResponse, ratingsResponse, guestbookResponse, announcementsResponse] = await Promise.all([
+    const [statsResponse, photosResponse, ratingsResponse, guestbookResponse, feedbackResponse, announcementsResponse] = await Promise.all([
       fetch("/api/stats"),
       fetch("/api/photos"),
       fetch("/api/ratings"),
       fetch("/api/guestbook"),
+      fetch("/api/feedback"),
       fetch("/api/announcements"),
     ]);
     latestStats = await statsResponse.json();
     latestPhotos = await photosResponse.json();
     latestRatings = await ratingsResponse.json();
     latestGuestbook = await guestbookResponse.json();
+    latestFeedback = await feedbackResponse.json();
     latestAnnouncements = await announcementsResponse.json();
   } catch {
     latestStats = createFallbackStats();
@@ -1126,6 +1218,7 @@ async function refreshLiveData() {
 
   renderLiveData();
   renderAnnouncementFeed();
+  renderFeedbackFeed();
   if (!document.querySelector("[data-game-modal]").hidden) {
     document.querySelector("[data-modal-content]").innerHTML = renderModal(selectedGame);
   }
@@ -1152,6 +1245,7 @@ bindGameCards();
 bindTrailer();
 updateSoundButton();
 renderBadgeGrid();
+renderFeedbackFeed();
 renderAnnouncementFeed();
 refreshLiveData();
 setInterval(refreshLiveData, 10000);
