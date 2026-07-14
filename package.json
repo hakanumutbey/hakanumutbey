@@ -7,7 +7,7 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build && node scripts/build-games.mjs",
     "preview": "vite preview --host 0.0.0.0",
-    "serve": "npx serve dist -l 3000"
+    "serve": "node server.mjs"
   },
   "dependencies": {},
   "devDependencies": {

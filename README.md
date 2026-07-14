@@ -43,18 +43,20 @@ hakanumutbey/
 ├── oyunlar/             # Tarayıcıdan oynanabilen oyun kaynakları
 ├── projeler/            # Yeni web projeleri ve denemeler
 ├── scripts/             # Build ve dağıtım yardımcıları
+├── server.mjs           # Canlı sayaç, oyun borsası ve fotoğraf API'si
 ├── Dockerfile           # Coolify için üretim imajı
-├── docker-compose.yml   # Coolify otomatik ayağa kaldırma
-└── nginx.conf           # Statik site ve oyun servis ayarı
+└── docker-compose.yml   # Coolify otomatik ayağa kaldırma
 ```
 
 ## Yayın Akışı
 
 - Ana site **Vite** ile build edilir.
 - Oyunlar `npm run build` sırasında `dist/oyunlar/` altına hazırlanır.
-- Üretimde **Nginx** statik dosyaları sunar.
+- Üretimde `server.mjs` statik dosyaları ve canlı API'yi sunar.
 - Coolify, `docker-compose.yml` üzerinden container'ı ayağa kaldırır.
 - `main` branch'e push sonrası site yeniden build edilip yayına alınır.
+- Oyunlarda `Ö` tuşu ile fotoğraf alınır; fotoğraflar canlı sitede oyunların altında görünür.
+- Site açık kişi, oyunda kişi ve oyun borsa grafikleri canlı API ile güncellenir.
 
 ## Geliştirme
 

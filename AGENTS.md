@@ -20,7 +20,8 @@ Bu repo `hakanumutbey` GitHub profil reposu ve ayni zamanda `https://hakorocks.a
 ## Yayin ve build
 
 - Coolify bu repoyu `docker-compose.yml` ile Docker Compose olarak calistirir.
-- Uretim imaji `Dockerfile` ile build edilir ve Nginx statik dosyalari sunar.
+- Uretim imaji `Dockerfile` ile build edilir; `server.mjs` statik dosyalari ve canli API'yi sunar.
+- `docker-compose.yml` host port bind etmemeli; Coolify reverse proxy icin sadece container portu expose edilmelidir.
 - `main` branch'e push sonrasi Coolify otomatik yayin alacak sekilde dusunulmelidir.
 - Degisikliklerden sonra mumkunse `npm run build` calistirilip dogrulanmalidir.
 

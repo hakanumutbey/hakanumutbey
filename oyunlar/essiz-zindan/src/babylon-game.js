@@ -229,7 +229,6 @@ export class BabylonDungeonGame {
     this.checkpointIndex = 0;
     this.maxHp = 5;
     this.hp = this.maxHp;
-    this.debugImmortal = false;
     this.state = "playing";
     this.stateTime = 0;
     this.stateStartedAt = performance.now();
@@ -555,7 +554,7 @@ export class BabylonDungeonGame {
   }
 
   isGameKey(keys) {
-    return keys.some((key) => ["KeyW", "KeyA", "KeyS", "KeyD", "w", "a", "s", "d", "ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight", "arrowup", "arrowleft", "arrowdown", "arrowright", "Space", " ", "Enter", "enter", "Shift", "shift", "ShiftLeft", "ShiftRight", "Digit1", "Digit2", "Digit3", "1", "2", "3", "KeyE", "e", "KeyR", "r", "KeyO", "o", "KeyF", "f"].includes(key));
+    return keys.some((key) => ["KeyW", "KeyA", "KeyS", "KeyD", "w", "a", "s", "d", "ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight", "arrowup", "arrowleft", "arrowdown", "arrowright", "Space", " ", "Enter", "enter", "Shift", "shift", "ShiftLeft", "ShiftRight", "Digit1", "Digit2", "Digit3", "1", "2", "3", "KeyE", "e", "KeyR", "r", "KeyF", "f"].includes(key));
   }
 
   keyDown(...keys) {
@@ -1594,12 +1593,6 @@ export class BabylonDungeonGame {
     this.stateTime += dt;
     this.updateGamepadInput();
     this.updateMusic(dt);
-    if (this.pressed("KeyO", "o")) {
-      this.debugImmortal = !this.debugImmortal;
-      this.damageFlash = this.debugImmortal ? 0 : this.damageFlash;
-      this.healFlash = this.debugImmortal ? 0.9 : this.healFlash;
-      this.updateHud();
-    }
     this.attackCooldown = Math.max(0, this.attackCooldown - dt);
     this.attackTimer = Math.max(0, this.attackTimer - dt);
     this.rageWaveTimer = Math.max(0, this.rageWaveTimer - dt);
@@ -2026,11 +2019,6 @@ export class BabylonDungeonGame {
   }
 
   takeDamage(enemy) {
-    if (this.debugImmortal) {
-      this.invulnerable = 0.35;
-      this.healFlash = 0.45;
-      return;
-    }
     this.hp = Math.max(0, this.hp - 1);
     this.updateHud();
     this.invulnerable = 1.05;
@@ -2805,10 +2793,9 @@ export class BabylonDungeonGame {
 
     const hint = this.hud.querySelector("[data-hint]");
     if (hint) {
-      const immortal = this.debugImmortal ? " - O: ölümsüzlük açık" : " - O: ölümsüzlük";
       const music = this.musicEnabled ? " - Müzik açık" : " - Müzik kapalı";
       const maps = this.mapFragments > 0 ? ` - Harita: ${this.mapFragments}/3` : "";
-      hint.textContent = `WASD / gamepad - Space saldırı - E öfke - F tam ekran - Kılıç: ${POWER_NAMES[this.swordPower] ?? "Normal"}${maps}${immortal}${music}`;
+      hint.textContent = `WASD / gamepad - Space saldırı - E öfke - F tam ekran - Kılıç: ${POWER_NAMES[this.swordPower] ?? "Normal"}${maps}${music}`;
     }
   }
 
