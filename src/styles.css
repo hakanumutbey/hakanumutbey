@@ -1359,14 +1359,30 @@ h3 {
   padding: 22px;
 }
 
-.project-card span {
+.project-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.project-card span,
+.project-card em {
   width: fit-content;
   padding: 7px 9px;
   border-radius: 6px;
-  color: #081006;
-  background: var(--gold);
   font-size: 0.78rem;
   font-weight: 900;
+  font-style: normal;
+}
+
+.project-card span {
+  color: #081006;
+  background: var(--gold);
+}
+
+.project-card em {
+  color: #071012;
+  background: var(--green);
 }
 
 .site-footer {

@@ -90,19 +90,22 @@ const games = [
 
 const upcomingGames = [
   {
-    title: "Uzay Macerası",
-    description: "Keşfet, savaş, eğlen. Yeni fragmanda görünen uzay temalı oyun dünyası.",
-    label: "Yakında",
+    title: "RHGPO",
+    description: "Rüzgarlı havada gemi park etme oyunu; patates ve patates kızartmasıyla hayatta kalma fikri üzerinde çalışılıyor.",
+    label: "Yeni fikir",
+    status: "Hazırlanıyor",
   },
   {
-    title: "Hakorocks Launcher",
-    description: "Oyun istatistiklerini, başarımları ve yeni sürümleri tek merkezde gösterecek panel.",
-    label: "Planlanıyor",
+    title: "Siyah Adam",
+    description: "Among Us benzeri çok oyunculu gizem oyunu; hesap sistemi ve oturum akışı hazırlanıyor.",
+    label: "Çok oyunculu",
+    status: "Hazırlanıyor",
   },
   {
     title: "Skeleton Wars 2",
     description: "Karanlık gözlerden başlayan yeni bölüm için hazırlık klasörü hazır.",
-    label: "Hazırlık",
+    label: "Devam ediyor",
+    status: "Hazırlanıyor",
   },
 ];
 
@@ -580,7 +583,10 @@ function renderGameCard(game, index) {
 function renderProjectCard(project) {
   return `
     <article class="project-card">
-      <span>${project.label}</span>
+      <div class="project-badges">
+        <span>${project.label}</span>
+        ${project.status ? `<em>${project.status}</em>` : ""}
+      </div>
       <h3>${project.title}</h3>
       <p>${project.description}</p>
     </article>
