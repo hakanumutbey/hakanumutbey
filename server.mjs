@@ -380,33 +380,46 @@ async function handleApi(request, response) {
     }
     const normalizedNickname = normalizeNickname(nickname);
     const taken = accounts.find((account) => normalizeNickname(account.nickname) === normalizedNickname && account.sessionId !== sessionId);
-    if (taken) {
+    if (taken && normalizeNickname(taken.name) !== normalizeNickname(name)) {
       response.writeHead(409, { "Content-Type": "application/json; charset=utf-8" });
       response.end(JSON.stringify({ error: "nickname-taken" }));
       return;
     }
     const now = new Date().toISOString();
     const existing = accounts.find((account) => account.sessionId === sessionId);
-    const account = existing
-      ? Object.assign(existing, {
-        name,
-        nickname,
-        avatarUrl,
-        voiceRoomId: existing.voiceRoomId || "",
-        updatedAt: now,
-      })
-      : {
-        id: createRecordId("acct"),
+    const restored = taken && normalizeNickname(taken.name) === normalizeNickname(name);
+    const account = restored
+      ? Object.assign(taken, {
         sessionId,
         name,
         nickname,
         avatarUrl,
-        voiceRoomId: "",
-        createdAt: now,
+        voiceRoomId: taken.voiceRoomId || "",
         updatedAt: now,
-        friends: [],
-      };
-    if (!existing) accounts = [account, ...accounts];
+      })
+      : existing
+        ? Object.assign(existing, {
+          name,
+          nickname,
+          avatarUrl,
+          voiceRoomId: existing.voiceRoomId || "",
+          updatedAt: now,
+        })
+        : {
+          id: createRecordId("acct"),
+          sessionId,
+          name,
+          nickname,
+          avatarUrl,
+          voiceRoomId: "",
+          createdAt: now,
+          updatedAt: now,
+          friends: [],
+        };
+    if (restored && existing && existing.id !== taken.id) {
+      accounts = accounts.filter((item) => item.id !== existing.id);
+    }
+    if (!existing && !restored) accounts = [account, ...accounts];
     await writeJson("accounts.json", accounts);
     sendJson(response, accountSnapshot(sessionId));
     return;
