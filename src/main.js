@@ -205,6 +205,8 @@ let latestRatings = createFallbackRatings();
 let latestGuestbook = [];
 let latestFeedback = [];
 let latestAnnouncements = [];
+let latestSocial = createFallbackSocial();
+let notificationPermission = "Notification" in window ? Notification.permission : "default";
 let selectedGame = games[0];
 let selectedPhotoFilter = "all";
 let soundEnabled = localStorage.getItem("hakorocks-sound") !== "off";
@@ -223,6 +225,7 @@ document.querySelector("#app").innerHTML = `
       <a href="#oyunlar">Oyunlar</a>
       <a href="#canli">Canlı</a>
       <a href="#haberler">Haberler</a>
+      <a href="#hesap">Hesap</a>
       <a href="#rozetler">Rozetler</a>
       <a href="#yakinda">Yakında</a>
       <a href="#defter">Defter</a>
@@ -244,6 +247,7 @@ document.querySelector("#app").innerHTML = `
         </p>
         <div class="hero-actions">
           <a class="button primary" href="#oyunlar">Oyunları aç</a>
+          <a class="button secondary" href="#hesap">Hesap oluştur</a>
           <a class="button secondary" href="#fragman">Fragmanı izle</a>
         </div>
       </div>
@@ -361,33 +365,75 @@ document.querySelector("#app").innerHTML = `
             </div>
           </div>
           <div class="announcement-panel">
-          <div class="announcement-editor">
-            <div class="announcement-lock">
-              <span>Şifreli alan</span>
-              <strong>Duyuru yayınla</strong>
+            <div class="announcement-editor">
+              <div class="announcement-lock">
+                <span>Şifreli alan</span>
+                <strong>Duyuru yayınla</strong>
+              </div>
+              <form class="announcement-form" data-announcement-form>
+                <label>
+                  Şifre
+                  <input name="password" type="password" autocomplete="current-password" placeholder="Duyuru şifresi" required />
+                </label>
+                <label>
+                  Başlık
+                  <input name="title" maxlength="60" placeholder="Duyuru başlığı" required />
+                </label>
+                <label>
+                  Duyuru
+                  <textarea name="message" maxlength="240" placeholder="Arkadaşlarına göstermek istediğin mesaj" required></textarea>
+                </label>
+                <button class="button primary" type="submit">Duyuru yayınla</button>
+                <p class="form-status" data-announcement-status aria-live="polite"></p>
+              </form>
             </div>
-            <form class="announcement-form" data-announcement-form>
-              <label>
-                Şifre
-                <input name="password" type="password" autocomplete="current-password" placeholder="Duyuru şifresi" required />
-              </label>
-              <label>
-                Başlık
-                <input name="title" maxlength="60" placeholder="Duyuru başlığı" required />
-              </label>
-              <label>
-                Duyuru
-                <textarea name="message" maxlength="240" placeholder="Arkadaşlarına göstermek istediğin mesaj" required></textarea>
-              </label>
-              <button class="button primary" type="submit">Duyuru yayınla</button>
-              <p class="form-status" data-announcement-status aria-live="polite"></p>
-            </form>
-          </div>
-          <div class="announcement-feed" data-announcement-list>
-            ${renderAnnouncements()}
-          </div>
+            <div class="announcement-feed" data-announcement-list>
+              ${renderAnnouncements()}
+            </div>
           </div>
         </div>
+      </div>
+    </section>
+
+    <section class="section social-section" id="hesap" aria-labelledby="social-title">
+      <div class="section-heading">
+        <p class="eyebrow">Siyah Adam hesabı</p>
+        <h2 id="social-title">Arkadaş, davet ve profil sistemi burada hazırlanıyor.</h2>
+        <p class="section-note">İlk girişte hesap oluştur; isim, takma ad ve basit robot onayı ister. Profil fotoğrafı eklersen görünür, eklemezsen adının baş harfi kullanılır.</p>
+      </div>
+      <div class="account-layout">
+        <article class="account-panel">
+          <div class="account-panel-head">
+            <div>
+              <span>Hesap oluştur</span>
+              <strong>Yeni profil</strong>
+            </div>
+            <button class="button secondary" type="button" data-notification-permission>Bildirimleri aç</button>
+          </div>
+          <form class="account-form" data-account-form>
+            <label>
+              İsim
+              <input name="name" maxlength="40" placeholder="Gerçek ad" autocomplete="name" required />
+            </label>
+            <label>
+              Takma ad
+              <input name="nickname" maxlength="24" placeholder="Oyunda görünecek ad" autocomplete="nickname" required />
+            </label>
+            <label>
+              Profil resmi
+              <input name="avatar" type="file" accept="image/*" />
+            </label>
+            <label class="check-row">
+              <input name="robotConfirmed" type="checkbox" />
+              Ben robot değilim
+            </label>
+            <button class="button primary" type="submit">Hesap oluştur</button>
+            <p class="form-status" data-account-status aria-live="polite"></p>
+          </form>
+        </article>
+        <article class="account-panel" data-account-dashboard>
+          ${renderAccountDashboard()}
+        </article>
       </div>
     </section>
 
@@ -648,6 +694,188 @@ function renderFeedback() {
     `;
   }
   return latestFeedback.slice(0, 8).map(renderFeedbackCard).join("");
+}
+
+function createFallbackSocial() {
+  return {
+    account: null,
+    people: [],
+    incomingRequests: [],
+    outgoingRequests: [],
+    invites: [],
+    friends: [],
+  };
+}
+
+function avatarMarkup(account, size = "medium") {
+  const letter = (account?.nickname || account?.name || "H").trim().charAt(0).toUpperCase();
+  const avatarUrl = account?.avatarUrl || "";
+  return avatarUrl
+    ? `<img class="avatar avatar-${size}" src="${avatarUrl}" alt="${escapeHtml(account?.nickname || account?.name || "Profil resmi")}" loading="lazy" />`
+    : `<div class="avatar avatar-${size} avatar-fallback" aria-hidden="true">${escapeHtml(letter)}</div>`;
+}
+
+function renderAccountDashboard() {
+  const { account, people, incomingRequests, outgoingRequests, invites, friends } = latestSocial;
+  if (!account) {
+    return `
+      <div class="account-empty">
+        <span>Hazır değil</span>
+        <h3>Önce hesabını oluştur</h3>
+        <p>Takma adını ve profilini girince arkadaş ekleme, davet gönderme ve bildirimler açılır.</p>
+        <ul class="clean-list">
+          <li>Arkadaş isteği gönder</li>
+          <li>Çok oyunculu davet al</li>
+          <li>Profil resmini kullan veya baş harfini göster</li>
+        </ul>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="account-profile">
+      <div class="account-profile-head">
+        ${avatarMarkup(account, "large")}
+        <div>
+          <span>Aktif profil</span>
+          <h3>${escapeHtml(account.name)}</h3>
+          <p>@${escapeHtml(account.nickname)}</p>
+        </div>
+      </div>
+      <div class="account-metrics">
+        <div><strong>${friends.length}</strong><span>arkadaş</span></div>
+        <div><strong>${incomingRequests.length}</strong><span>istek</span></div>
+        <div><strong>${invites.length}</strong><span>davet</span></div>
+      </div>
+    </div>
+    <div class="account-social-grid">
+      <section class="account-box">
+        <h4>Arkadaş ekle</h4>
+        <form class="mini-form" data-friend-form>
+          <label>
+            Takma ad
+            <input name="targetNickname" maxlength="24" placeholder="Örn: hakan" required />
+          </label>
+          <label>
+            Mesaj
+            <input name="message" maxlength="120" placeholder="İstersen kısa not bırak" />
+          </label>
+          <button class="button primary" type="submit">İstek gönder</button>
+          <p class="form-status" data-friend-status aria-live="polite"></p>
+        </form>
+        <div class="people-list">
+          ${people.length ? people.slice(0, 6).map(renderPersonCard).join("") : `<p class="muted-copy">Yakın zamanda burada önerilen kişiler görünecek.</p>`}
+        </div>
+      </section>
+      <section class="account-box">
+        <h4>Gelen istekler</h4>
+        <div class="request-list" data-friend-request-list>
+          ${renderFriendRequests(incomingRequests)}
+        </div>
+      </section>
+      <section class="account-box">
+        <h4>Davetler</h4>
+        <form class="mini-form" data-invite-form>
+          <label>
+            Arkadaş takma adı
+            <input name="targetNickname" maxlength="24" placeholder="Arkadaşın takma adı" required />
+          </label>
+          <label>
+            Oyun
+            <select name="gameSlug">
+              <option value="robot-avcisi">Robot Avcısı</option>
+              <option value="skeleton-wars">Skeleton Wars</option>
+              <option value="vale">Vale</option>
+            </select>
+          </label>
+          <label>
+            Not
+            <input name="message" maxlength="120" placeholder="Davet notu" />
+          </label>
+          <button class="button primary" type="submit">Davet et</button>
+          <p class="form-status" data-invite-status aria-live="polite"></p>
+        </form>
+        <div class="invite-list">
+          ${renderInvites(invites)}
+        </div>
+      </section>
+      <section class="account-box">
+        <h4>Arkadaşların</h4>
+        <div class="friend-list">
+          ${friends.length ? friends.map(renderFriendCard).join("") : `<p class="muted-copy">Henüz arkadaş yok. Önce istek gönder.</p>`}
+        </div>
+      </section>
+      <section class="account-box">
+        <h4>Dışarıdan görünen örnek hesaplar</h4>
+        <div class="people-list">
+          ${people.slice(0, 4).map(renderPersonCard).join("")}
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function renderPersonCard(person) {
+  return `
+    <article class="person-card">
+      ${avatarMarkup(person)}
+      <div>
+        <strong>${escapeHtml(person.name)}</strong>
+        <span>@${escapeHtml(person.nickname)}</span>
+      </div>
+    </article>
+  `;
+}
+
+function renderFriendCard(friend) {
+  return `
+    <article class="person-card">
+      ${avatarMarkup(friend)}
+      <div>
+        <strong>${escapeHtml(friend.name)}</strong>
+        <span>@${escapeHtml(friend.nickname)}</span>
+      </div>
+    </article>
+  `;
+}
+
+function renderFriendRequests(requests) {
+  if (!requests.length) {
+    return `<p class="muted-copy">Gelen arkadaş isteği yok.</p>`;
+  }
+  return requests.map((request) => `
+    <article class="request-card">
+      ${avatarMarkup(request.from)}
+      <div>
+        <strong>${escapeHtml(request.from?.name || "Bilinmeyen")}</strong>
+        <span>@${escapeHtml(request.from?.nickname || "")}</span>
+        <p>${escapeHtml(request.message || "Arkadaşlık isteği")}</p>
+      </div>
+      <div class="request-actions">
+        <button class="button primary" type="button" data-friend-response="accept" data-request-id="${request.id}">Kabul et</button>
+        <button class="button secondary" type="button" data-friend-response="decline" data-request-id="${request.id}">Reddet</button>
+      </div>
+    </article>
+  `).join("");
+}
+
+function renderInvites(list) {
+  if (!list.length) {
+    return `<p class="muted-copy">Henüz davet yok.</p>`;
+  }
+  return list.map((invite) => `
+    <article class="request-card">
+      ${avatarMarkup(invite.from)}
+      <div>
+        <strong>${escapeHtml(invite.from?.name || "Bilinmeyen")}</strong>
+        <span>${escapeHtml(invite.gameSlug)}</span>
+        <p>${escapeHtml(invite.message || "Oyun daveti")}</p>
+      </div>
+      <div class="request-actions">
+        <span class="status-pill">Bekliyor</span>
+      </div>
+    </article>
+  `).join("");
 }
 
 function renderBadges() {
@@ -968,6 +1196,11 @@ function bindGameCards() {
   document.querySelector("[data-guestbook-form]")?.addEventListener("submit", submitGuestbook);
   document.querySelector("[data-feedback-form]")?.addEventListener("submit", submitFeedback);
   document.querySelector("[data-announcement-form]")?.addEventListener("submit", submitAnnouncement);
+  document.querySelector("[data-account-form]")?.addEventListener("submit", submitAccount);
+  document.querySelector("[data-friend-form]")?.addEventListener("submit", submitFriendRequest);
+  document.querySelector("[data-invite-form]")?.addEventListener("submit", submitInvite);
+  document.querySelector("[data-notification-permission]")?.addEventListener("click", requestNotificationPermission);
+  document.addEventListener("click", handleAccountActions);
 }
 
 function openGameModal(slug) {
@@ -1094,6 +1327,19 @@ function renderGuestbookList() {
   if (list) list.innerHTML = renderGuestbook();
 }
 
+function renderSocialDashboard() {
+  const panel = document.querySelector("[data-account-dashboard]");
+  if (panel) panel.innerHTML = renderAccountDashboard();
+  bindSocialForms();
+}
+
+function bindSocialForms() {
+  document.querySelector("[data-account-form]")?.addEventListener("submit", submitAccount);
+  document.querySelector("[data-friend-form]")?.addEventListener("submit", submitFriendRequest);
+  document.querySelector("[data-invite-form]")?.addEventListener("submit", submitInvite);
+  document.querySelector("[data-notification-permission]")?.addEventListener("click", requestNotificationPermission);
+}
+
 function renderFeedbackFeed() {
   const list = document.querySelector("[data-feedback-list]");
   if (list) list.innerHTML = renderFeedback();
@@ -1126,6 +1372,151 @@ async function submitAnnouncement(event) {
     status.textContent = error?.message === "invalid-password"
       ? "Şifre yanlış."
       : "Duyuru yayımlanamadı. Tekrar dene.";
+  }
+}
+
+async function submitAccount(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const status = document.querySelector("[data-account-status]");
+  const formData = new FormData(form);
+  const payload = {
+    sessionId,
+    name: formData.get("name"),
+    nickname: formData.get("nickname"),
+    robotConfirmed: formData.get("robotConfirmed") === "on",
+  };
+  status.textContent = "Kontrol ediliyor...";
+  try {
+    const avatarFile = formData.get("avatar");
+    if (avatarFile instanceof File && avatarFile.size > 0) {
+      payload.avatarUrl = await fileToDataUrl(avatarFile);
+    }
+    const response = await fetch("/api/account", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "account-failed");
+    latestSocial = data;
+    form.reset();
+    status.textContent = "Hesap oluşturuldu.";
+    renderSocialDashboard();
+    maybeNotifySocialChanges();
+  } catch (error) {
+    status.textContent = error?.message === "nickname-taken"
+      ? "Bu takma ad alınmış."
+      : error?.message === "invalid-account"
+        ? "İsim, takma ad ve robot onayı gerekli."
+        : error?.message === "avatar-too-large"
+          ? "Profil resmi fazla büyük."
+          : "Hesap oluşturulamadı.";
+  }
+}
+
+async function submitFriendRequest(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const status = document.querySelector("[data-friend-status]");
+  const formData = new FormData(form);
+  const payload = {
+    sessionId,
+    targetNickname: formData.get("targetNickname"),
+    message: formData.get("message"),
+  };
+  status.textContent = "Gönderiliyor...";
+  try {
+    const response = await fetch("/api/friends/request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "friend-request-failed");
+    latestSocial = data;
+    form.reset();
+    status.textContent = "Arkadaş isteği gönderildi.";
+    renderSocialDashboard();
+  } catch (error) {
+    status.textContent = error?.message === "account-missing"
+      ? "Önce hesap oluştur."
+      : error?.message === "user-not-found"
+        ? "Bu takma ad bulunamadı."
+        : error?.message === "already-friends"
+          ? "Zaten arkadaşsınız."
+          : "İstek gönderilemedi.";
+  }
+}
+
+async function submitInvite(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const status = document.querySelector("[data-invite-status]");
+  const formData = new FormData(form);
+  const payload = {
+    sessionId,
+    targetNickname: formData.get("targetNickname"),
+    gameSlug: formData.get("gameSlug"),
+    message: formData.get("message"),
+  };
+  status.textContent = "Gönderiliyor...";
+  try {
+    const response = await fetch("/api/invites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "invite-failed");
+    latestSocial = data;
+    form.reset();
+    status.textContent = "Davet gönderildi.";
+    renderSocialDashboard();
+  } catch (error) {
+    status.textContent = error?.message === "not-friends"
+      ? "Önce arkadaş olmanız gerekiyor."
+      : error?.message === "user-not-found"
+        ? "Bu takma ad bulunamadı."
+        : "Davet gönderilemedi.";
+  }
+}
+
+async function requestNotificationPermission() {
+  if (!("Notification" in window)) {
+    const status = document.querySelector("[data-account-status]");
+    if (status) status.textContent = "Bu tarayıcı bildirimleri desteklemiyor.";
+    return;
+  }
+  notificationPermission = await Notification.requestPermission();
+  const status = document.querySelector("[data-account-status]");
+  if (status) {
+    status.textContent = notificationPermission === "granted"
+      ? "Masaüstü bildirimleri açıldı."
+      : "Bildirim izni verilmedi.";
+  }
+}
+
+function handleAccountActions(event) {
+  const button = event.target.closest?.("[data-friend-response]");
+  if (!button) return;
+  void respondFriendRequest(button.dataset.requestId, button.dataset.friendResponse);
+}
+
+async function respondFriendRequest(requestId, action) {
+  try {
+    const response = await fetch("/api/friends/respond", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId, requestId, action }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "request-response-failed");
+    latestSocial = data;
+    renderSocialDashboard();
+  } catch {
+    const status = document.querySelector("[data-account-status]");
+    if (status) status.textContent = "İstek güncellenemedi.";
   }
 }
 
@@ -1204,13 +1595,14 @@ async function refreshLiveData() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    const [statsResponse, photosResponse, ratingsResponse, guestbookResponse, feedbackResponse, announcementsResponse] = await Promise.all([
+    const [statsResponse, photosResponse, ratingsResponse, guestbookResponse, feedbackResponse, announcementsResponse, accountResponse] = await Promise.all([
       fetch("/api/stats"),
       fetch("/api/photos"),
       fetch("/api/ratings"),
       fetch("/api/guestbook"),
       fetch("/api/feedback"),
       fetch("/api/announcements"),
+      fetch(`/api/account?sessionId=${encodeURIComponent(sessionId)}`),
     ]);
     latestStats = await statsResponse.json();
     latestPhotos = await photosResponse.json();
@@ -1218,13 +1610,17 @@ async function refreshLiveData() {
     latestGuestbook = await guestbookResponse.json();
     latestFeedback = await feedbackResponse.json();
     latestAnnouncements = await announcementsResponse.json();
+    latestSocial = await accountResponse.json();
   } catch {
     latestStats = createFallbackStats();
+    latestSocial = createFallbackSocial();
   }
 
   renderLiveData();
   renderAnnouncementFeed();
   renderFeedbackFeed();
+  renderSocialDashboard();
+  maybeNotifySocialChanges();
   if (!document.querySelector("[data-game-modal]").hidden) {
     document.querySelector("[data-modal-content]").innerHTML = renderModal(selectedGame);
   }
@@ -1253,5 +1649,44 @@ updateSoundButton();
 renderBadgeGrid();
 renderFeedbackFeed();
 renderAnnouncementFeed();
+renderSocialDashboard();
 refreshLiveData();
 setInterval(refreshLiveData, 10000);
+
+function maybeNotifySocialChanges() {
+  if (!("Notification" in window) || notificationPermission !== "granted" || !latestSocial.account) return;
+  const seenRequests = new Set(JSON.parse(localStorage.getItem("hakorocks-seen-requests") || "[]"));
+  const seenInvites = new Set(JSON.parse(localStorage.getItem("hakorocks-seen-invites") || "[]"));
+  const unseenRequests = latestSocial.incomingRequests.filter((request) => !seenRequests.has(request.id));
+  const unseenInvites = latestSocial.invites.filter((invite) => !seenInvites.has(invite.id));
+
+  for (const request of unseenRequests) {
+    new Notification("Yeni arkadaş isteği", {
+      body: `${request.from?.nickname || "Birisi"} sana arkadaşlık isteği gönderdi.`,
+    });
+    seenRequests.add(request.id);
+  }
+
+  for (const invite of unseenInvites) {
+    new Notification("Yeni oyun daveti", {
+      body: `${invite.from?.nickname || "Birisi"} seni ${invite.gameSlug} için davet etti.`,
+    });
+    seenInvites.add(invite.id);
+  }
+
+  localStorage.setItem("hakorocks-seen-requests", JSON.stringify([...seenRequests]));
+  localStorage.setItem("hakorocks-seen-invites", JSON.stringify([...seenInvites]));
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    if (file.size > 250_000) {
+      reject(new Error("avatar-too-large"));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("avatar-read-failed"));
+    reader.readAsDataURL(file);
+  });
+}

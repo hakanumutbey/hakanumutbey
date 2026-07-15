@@ -59,6 +59,7 @@ hakanumutbey/
 - Site açık kişi, oyunda kişi ve oyun borsa grafikleri canlı API ile güncellenir.
 - Oyunlara yıldız puanı, ziyaretçi defteri, rozetler, haberler, ses efektleri ve galeri filtresi eklidir.
 - Haberler bölümünde herkese açık geri bildirim/talep alanı ve şifreli duyuru formu vardır; duyurular `/api/announcements` ile yayınlanır.
+- Siyah Adam için hesap sistemi; isim, takma ad, profil resmi, arkadaş isteği, davet ve masaüstü bildirim akışı hazırlanır.
 - Site `hakorocks.akadal.tr` üzerinden herkese açık bir oyun vitrini olarak çalışır.
 
 ## Geliştirme

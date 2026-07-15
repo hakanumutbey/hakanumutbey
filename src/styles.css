@@ -398,6 +398,243 @@ h3 {
   gap: 16px;
 }
 
+.social-section {
+  background: linear-gradient(180deg, rgba(143, 255, 106, 0.03), transparent 40%), #0b0d10;
+}
+
+.account-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.75fr) minmax(0, 1.25fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.account-panel {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.account-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.account-panel-head span,
+.account-empty span {
+  width: fit-content;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: #081006;
+  background: var(--green);
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.account-panel-head strong,
+.account-empty h3 {
+  display: block;
+  margin-top: 6px;
+}
+
+.account-form,
+.mini-form,
+.account-social-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.account-form label,
+.mini-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.check-row {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  color: var(--text) !important;
+}
+
+.check-row input {
+  width: 18px;
+  height: 18px;
+}
+
+.account-form input,
+.mini-form input,
+.mini-form select {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.22);
+  font: inherit;
+}
+
+.account-social-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.account-box,
+.account-empty,
+.request-card,
+.person-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.account-box,
+.account-empty {
+  padding: 18px;
+}
+
+.account-box {
+  display: grid;
+  gap: 12px;
+}
+
+.account-box h4 {
+  margin: 0;
+}
+
+.account-empty {
+  display: grid;
+  gap: 12px;
+}
+
+.account-empty p,
+.muted-copy {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.account-profile {
+  display: grid;
+  gap: 14px;
+}
+
+.account-profile-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.account-profile-head span,
+.person-card span,
+.request-card span {
+  color: var(--muted);
+}
+
+.account-profile-head p {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+.account-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.account-metrics div {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.account-metrics strong {
+  font-size: 1.4rem;
+  color: var(--cyan);
+}
+
+.people-list,
+.friend-list,
+.invite-list,
+.request-list {
+  display: grid;
+  gap: 10px;
+}
+
+.person-card,
+.request-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+}
+
+.person-card div,
+.request-card div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.person-card strong,
+.request-card strong {
+  color: var(--text);
+}
+
+.avatar {
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.avatar-medium {
+  width: 42px;
+  height: 42px;
+}
+
+.avatar-large {
+  width: 60px;
+  height: 60px;
+}
+
+.avatar-fallback {
+  display: grid;
+  place-items: center;
+  color: #081006;
+  background: var(--gold);
+  font-weight: 900;
+}
+
+.request-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: #071012;
+  background: var(--gold);
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
 .feedback-panel {
   display: grid;
   gap: 14px;
@@ -1439,6 +1676,8 @@ h3 {
   .project-grid,
   .news-grid,
   .news-layout,
+  .account-layout,
+  .account-social-grid,
   .badge-grid,
   .resume-grid,
   .trailer-layout,
@@ -1502,6 +1741,22 @@ h3 {
   }
 
   .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .account-panel-head,
+  .account-profile-head,
+  .person-card,
+  .request-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .request-actions {
+    margin-left: 0;
+  }
+
+  .account-metrics {
     grid-template-columns: 1fr;
   }
 

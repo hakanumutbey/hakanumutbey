@@ -55,6 +55,9 @@ let ratings = await readJson("ratings.json", {
 let guestbook = await readJson("guestbook.json", []);
 let feedback = await readJson("feedback.json", []);
 let announcements = await readJson("announcements.json", []);
+let accounts = normalizeAccounts(await readJson("accounts.json", []));
+let friendRequests = normalizeFriendRequests(await readJson("friend-requests.json", []));
+let invites = normalizeInvites(await readJson("invites.json", []));
 
 createServer(async (request, response) => {
   try {
@@ -95,6 +98,28 @@ async function handleApi(request, response) {
   }
   if (request.method === "GET" && url.pathname === "/api/announcements") {
     sendJson(response, announcements.slice(0, 20));
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/account") {
+    const sessionId = safeText(url.searchParams.get("sessionId"), 120);
+    sendJson(response, accountSnapshot(sessionId));
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/users") {
+    const sessionId = safeText(url.searchParams.get("sessionId"), 120);
+    const query = safeText(url.searchParams.get("query"), 40).toLocaleLowerCase("tr-TR");
+    const list = accounts
+      .filter((account) => account.sessionId !== sessionId)
+      .filter((account) => {
+        if (!query) return true;
+        return [
+          account.name,
+          account.nickname,
+        ].some((value) => value.toLocaleLowerCase("tr-TR").includes(query));
+      })
+      .slice(0, 12)
+      .map(publicAccount);
+    sendJson(response, list);
     return;
   }
   if (request.method === "POST" && url.pathname === "/api/heartbeat") {
@@ -229,6 +254,96 @@ async function handleApi(request, response) {
     announcements = [entry, ...announcements].slice(0, 40);
     await writeJson("announcements.json", announcements);
     sendJson(response, announcements.slice(0, 20));
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/account") {
+    const body = await readBody(request, 250_000);
+    const sessionId = safeText(body.sessionId, 120);
+    const name = safeText(body.name, 40);
+    const nickname = safeText(body.nickname, 24);
+    const avatarUrl = safeAvatar(body.avatarUrl);
+    const robotConfirmed = body.robotConfirmed === true;
+    if (!sessionId || name.length < 2 || nickname.length < 2 || !robotConfirmed) {
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "invalid-account" }));
+      return;
+    }
+    const normalizedNickname = normalizeNickname(nickname);
+    const taken = accounts.find((account) => normalizeNickname(account.nickname) === normalizedNickname && account.sessionId !== sessionId);
+    if (taken) {
+      response.writeHead(409, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "nickname-taken" }));
+      return;
+    }
+    const now = new Date().toISOString();
+    const existing = accounts.find((account) => account.sessionId === sessionId);
+    const account = existing
+      ? Object.assign(existing, {
+        name,
+        nickname,
+        avatarUrl,
+        updatedAt: now,
+      })
+      : {
+        id: createRecordId("acct"),
+        sessionId,
+        name,
+        nickname,
+        avatarUrl,
+        createdAt: now,
+        updatedAt: now,
+        friends: [],
+      };
+    if (!existing) accounts = [account, ...accounts];
+    await writeJson("accounts.json", accounts);
+    sendJson(response, accountSnapshot(sessionId));
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/friends/request") {
+    const body = await readBody(request, 64_000);
+    const sessionId = safeText(body.sessionId, 120);
+    const targetNickname = safeText(body.targetNickname, 24);
+    const message = safeText(body.message, 120);
+    const result = createFriendRequest(sessionId, targetNickname, message);
+    if (result.error) {
+      response.writeHead(result.status, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: result.error }));
+      return;
+    }
+    await writeJson("friend-requests.json", friendRequests);
+    sendJson(response, accountSnapshot(sessionId));
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/friends/respond") {
+    const body = await readBody(request, 64_000);
+    const sessionId = safeText(body.sessionId, 120);
+    const requestId = safeText(body.requestId, 120);
+    const action = safeText(body.action, 16);
+    const result = respondFriendRequest(sessionId, requestId, action);
+    if (result.error) {
+      response.writeHead(result.status, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: result.error }));
+      return;
+    }
+    await writeJson("friend-requests.json", friendRequests);
+    await writeJson("accounts.json", accounts);
+    sendJson(response, accountSnapshot(sessionId));
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/invites") {
+    const body = await readBody(request, 64_000);
+    const sessionId = safeText(body.sessionId, 120);
+    const targetNickname = safeText(body.targetNickname, 24);
+    const gameSlug = games.includes(body.gameSlug) ? body.gameSlug : "";
+    const message = safeText(body.message, 120);
+    const result = createInvite(sessionId, targetNickname, gameSlug, message);
+    if (result.error) {
+      response.writeHead(result.status, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: result.error }));
+      return;
+    }
+    await writeJson("invites.json", invites);
+    sendJson(response, accountSnapshot(sessionId));
     return;
   }
   response.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
@@ -397,4 +512,221 @@ function safeText(value, maxLength) {
 
 function passwordHash(value) {
   return createHash("sha256").update(value || "", "utf8").digest("hex");
+}
+
+function normalizeAccounts(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item) => item && typeof item === "object")
+    .map((item) => ({
+      id: safeText(item.id, 80) || createRecordId("acct"),
+      sessionId: safeText(item.sessionId, 120),
+      name: safeText(item.name, 40) || "Hakan",
+      nickname: safeText(item.nickname, 24) || "hakan",
+      avatarUrl: safeAvatar(item.avatarUrl),
+      createdAt: safeText(item.createdAt, 40) || new Date().toISOString(),
+      updatedAt: safeText(item.updatedAt, 40) || new Date().toISOString(),
+      friends: Array.isArray(item.friends) ? item.friends.map((friendId) => safeText(friendId, 80)).filter(Boolean) : [],
+    }))
+    .filter((item) => item.sessionId);
+}
+
+function normalizeFriendRequests(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item) => item && typeof item === "object")
+    .map((item) => ({
+      id: safeText(item.id, 80) || createRecordId("req"),
+      fromAccountId: safeText(item.fromAccountId, 80),
+      toAccountId: safeText(item.toAccountId, 80),
+      message: safeText(item.message, 120),
+      status: ["pending", "accepted", "declined"].includes(item.status) ? item.status : "pending",
+      createdAt: safeText(item.createdAt, 40) || new Date().toISOString(),
+      updatedAt: safeText(item.updatedAt, 40) || new Date().toISOString(),
+    }))
+    .filter((item) => item.fromAccountId && item.toAccountId);
+}
+
+function normalizeInvites(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item) => item && typeof item === "object")
+    .map((item) => ({
+      id: safeText(item.id, 80) || createRecordId("inv"),
+      fromAccountId: safeText(item.fromAccountId, 80),
+      toAccountId: safeText(item.toAccountId, 80),
+      gameSlug: games.includes(item.gameSlug) ? item.gameSlug : "",
+      message: safeText(item.message, 120),
+      status: ["pending", "accepted", "declined"].includes(item.status) ? item.status : "pending",
+      createdAt: safeText(item.createdAt, 40) || new Date().toISOString(),
+      updatedAt: safeText(item.updatedAt, 40) || new Date().toISOString(),
+    }))
+    .filter((item) => item.fromAccountId && item.toAccountId && item.gameSlug);
+}
+
+function safeAvatar(value) {
+  const avatar = safeText(value, 220_000);
+  return avatar.startsWith("data:image/") ? avatar : "";
+}
+
+function normalizeNickname(value) {
+  return safeText(value, 24).toLocaleLowerCase("tr-TR");
+}
+
+function createRecordId(prefix) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+}
+
+function publicAccount(account) {
+  if (!account) return null;
+  const friends = account.friends
+    .map((friendId) => accountById(friendId))
+    .filter(Boolean)
+    .map((friend) => ({
+      id: friend.id,
+      name: friend.name,
+      nickname: friend.nickname,
+      avatarUrl: friend.avatarUrl,
+    }));
+  return {
+    id: account.id,
+    name: account.name,
+    nickname: account.nickname,
+    avatarUrl: account.avatarUrl,
+    createdAt: account.createdAt,
+    updatedAt: account.updatedAt,
+    friendCount: friends.length,
+    friends,
+  };
+}
+
+function accountById(id) {
+  return accounts.find((account) => account.id === id) || null;
+}
+
+function accountBySessionId(sessionId) {
+  return accounts.find((account) => account.sessionId === sessionId) || null;
+}
+
+function accountSnapshot(sessionId) {
+  const account = sessionId ? accountBySessionId(sessionId) : null;
+  if (!account) {
+    return {
+      account: null,
+      people: accounts.slice(0, 12).map(publicAccount),
+      incomingRequests: [],
+      outgoingRequests: [],
+      invites: [],
+    };
+  }
+  const incomingRequests = friendRequests
+    .filter((request) => request.toAccountId === account.id && request.status === "pending")
+    .map((request) => ({
+      ...request,
+      from: publicAccount(accountById(request.fromAccountId)),
+    }));
+  const outgoingRequests = friendRequests
+    .filter((request) => request.fromAccountId === account.id && request.status === "pending")
+    .map((request) => ({
+      ...request,
+      to: publicAccount(accountById(request.toAccountId)),
+    }));
+  const incomingInvites = invites
+    .filter((invite) => invite.toAccountId === account.id && invite.status === "pending")
+    .map((invite) => ({
+      ...invite,
+      from: publicAccount(accountById(invite.fromAccountId)),
+    }));
+  const friends = account.friends
+    .map((friendId) => accountById(friendId))
+    .filter(Boolean)
+    .map(publicAccount);
+  return {
+    account: publicAccount(account),
+    people: accounts
+      .filter((item) => item.id !== account.id)
+      .slice(0, 12)
+      .map(publicAccount),
+    incomingRequests,
+    outgoingRequests,
+    invites: incomingInvites,
+    friends,
+  };
+}
+
+function createFriendRequest(sessionId, targetNickname, message) {
+  const source = accountBySessionId(sessionId);
+  if (!source) return { error: "account-missing", status: 404 };
+  const target = accounts.find((account) => normalizeNickname(account.nickname) === normalizeNickname(targetNickname));
+  if (!target) return { error: "user-not-found", status: 404 };
+  if (target.id === source.id) return { error: "self-request", status: 400 };
+  if (source.friends.includes(target.id)) return { error: "already-friends", status: 409 };
+  if (friendRequests.some((request) => request.fromAccountId === source.id && request.toAccountId === target.id && request.status === "pending")) {
+    return { error: "request-exists", status: 409 };
+  }
+  friendRequests = [
+    {
+      id: createRecordId("req"),
+      fromAccountId: source.id,
+      toAccountId: target.id,
+      message,
+      status: "pending",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    ...friendRequests,
+  ].slice(0, 120);
+  return { ok: true };
+}
+
+function respondFriendRequest(sessionId, requestId, action) {
+  const account = accountBySessionId(sessionId);
+  if (!account) return { error: "account-missing", status: 404 };
+  const request = friendRequests.find((item) => item.id === requestId && item.toAccountId === account.id);
+  if (!request) return { error: "request-not-found", status: 404 };
+  if (action === "accept") {
+    request.status = "accepted";
+    request.updatedAt = new Date().toISOString();
+    addFriendship(request.fromAccountId, request.toAccountId);
+    return { ok: true };
+  }
+  if (action === "decline") {
+    request.status = "declined";
+    request.updatedAt = new Date().toISOString();
+    return { ok: true };
+  }
+  return { error: "invalid-action", status: 400 };
+}
+
+function addFriendship(firstId, secondId) {
+  const first = accountById(firstId);
+  const second = accountById(secondId);
+  if (!first || !second) return;
+  if (!first.friends.includes(second.id)) first.friends.push(second.id);
+  if (!second.friends.includes(first.id)) second.friends.push(first.id);
+  first.updatedAt = new Date().toISOString();
+  second.updatedAt = first.updatedAt;
+}
+
+function createInvite(sessionId, targetNickname, gameSlug, message) {
+  const source = accountBySessionId(sessionId);
+  if (!source) return { error: "account-missing", status: 404 };
+  const target = accounts.find((account) => normalizeNickname(account.nickname) === normalizeNickname(targetNickname));
+  if (!target) return { error: "user-not-found", status: 404 };
+  if (target.id === source.id) return { error: "self-invite", status: 400 };
+  if (!source.friends.includes(target.id)) return { error: "not-friends", status: 403 };
+  invites = [
+    {
+      id: createRecordId("inv"),
+      fromAccountId: source.id,
+      toAccountId: target.id,
+      gameSlug,
+      message,
+      status: "pending",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    ...invites,
+  ].slice(0, 120);
+  return { ok: true };
 }
