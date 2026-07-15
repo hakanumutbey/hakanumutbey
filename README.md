@@ -60,6 +60,7 @@ hakanumutbey/
 - Oyunlara yıldız puanı, ziyaretçi defteri, rozetler, haberler, ses efektleri ve galeri filtresi eklidir.
 - Haberler bölümünde herkese açık geri bildirim/talep alanı ve şifreli duyuru formu vardır; duyurular `/api/announcements` ile yayınlanır.
 - Siyah Adam için hesap sistemi; isim, takma ad, profil resmi, arkadaş isteği, davet ve masaüstü bildirim akışı hazırlanır.
+- Sesli sohbet odası WebRTC ile kurulur; oda kodu giren kullanıcılar doğrudan konuşabilir.
 - Site `hakorocks.akadal.tr` üzerinden herkese açık bir oyun vitrini olarak çalışır.
 
 ## Geliştirme

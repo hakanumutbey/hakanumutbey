@@ -9,7 +9,9 @@
     "preview": "vite preview --host 0.0.0.0",
     "serve": "node server.mjs"
   },
-  "dependencies": {},
+  "dependencies": {
+    "ws": "^8.21.1"
+  },
   "devDependencies": {
     "vite": "^6.4.3"
   }

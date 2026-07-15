@@ -4,6 +4,7 @@ import { createReadStream } from "node:fs";
 import { createHash } from "node:crypto";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { WebSocketServer } from "ws";
 
 const root = resolve(fileURLToPath(new URL(".", import.meta.url)));
 const distRoot = join(root, "dist");
@@ -13,6 +14,7 @@ const announcementPasswordHash =
   process.env.ANNOUNCEMENT_PASSWORD_HASH ||
   "7241bb00842e01487a32ea059136a43484969ae967f2dfd50e8ac15a4234d257";
 const sessions = new Map();
+const voiceRooms = new Map();
 const games = ["annenden-kac", "bardak", "essiz-zindan", "skeleton-wars", "vale", "robot-avcisi"];
 const baseValues = {
   "annenden-kac": 128,
@@ -59,7 +61,7 @@ let accounts = normalizeAccounts(await readJson("accounts.json", []));
 let friendRequests = normalizeFriendRequests(await readJson("friend-requests.json", []));
 let invites = normalizeInvites(await readJson("invites.json", []));
 
-createServer(async (request, response) => {
+const server = createServer(async (request, response) => {
   try {
     if (request.url.startsWith("/api/")) {
       await handleApi(request, response);
@@ -70,7 +72,41 @@ createServer(async (request, response) => {
     response.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
     response.end(JSON.stringify({ error: error.message }));
   }
-}).listen(port, () => {
+});
+
+const voiceSocketServer = new WebSocketServer({ server, path: "/voice" });
+voiceSocketServer.on("connection", (socket) => {
+  socket.voiceAccountId = "";
+  socket.voiceRoomId = "";
+
+  socket.on("message", async (raw) => {
+    let message;
+    try {
+      message = JSON.parse(raw.toString());
+    } catch {
+      return;
+    }
+
+    if (message?.type === "join") {
+      await joinVoiceRoom(socket, message);
+      return;
+    }
+    if (message?.type === "leave") {
+      leaveVoiceRoom(socket);
+      return;
+    }
+    if (message?.type === "signal") {
+      relayVoiceSignal(socket, message);
+      return;
+    }
+  });
+
+  socket.on("close", () => {
+    leaveVoiceRoom(socket);
+  });
+});
+
+server.listen(port, () => {
   console.log(`Hakorocks Studio running on ${port}`);
 });
 
@@ -281,6 +317,7 @@ async function handleApi(request, response) {
         name,
         nickname,
         avatarUrl,
+        voiceRoomId: existing.voiceRoomId || "",
         updatedAt: now,
       })
       : {
@@ -289,6 +326,7 @@ async function handleApi(request, response) {
         name,
         nickname,
         avatarUrl,
+        voiceRoomId: "",
         createdAt: now,
         updatedAt: now,
         friends: [],
@@ -343,6 +381,11 @@ async function handleApi(request, response) {
     }
     await writeJson("invites.json", invites);
     sendJson(response, accountSnapshot(sessionId));
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/voice") {
+    const sessionId = safeText(url.searchParams.get("sessionId"), 120);
+    sendJson(response, voiceSnapshot(sessionId));
     return;
   }
   response.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
@@ -523,6 +566,7 @@ function normalizeAccounts(value) {
       name: safeText(item.name, 40) || "Hakan",
       nickname: safeText(item.nickname, 24) || "hakan",
       avatarUrl: safeAvatar(item.avatarUrl),
+      voiceRoomId: safeText(item.voiceRoomId, 40),
       createdAt: safeText(item.createdAt, 40) || new Date().toISOString(),
       updatedAt: safeText(item.updatedAt, 40) || new Date().toISOString(),
       friends: Array.isArray(item.friends) ? item.friends.map((friendId) => safeText(friendId, 80)).filter(Boolean) : [],
@@ -592,6 +636,7 @@ function publicAccount(account) {
     name: account.name,
     nickname: account.nickname,
     avatarUrl: account.avatarUrl,
+    voiceRoomId: account.voiceRoomId || "",
     createdAt: account.createdAt,
     updatedAt: account.updatedAt,
     friendCount: friends.length,
@@ -728,4 +773,110 @@ function createInvite(sessionId, targetNickname, gameSlug, message) {
     ...invites,
   ].slice(0, 120);
   return { ok: true };
+}
+
+function voiceSnapshot(sessionId) {
+  const account = sessionId ? accountBySessionId(sessionId) : null;
+  if (!account) {
+    return { roomId: "", self: null, participants: [] };
+  }
+  const room = voiceRooms.get(account.voiceRoomId || "") || null;
+  if (!room) {
+    return { roomId: "", self: publicAccount(account), participants: [] };
+  }
+  return {
+    roomId: room.id,
+    self: publicAccount(account),
+    participants: [...room.members.values()]
+      .map((memberSocket) => accountById(memberSocket.voiceAccountId))
+      .filter(Boolean)
+      .map(publicAccount),
+  };
+}
+
+async function joinVoiceRoom(socket, message) {
+  const sessionId = safeText(message.sessionId, 120);
+  const roomId = normalizeVoiceRoomId(message.roomId);
+  const account = accountBySessionId(sessionId);
+  if (!account || !roomId) {
+    socket.send(JSON.stringify({ type: "voice-error", code: "invalid-join" }));
+    return;
+  }
+
+  leaveVoiceRoom(socket);
+  for (const [existingRoomId, existingRoom] of voiceRooms) {
+    if (!existingRoom.members.has(account.id)) continue;
+    existingRoom.members.delete(account.id);
+    if (existingRoom.members.size === 0) voiceRooms.delete(existingRoomId);
+    else broadcastVoiceRoom(existingRoomId);
+  }
+  const room = voiceRooms.get(roomId) || { id: roomId, members: new Map() };
+  room.members.set(account.id, socket);
+  voiceRooms.set(roomId, room);
+  socket.voiceAccountId = account.id;
+  socket.voiceRoomId = roomId;
+  account.voiceRoomId = roomId;
+  account.updatedAt = new Date().toISOString();
+  await writeJson("accounts.json", accounts);
+  broadcastVoiceRoom(roomId);
+}
+
+function leaveVoiceRoom(socket) {
+  const accountId = socket.voiceAccountId;
+  const roomId = socket.voiceRoomId;
+  if (!accountId || !roomId) return;
+
+  const room = voiceRooms.get(roomId);
+  if (room) {
+    room.members.delete(accountId);
+    if (room.members.size === 0) voiceRooms.delete(roomId);
+    else broadcastVoiceRoom(roomId);
+  }
+
+  const account = accountById(accountId);
+  if (account && account.voiceRoomId === roomId) {
+    account.voiceRoomId = "";
+    account.updatedAt = new Date().toISOString();
+    void writeJson("accounts.json", accounts);
+  }
+
+  socket.voiceAccountId = "";
+  socket.voiceRoomId = "";
+}
+
+function relayVoiceSignal(socket, message) {
+  const roomId = socket.voiceRoomId;
+  if (!roomId || !socket.voiceAccountId) return;
+  const room = voiceRooms.get(roomId);
+  if (!room) return;
+  const targetAccountId = safeText(message.to, 120);
+  const target = room.members.get(targetAccountId);
+  if (!target || target.readyState !== target.OPEN) return;
+  target.send(JSON.stringify({
+    type: "voice-signal",
+    from: socket.voiceAccountId,
+    signal: message.signal,
+  }));
+}
+
+function broadcastVoiceRoom(roomId) {
+  const room = voiceRooms.get(roomId);
+  if (!room) return;
+  const participants = [...room.members.values()]
+    .map((memberSocket) => accountById(memberSocket.voiceAccountId))
+    .filter(Boolean)
+    .map(publicAccount);
+  const payload = JSON.stringify({
+    type: "voice-state",
+    roomId,
+    participants,
+  });
+  for (const memberSocket of room.members.values()) {
+    if (memberSocket.readyState === memberSocket.OPEN) memberSocket.send(payload);
+  }
+}
+
+function normalizeVoiceRoomId(value) {
+  const roomId = safeText(value, 40).replace(/[^a-zA-Z0-9-_]/g, "");
+  return roomId || "";
 }

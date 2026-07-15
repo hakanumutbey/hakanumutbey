@@ -206,9 +206,13 @@ let latestGuestbook = [];
 let latestFeedback = [];
 let latestAnnouncements = [];
 let latestSocial = createFallbackSocial();
+let latestVoice = createFallbackVoice();
 let notificationPermission = "Notification" in window ? Notification.permission : "default";
 let selectedGame = games[0];
 let selectedPhotoFilter = "all";
+let selectedInviteGameSlug = localStorage.getItem("hakorocks-invite-game") || "robot-avcisi";
+let selectedVoiceRoomId = localStorage.getItem("hakorocks-voice-room") || "hakorocks-oda";
+let voiceClient = null;
 let soundEnabled = localStorage.getItem("hakorocks-sound") !== "off";
 let audioContext;
 
@@ -703,6 +707,14 @@ function createFallbackSocial() {
   };
 }
 
+function createFallbackVoice() {
+  return {
+    roomId: "",
+    self: null,
+    participants: [],
+  };
+}
+
 function avatarMarkup(account, size = "medium") {
   const letter = (account?.nickname || account?.name || "H").trim().charAt(0).toUpperCase();
   const avatarUrl = account?.avatarUrl || "";
@@ -728,6 +740,7 @@ function renderAccountDashboard() {
     `;
   }
 
+  const voiceRoom = latestVoice.roomId || account.voiceRoomId || "";
   return `
     <div class="account-profile">
       <div class="account-profile-head">
@@ -779,9 +792,9 @@ function renderAccountDashboard() {
           <label>
             Oyun
             <select name="gameSlug">
-              <option value="robot-avcisi">Robot Avcısı</option>
-              <option value="skeleton-wars">Skeleton Wars</option>
-              <option value="vale">Vale</option>
+              <option value="robot-avcisi" ${selectedInviteGameSlug === "robot-avcisi" ? "selected" : ""}>Robot Avcısı</option>
+              <option value="skeleton-wars" ${selectedInviteGameSlug === "skeleton-wars" ? "selected" : ""}>Skeleton Wars</option>
+              <option value="vale" ${selectedInviteGameSlug === "vale" ? "selected" : ""}>Vale</option>
             </select>
           </label>
           <label>
@@ -793,6 +806,26 @@ function renderAccountDashboard() {
         </form>
         <div class="invite-list">
           ${renderInvites(invites)}
+        </div>
+      </section>
+      <section class="account-box account-box-voice">
+        <div class="account-box-head">
+          <h4>Sesli sohbet</h4>
+          <button class="button secondary" type="button" data-voice-copy ${voiceRoom ? "" : "disabled"}>Oda kodunu kopyala</button>
+        </div>
+        <form class="mini-form" data-voice-form>
+          <label>
+            Oda kodu
+            <input name="roomId" maxlength="40" placeholder="hakorocks-oda" value="${escapeHtml(voiceRoom || selectedVoiceRoomId)}" required />
+          </label>
+          <div class="voice-actions">
+            <button class="button primary" type="submit" data-voice-join>${voiceClient?.connected ? "Sesli odadan çık" : "Sesli odaya gir"}</button>
+            <button class="button secondary" type="button" data-voice-refresh>Katılımcıları yenile</button>
+          </div>
+          <p class="form-status" data-voice-status aria-live="polite">${voiceStatusText()}</p>
+        </form>
+        <div class="voice-peer-list" data-voice-list>
+          ${renderVoiceParticipants()}
         </div>
       </section>
       <section class="account-box">
@@ -872,6 +905,30 @@ function renderInvites(list) {
       </div>
     </article>
   `).join("");
+}
+
+function renderVoiceParticipants() {
+  if (!latestVoice.roomId) {
+    return `<p class="muted-copy">Sesli oda kapalı. Oda kodunu girip giriş yap.</p>`;
+  }
+  if (!latestVoice.participants.length) {
+    return `<p class="muted-copy">Bu odada henüz kimse yok.</p>`;
+  }
+  return latestVoice.participants.map((participant) => `
+    <article class="person-card">
+      ${avatarMarkup(participant)}
+      <div>
+        <strong>${escapeHtml(participant.name)}</strong>
+        <span>@${escapeHtml(participant.nickname)}</span>
+      </div>
+    </article>
+  `).join("");
+}
+
+function voiceStatusText() {
+  if (!voiceClient) return "Sesli sohbet hazır değil.";
+  if (!voiceClient.connected) return "Sesli oda bağlı değil.";
+  return `Sesli oda: ${latestVoice.roomId || selectedVoiceRoomId}`;
 }
 
 function renderBadges() {
@@ -1330,10 +1387,23 @@ function renderSocialDashboard() {
 }
 
 function bindSocialForms() {
-  document.querySelector("[data-account-form]")?.addEventListener("submit", submitAccount);
-  document.querySelector("[data-friend-form]")?.addEventListener("submit", submitFriendRequest);
-  document.querySelector("[data-invite-form]")?.addEventListener("submit", submitInvite);
-  document.querySelector("[data-notification-permission]")?.addEventListener("click", requestNotificationPermission);
+  bindOnce(document.querySelector("[data-account-form]"), "submit", submitAccount);
+  bindOnce(document.querySelector("[data-friend-form]"), "submit", submitFriendRequest);
+  bindOnce(document.querySelector("[data-invite-form]"), "submit", submitInvite);
+  bindOnce(document.querySelector("[data-notification-permission]"), "click", requestNotificationPermission);
+  bindOnce(document.querySelector("[data-invite-form] select[name='gameSlug']"), "change", handleInviteGameChange);
+  bindOnce(document.querySelector("[data-voice-form]"), "submit", submitVoiceRoom);
+  bindOnce(document.querySelector("[data-voice-form] input[name='roomId']"), "change", handleVoiceRoomChange);
+  bindOnce(document.querySelector("[data-voice-refresh]"), "click", refreshVoiceState);
+  bindOnce(document.querySelector("[data-voice-copy]"), "click", copyVoiceRoomCode);
+}
+
+function bindOnce(element, eventName, handler) {
+  if (!element) return;
+  const key = `data-bound-${eventName}-${handler.name}`;
+  if (element.getAttribute(key) === "1") return;
+  element.addEventListener(eventName, handler);
+  element.setAttribute(key, "1");
 }
 
 function renderFeedbackFeed() {
@@ -1466,6 +1536,7 @@ async function submitInvite(event) {
     if (!response.ok) throw new Error(data.error || "invite-failed");
     latestSocial = data;
     form.reset();
+    persistInviteGameSlug(selectedInviteGameSlug);
     status.textContent = "Davet gönderildi.";
     renderSocialDashboard();
   } catch (error) {
@@ -1475,6 +1546,323 @@ async function submitInvite(event) {
         ? "Bu takma ad bulunamadı."
         : "Davet gönderilemedi.";
   }
+}
+
+async function submitVoiceRoom(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const status = document.querySelector("[data-voice-status]");
+  const roomId = new FormData(form).get("roomId");
+  const nextRoomId = typeof roomId === "string" ? roomId.trim() : "";
+  if (!nextRoomId) {
+    status.textContent = "Oda kodu gerekli.";
+    return;
+  }
+  selectedVoiceRoomId = nextRoomId;
+  localStorage.setItem("hakorocks-voice-room", selectedVoiceRoomId);
+  const isConnected = Boolean(voiceClient?.connected);
+  const sameRoom = isConnected && voiceClient.roomId === selectedVoiceRoomId;
+  if (isConnected && sameRoom) {
+    await leaveVoiceRoom();
+    return;
+  }
+  if (isConnected) await leaveVoiceRoom();
+  try {
+    await ensureVoiceClient();
+    await voiceClient.join(selectedVoiceRoomId);
+    status.textContent = `Sesli odaya girildi: ${selectedVoiceRoomId}`;
+    await refreshVoiceState();
+  } catch (error) {
+    status.textContent = error?.message === "microphone-denied"
+      ? "Mikrofon izni gerekli."
+      : "Sesli oda açılamadı.";
+  }
+}
+
+function handleVoiceRoomChange(event) {
+  selectedVoiceRoomId = event.currentTarget.value.trim() || "hakorocks-oda";
+  localStorage.setItem("hakorocks-voice-room", selectedVoiceRoomId);
+}
+
+async function refreshVoiceState() {
+  try {
+    const response = await fetch(`/api/voice?sessionId=${encodeURIComponent(sessionId)}`);
+    latestVoice = await response.json();
+    if (latestVoice.roomId) {
+      selectedVoiceRoomId = latestVoice.roomId;
+      localStorage.setItem("hakorocks-voice-room", selectedVoiceRoomId);
+    }
+    renderSocialDashboard();
+  } catch {
+    latestVoice = createFallbackVoice();
+    renderSocialDashboard();
+  }
+}
+
+async function copyVoiceRoomCode() {
+  const code = latestVoice.roomId || selectedVoiceRoomId;
+  if (!code) return;
+  try {
+    await navigator.clipboard.writeText(code);
+    const status = document.querySelector("[data-voice-status]");
+    if (status) status.textContent = "Oda kodu kopyalandı.";
+  } catch {
+    const status = document.querySelector("[data-voice-status]");
+    if (status) status.textContent = "Kopyalama başarısız oldu.";
+  }
+}
+
+async function leaveVoiceRoom() {
+  if (!voiceClient) return;
+  await voiceClient.leave();
+  latestVoice = createFallbackVoice();
+  renderSocialDashboard();
+}
+
+async function ensureVoiceClient() {
+  if (voiceClient) return voiceClient;
+  const account = latestSocial.account;
+  if (!account) throw new Error("account-missing");
+  voiceClient = new VoiceChatClient({
+    sessionId,
+    accountId: account.id,
+    accountName: account.name,
+    accountNickname: account.nickname,
+    onState: (state) => {
+      latestVoice = state;
+      renderSocialDashboard();
+    },
+    onStatus: (text) => {
+      const status = document.querySelector("[data-voice-status]");
+      if (status) status.textContent = text;
+    }
+  });
+  return voiceClient;
+}
+
+class VoiceChatClient {
+  constructor({ sessionId: clientSessionId, accountId, accountName, accountNickname, onState, onStatus }) {
+    this.sessionId = clientSessionId;
+    this.accountId = accountId;
+    this.accountName = accountName;
+    this.accountNickname = accountNickname;
+    this.onState = onState;
+    this.onStatus = onStatus;
+    this.roomId = "";
+    this.ws = null;
+    this.connected = false;
+    this.localStream = null;
+    this.peers = new Map();
+    this.audioElements = new Map();
+    this.participants = [];
+  }
+
+  async join(roomId) {
+    const cleanRoomId = String(roomId || "").trim();
+    if (!cleanRoomId) throw new Error("invalid-room");
+    if (!this.localStream) {
+      this.localStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      }).catch(() => {
+        throw new Error("microphone-denied");
+      });
+    }
+    await this.connect();
+    this.roomId = cleanRoomId;
+    this.send({
+      type: "join",
+      sessionId: this.sessionId,
+      roomId: this.roomId,
+      accountId: this.accountId,
+      name: this.accountName,
+      nickname: this.accountNickname,
+    });
+    this.connected = true;
+    this.onStatus(`Sesli oda bekleniyor: ${this.roomId}`);
+    return true;
+  }
+
+  async leave() {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.send({ type: "leave" });
+    }
+    this.cleanupPeers();
+    this.stopLocalStream();
+    this.closeSocket();
+    this.connected = false;
+    this.roomId = "";
+    this.onState(createFallbackVoice());
+    this.onStatus("Sesli sohbet kapandı.");
+  }
+
+  async connect() {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
+    await new Promise((resolve, reject) => {
+      const protocol = location.protocol === "https:" ? "wss" : "ws";
+      const socket = new WebSocket(`${protocol}://${location.host}/voice`);
+      this.ws = socket;
+      socket.addEventListener("open", () => resolve(), { once: true });
+      socket.addEventListener("error", () => reject(new Error("voice-socket-failed")), { once: true });
+      socket.addEventListener("message", (event) => this.handleMessage(event.data));
+      socket.addEventListener("close", () => {
+        this.cleanupPeers();
+        this.connected = false;
+        if (this.roomId) this.onStatus("Sesli oda bağlantısı kapandı.");
+      });
+    });
+  }
+
+  closeSocket() {
+    if (!this.ws) return;
+    this.ws.close();
+    this.ws = null;
+  }
+
+  stopLocalStream() {
+    if (!this.localStream) return;
+    for (const track of this.localStream.getTracks()) track.stop();
+    this.localStream = null;
+  }
+
+  cleanupPeers() {
+    for (const peer of this.peers.values()) peer.close();
+    for (const audio of this.audioElements.values()) audio.remove();
+    this.peers.clear();
+    this.audioElements.clear();
+    this.participants = [];
+  }
+
+  handleMessage(raw) {
+    let message;
+    try {
+      message = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    if (message.type === "voice-state") {
+      this.participants = Array.isArray(message.participants) ? message.participants : [];
+      this.onState({ roomId: message.roomId || "", self: this.participantSnapshot(), participants: this.participants });
+      this.syncPeers();
+      this.onStatus(`Sesli oda: ${message.roomId || "hazır"}`);
+      return;
+    }
+    if (message.type === "voice-signal") {
+      void this.handleSignal(message.from, message.signal);
+      return;
+    }
+    if (message.type === "voice-error") {
+      this.onStatus("Sesli oda hatası oluştu.");
+    }
+  }
+
+  participantSnapshot() {
+    return {
+      id: this.accountId,
+      name: this.accountName,
+      nickname: this.accountNickname,
+      avatarUrl: latestSocial.account?.avatarUrl || "",
+    };
+  }
+
+  syncPeers() {
+    if (!this.connected) return;
+    const desiredPeers = this.participants.filter((participant) => participant.id && participant.id !== this.accountId);
+    for (const participant of desiredPeers) {
+      if (!this.peers.has(participant.id)) {
+        this.createPeer(participant.id, this.accountId < participant.id);
+      }
+    }
+    for (const peerId of [...this.peers.keys()]) {
+      if (!desiredPeers.some((participant) => participant.id === peerId)) {
+        this.removePeer(peerId);
+      }
+    }
+  }
+
+  async handleSignal(from, signal) {
+    if (!signal || !from) return;
+    const peer = this.peers.get(from) || this.createPeer(from, false);
+    if (signal.description) {
+      await peer.setRemoteDescription(signal.description);
+      if (signal.description.type === "offer") {
+        const answer = await peer.createAnswer();
+        await peer.setLocalDescription(answer);
+        this.sendSignal(from, { description: peer.localDescription });
+      }
+    }
+    if (signal.candidate) {
+      try {
+        await peer.addIceCandidate(signal.candidate);
+      } catch {
+        this.onStatus("Ses sinyali reddedildi.");
+      }
+    }
+  }
+
+  createPeer(peerId, shouldOffer) {
+    const peer = new RTCPeerConnection({
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    });
+    if (this.localStream) {
+      for (const track of this.localStream.getTracks()) peer.addTrack(track, this.localStream);
+    }
+    peer.addEventListener("icecandidate", (event) => {
+      if (event.candidate) this.sendSignal(peerId, { candidate: event.candidate });
+    });
+    peer.addEventListener("track", (event) => {
+      const audio = this.audioElements.get(peerId) || document.createElement("audio");
+      audio.autoplay = true;
+      audio.playsInline = true;
+      audio.srcObject = event.streams[0];
+      audio.volume = 1;
+      if (!this.audioElements.has(peerId)) document.body.appendChild(audio);
+      this.audioElements.set(peerId, audio);
+    });
+    peer.addEventListener("connectionstatechange", () => {
+      if (["failed", "closed", "disconnected"].includes(peer.connectionState)) {
+        this.removePeer(peerId);
+      }
+    });
+    this.peers.set(peerId, peer);
+    if (shouldOffer) {
+      peer.createOffer()
+        .then((offer) => peer.setLocalDescription(offer))
+        .then(() => this.sendSignal(peerId, { description: peer.localDescription }))
+        .catch(() => this.onStatus("Ses bağlantısı başlatılamadı."));
+    }
+    return peer;
+  }
+
+  removePeer(peerId) {
+    const peer = this.peers.get(peerId);
+    if (peer) peer.close();
+    this.peers.delete(peerId);
+    const audio = this.audioElements.get(peerId);
+    if (audio) audio.remove();
+    this.audioElements.delete(peerId);
+  }
+
+  send(payload) {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    this.ws.send(JSON.stringify(payload));
+  }
+
+  sendSignal(to, signal) {
+    this.send({ type: "signal", to, signal });
+  }
+}
+
+function handleInviteGameChange(event) {
+  selectedInviteGameSlug = event.currentTarget.value;
+  persistInviteGameSlug(selectedInviteGameSlug);
+}
+
+function persistInviteGameSlug(value) {
+  localStorage.setItem("hakorocks-invite-game", value);
 }
 
 async function requestNotificationPermission() {
@@ -1590,7 +1978,7 @@ async function refreshLiveData() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    const [statsResponse, photosResponse, ratingsResponse, guestbookResponse, feedbackResponse, announcementsResponse, accountResponse] = await Promise.all([
+    const [statsResponse, photosResponse, ratingsResponse, guestbookResponse, feedbackResponse, announcementsResponse, accountResponse, voiceResponse] = await Promise.all([
       fetch("/api/stats"),
       fetch("/api/photos"),
       fetch("/api/ratings"),
@@ -1598,6 +1986,7 @@ async function refreshLiveData() {
       fetch("/api/feedback"),
       fetch("/api/announcements"),
       fetch(`/api/account?sessionId=${encodeURIComponent(sessionId)}`),
+      fetch(`/api/voice?sessionId=${encodeURIComponent(sessionId)}`),
     ]);
     latestStats = await statsResponse.json();
     latestPhotos = await photosResponse.json();
@@ -1606,9 +1995,15 @@ async function refreshLiveData() {
     latestFeedback = await feedbackResponse.json();
     latestAnnouncements = await announcementsResponse.json();
     latestSocial = await accountResponse.json();
+    latestVoice = await voiceResponse.json();
+    if (latestVoice.roomId) {
+      selectedVoiceRoomId = latestVoice.roomId;
+      localStorage.setItem("hakorocks-voice-room", selectedVoiceRoomId);
+    }
   } catch {
     latestStats = createFallbackStats();
     latestSocial = createFallbackSocial();
+    latestVoice = createFallbackVoice();
   }
 
   renderLiveData();

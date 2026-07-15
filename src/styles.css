@@ -493,6 +493,13 @@ h3 {
   gap: 12px;
 }
 
+.account-box-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .account-box h4 {
   margin: 0;
 }
@@ -557,6 +564,21 @@ h3 {
 .request-list {
   display: grid;
   gap: 10px;
+}
+
+.voice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.voice-peer-list {
+  display: grid;
+  gap: 10px;
+}
+
+.account-box-voice {
+  grid-column: 1 / -1;
 }
 
 .person-card,
@@ -1733,6 +1755,7 @@ h3 {
   }
 
   .account-panel-head,
+  .account-box-head,
   .account-profile-head,
   .person-card,
   .request-card {
