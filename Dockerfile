@@ -10,6 +10,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV DATA_DIR=/app/data
 COPY --from=build /app/dist ./dist
+COPY package*.json ./
+RUN npm ci --omit=dev
 COPY server.mjs ./server.mjs
 RUN mkdir -p /app/data
 EXPOSE 8080
