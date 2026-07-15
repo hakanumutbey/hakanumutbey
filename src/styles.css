@@ -1195,6 +1195,11 @@ h3 {
   background: #8fff6a;
 }
 
+.poster-red {
+  color: #fff2f4;
+  background: #ff5b6e;
+}
+
 .game-body {
   display: grid;
   gap: 12px;

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="cache-control" content="no-store" />
+    <title>Siyah Adam</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="game-shell">
+      <header class="topbar">
+        <div>
+          <span class="eyebrow">3-10 oyuncu · Sosyal çıkarım · WebSocket çok oyunculu</span>
+          <h1>Siyah Adam</h1>
+          <p>
+            Renk seç, çemberde toplan, geceleri hedefi bul ve en son siyahı yakala.
+            Hayaletler konuşamaz, ama oyunun akışını izlemeye devam eder.
+          </p>
+        </div>
+        <div class="topbar-actions">
+          <button id="joinButton" type="button">Odaya gir</button>
+          <button id="readyButton" type="button" disabled>Hazırım</button>
+          <button id="startButton" type="button" disabled>Oyunu başlat</button>
+        </div>
+      </header>
+
+      <section class="lobby-panel">
+        <form id="joinForm" class="join-form">
+          <label>
+            Oda kodu
+            <input id="roomInput" name="roomId" maxlength="40" placeholder="siyah-oda" />
+          </label>
+          <label>
+            Ad
+            <input id="nameInput" name="name" maxlength="40" placeholder="Adın" />
+          </label>
+          <label>
+            Takma ad
+            <input id="nicknameInput" name="nickname" maxlength="24" placeholder="Takma adın" />
+          </label>
+          <label>
+            Renk
+            <select id="colorSelect" name="colorId"></select>
+          </label>
+        </form>
+
+        <div class="status-grid">
+          <article>
+            <span>Faz</span>
+            <strong id="phaseLabel">Hazır değil</strong>
+          </article>
+          <article>
+            <span>Süre</span>
+            <strong id="timerLabel">--</strong>
+          </article>
+          <article>
+            <span>Oyuncu</span>
+            <strong id="playerCountLabel">0/10</strong>
+          </article>
+          <article>
+            <span>Çember</span>
+            <strong id="meetingLabel">2 hak</strong>
+          </article>
+        </div>
+
+        <div class="room-actions">
+          <button id="meetingButton" type="button" disabled>Çemberi çağır</button>
+          <button id="leaveButton" type="button" disabled>Odadan çık</button>
+        </div>
+      </section>
+
+      <section class="arena-section">
+        <canvas id="arena" width="1200" height="760" aria-label="Siyah Adam oyun alanı"></canvas>
+        <div class="hud-overlay">
+          <div>
+            <span id="roleLabel">Rol gizli</span>
+            <strong id="eventLabel">Odaya girip hazır ol.</strong>
+          </div>
+          <div class="touch-pad" aria-label="Hareket kontrolleri">
+            <button data-move="up">▲</button>
+            <div>
+              <button data-move="left">◀</button>
+              <button data-move="down">▼</button>
+              <button data-move="right">▶</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="side-grid">
+        <article class="panel">
+          <h2>Oyuncular</h2>
+          <div id="playerList" class="player-list"></div>
+        </article>
+        <article class="panel">
+          <h2>Oylama / hedef</h2>
+          <div id="actionList" class="action-list"></div>
+        </article>
+        <article class="panel">
+          <h2>Günlük kayıt</h2>
+          <div id="eventList" class="event-list"></div>
+        </article>
+        <article class="panel">
+          <h2>Kurallar</h2>
+          <ul class="rule-list">
+            <li>3 ila 10 oyuncu ile başlar.</li>
+            <li>Her oyuncu siyah hariç bir renk seçer.</li>
+            <li>Gündüz dolaşılır, çember toplantısı yapılır ve oylanır.</li>
+            <li>Gece Siyah Adam 10 saniye içinde hedef seçer.</li>
+            <li>Hayaletler oyuna bakar ama oy veremez.</li>
+          </ul>
+        </article>
+      </section>
+
+      <p id="statusText" class="status-text">Bağlantı bekleniyor.</p>
+    </main>
+
+    <script type="module" src="./game.js"></script>
+  </body>
+</html>

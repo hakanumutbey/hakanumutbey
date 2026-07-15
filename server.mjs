@@ -15,12 +15,14 @@ const announcementPasswordHash =
   "7241bb00842e01487a32ea059136a43484969ae967f2dfd50e8ac15a4234d257";
 const sessions = new Map();
 const voiceRooms = new Map();
-const games = ["annenden-kac", "bardak", "essiz-zindan", "skeleton-wars", "vale", "robot-avcisi"];
+const siyahAdamRooms = new Map();
+const games = ["annenden-kac", "bardak", "essiz-zindan", "skeleton-wars", "siyah-adam", "vale", "robot-avcisi"];
 const baseValues = {
   "annenden-kac": 128,
   bardak: 96,
   "essiz-zindan": 154,
   "skeleton-wars": 188,
+  "siyah-adam": 168,
   vale: 112,
   "robot-avcisi": 173,
 };
@@ -74,7 +76,7 @@ const server = createServer(async (request, response) => {
   }
 });
 
-const voiceSocketServer = new WebSocketServer({ server, path: "/voice" });
+const voiceSocketServer = new WebSocketServer({ noServer: true });
 voiceSocketServer.on("connection", (socket) => {
   socket.voiceAccountId = "";
   socket.voiceRoomId = "";
@@ -105,6 +107,79 @@ voiceSocketServer.on("connection", (socket) => {
     leaveVoiceRoom(socket);
   });
 });
+
+const siyahAdamSocketServer = new WebSocketServer({ noServer: true });
+siyahAdamSocketServer.on("connection", (socket) => {
+  socket.blackSessionId = "";
+  socket.blackRoomId = "";
+
+  socket.on("message", async (raw) => {
+    let message;
+    try {
+      message = JSON.parse(raw.toString());
+    } catch {
+      return;
+    }
+
+    if (message?.type === "join") {
+      await joinBlackRoom(socket, message);
+      return;
+    }
+    if (message?.type === "ready") {
+      setBlackReady(socket, message);
+      return;
+    }
+    if (message?.type === "input") {
+      setBlackInput(socket, message);
+      return;
+    }
+    if (message?.type === "vote") {
+      castBlackVote(socket, message);
+      return;
+    }
+    if (message?.type === "night-target") {
+      setBlackNightTarget(socket, message);
+      return;
+    }
+    if (message?.type === "start") {
+      startBlackGameBySocket(socket);
+      return;
+    }
+    if (message?.type === "call-meeting") {
+      callBlackMeeting(socket);
+      return;
+    }
+    if (message?.type === "leave") {
+      leaveBlackRoom(socket);
+      return;
+    }
+  });
+
+  socket.on("close", () => {
+    leaveBlackRoom(socket);
+  });
+});
+
+server.on("upgrade", (request, socket, head) => {
+  const { pathname } = new URL(request.url, `http://${request.headers.host}`);
+  if (pathname === "/voice") {
+    voiceSocketServer.handleUpgrade(request, socket, head, (ws) => {
+      voiceSocketServer.emit("connection", ws, request);
+    });
+    return;
+  }
+  if (pathname === "/siyah-adam") {
+    siyahAdamSocketServer.handleUpgrade(request, socket, head, (ws) => {
+      siyahAdamSocketServer.emit("connection", ws, request);
+    });
+    return;
+  }
+  socket.destroy();
+});
+
+setInterval(() => {
+  tickBlackRooms();
+}, 100);
 
 server.listen(port, () => {
   console.log(`Hakorocks Studio running on ${port}`);
@@ -388,6 +463,12 @@ async function handleApi(request, response) {
     sendJson(response, voiceSnapshot(sessionId));
     return;
   }
+  if (request.method === "GET" && url.pathname === "/api/siyah-adam") {
+    const roomId = normalizeBlackRoomId(safeText(url.searchParams.get("roomId"), 40));
+    const sessionId = safeText(url.searchParams.get("sessionId"), 120);
+    sendJson(response, blackSnapshot(roomId, sessionId));
+    return;
+  }
   response.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
   response.end(JSON.stringify({ error: "not-found" }));
 }
@@ -550,6 +631,10 @@ function sendJson(response, payload) {
 
 function safeText(value, maxLength) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }
 
 function passwordHash(value) {
@@ -879,4 +964,666 @@ function broadcastVoiceRoom(roomId) {
 function normalizeVoiceRoomId(value) {
   const roomId = safeText(value, 40).replace(/[^a-zA-Z0-9-_]/g, "");
   return roomId || "";
+}
+
+const BLACK_PHASE = {
+  LOBBY: "lobby",
+  DAY: "day",
+  VOTE: "vote",
+  NIGHT: "night",
+  ENDED: "ended",
+};
+
+const BLACK_COLORS = [
+  { id: "red", label: "Kırmızı", hex: "#ff5b6e" },
+  { id: "blue", label: "Mavi", hex: "#4ea3ff" },
+  { id: "green", label: "Yeşil", hex: "#69d18b" },
+  { id: "yellow", label: "Sarı", hex: "#ffd166" },
+  { id: "purple", label: "Mor", hex: "#b67dff" },
+  { id: "orange", label: "Turuncu", hex: "#ff9f43" },
+  { id: "teal", label: "Turkuaz", hex: "#34d1bf" },
+  { id: "pink", label: "Pembe", hex: "#ff8fd6" },
+  { id: "white", label: "Beyaz", hex: "#e8eef6" },
+];
+
+const BLACK_LIMITS = {
+  minPlayers: 3,
+  maxPlayers: 10,
+  dayMs: 40000,
+  voteMs: 20000,
+  nightMs: 10000,
+  disconnectGraceMs: 15000,
+  arenaWidth: 1200,
+  arenaHeight: 760,
+  centerX: 600,
+  centerY: 380,
+  moveSpeed: 2.8,
+};
+
+function createBlackRoom(roomId) {
+  return {
+    id: roomId,
+    hostSessionId: "",
+    phase: BLACK_PHASE.LOBBY,
+    round: 0,
+    phaseEndsAt: 0,
+    winner: "",
+    blackSessionId: "",
+    nightTargetSessionId: "",
+    meetingCallsLeft: 2,
+    lastEvent: "Oda hazır.",
+    players: new Map(),
+    votes: new Map(),
+    events: [],
+    broadcastAt: 0,
+  };
+}
+
+function createBlackPlayerFromMessage(sessionId, message) {
+  const account = accountBySessionId(sessionId);
+  const nickname = safeText(message.nickname, 24) || account?.nickname || "misafir";
+  const name = safeText(message.name, 40) || account?.name || nickname;
+  const avatarUrl = safeAvatar(message.avatarUrl) || account?.avatarUrl || "";
+  return {
+    sessionId,
+    name,
+    nickname,
+    avatarUrl,
+    colorId: normalizeBlackColorId(message.colorId) || pickBlackColorId(),
+    x: randomBlackX(),
+    y: randomBlackY(),
+    dx: 0,
+    dy: 0,
+    ready: false,
+    alive: true,
+    ghost: false,
+    connected: true,
+    disconnectedAt: 0,
+    joinedAt: Date.now(),
+    voteTargetSessionId: "",
+    isBlack: false,
+    blackMarkedTargetSessionId: "",
+  };
+}
+
+function randomBlackX() {
+  return 140 + Math.random() * (BLACK_LIMITS.arenaWidth - 280);
+}
+
+function randomBlackY() {
+  return 110 + Math.random() * (BLACK_LIMITS.arenaHeight - 220);
+}
+
+function pickBlackColorId() {
+  return BLACK_COLORS[Math.floor(Math.random() * BLACK_COLORS.length)]?.id || "red";
+}
+
+function normalizeBlackColorId(value) {
+  const colorId = safeText(value, 24).toLowerCase();
+  return BLACK_COLORS.some((color) => color.id === colorId) ? colorId : "";
+}
+
+function colorFromId(colorId) {
+  return BLACK_COLORS.find((color) => color.id === colorId) || BLACK_COLORS[0];
+}
+
+function blackRoomPlayerList(room) {
+  return [...room.players.values()].sort((first, second) => first.joinedAt - second.joinedAt);
+}
+
+function blackAlivePlayers(room) {
+  return blackRoomPlayerList(room).filter((player) => player.connected && player.alive && !player.ghost);
+}
+
+function blackLivingPlayers(room) {
+  return blackRoomPlayerList(room).filter((player) => player.connected !== false && !player.ghost);
+}
+
+function blackPlayerBySession(room, sessionId) {
+  return room.players.get(sessionId) || null;
+}
+
+function blackPlayerLabel(player) {
+  return `${player.nickname || player.name}`.trim();
+}
+
+function queueBlackEvent(room, text) {
+  room.lastEvent = text;
+  room.events = [
+    { id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, text, createdAt: new Date().toISOString() },
+    ...room.events,
+  ].slice(0, 8);
+}
+
+function normalizeBlackRoomId(value) {
+  const roomId = safeText(value, 40).replace(/[^a-zA-Z0-9-_]/g, "");
+  return roomId || "";
+}
+
+function blackSnapshot(roomId, sessionId) {
+  const room = siyahAdamRooms.get(roomId);
+  if (!room) {
+    return {
+      roomId,
+      room: null,
+      self: null,
+      players: [],
+      colors: BLACK_COLORS,
+    };
+  }
+
+  const selfPlayer = sessionId ? blackPlayerBySession(room, sessionId) : null;
+  return {
+    roomId: room.id,
+    room: publicBlackRoom(room, sessionId),
+    self: selfPlayer ? publicBlackPlayer(selfPlayer, room, sessionId) : null,
+    players: blackRoomPlayerList(room).map((player) => publicBlackPlayer(player, room, sessionId)),
+    colors: BLACK_COLORS,
+  };
+}
+
+function publicBlackRoom(room, sessionId) {
+  const players = blackRoomPlayerList(room).map((player) => publicBlackPlayer(player, room, sessionId));
+  const aliveCount = players.filter((player) => player.alive && !player.ghost && player.connected !== false).length;
+  const blackAlive = players.find((player) => player.isBlack && player.alive && !player.ghost && player.connected !== false);
+  return {
+    id: room.id,
+    phase: room.phase,
+    round: room.round,
+    phaseEndsAt: room.phaseEndsAt,
+    hostSessionId: room.hostSessionId,
+    winner: room.winner,
+    meetingCallsLeft: room.meetingCallsLeft,
+    aliveCount,
+    playerCount: players.length,
+    blackKnown: room.phase === BLACK_PHASE.ENDED,
+    blackAlive: Boolean(blackAlive),
+    lastEvent: room.lastEvent,
+    events: room.events,
+    players,
+    me: sessionId ? players.find((player) => player.sessionId === sessionId) || null : null,
+    selectedTargetSessionId: sessionId && room.blackSessionId === sessionId ? room.nightTargetSessionId : "",
+    colors: BLACK_COLORS,
+    limits: BLACK_LIMITS,
+  };
+}
+
+function publicBlackPlayer(player, room, sessionId) {
+  const color = colorFromId(player.colorId);
+  const revealBlack = room.phase === BLACK_PHASE.ENDED || sessionId === room.blackSessionId;
+  const isBlack = revealBlack && player.sessionId === room.blackSessionId;
+  return {
+    sessionId: player.sessionId,
+    name: player.name,
+    nickname: player.nickname,
+    avatarUrl: player.avatarUrl,
+    colorId: player.colorId,
+    colorLabel: color.label,
+    colorHex: isBlack ? "#101010" : color.hex,
+    x: player.x,
+    y: player.y,
+    dx: player.dx,
+    dy: player.dy,
+    ready: player.ready,
+    alive: player.alive,
+    ghost: player.ghost,
+    connected: player.connected !== false,
+    isBlack,
+    voteTargetSessionId: player.voteTargetSessionId || "",
+    blackMarkedTargetSessionId: sessionId === room.blackSessionId ? room.nightTargetSessionId : "",
+  };
+}
+
+async function joinBlackRoom(socket, message) {
+  const sessionId = safeText(message.sessionId, 120);
+  const roomId = normalizeBlackRoomId(message.roomId);
+  if (!sessionId || !roomId) {
+    socket.send(JSON.stringify({ type: "black-error", code: "invalid-join" }));
+    return;
+  }
+
+  let room = siyahAdamRooms.get(roomId);
+  if (!room) {
+    room = createBlackRoom(roomId);
+    siyahAdamRooms.set(roomId, room);
+  }
+
+  for (const [existingRoomId, existingRoom] of siyahAdamRooms) {
+    if (existingRoomId === roomId || !existingRoom.players.has(sessionId)) continue;
+    existingRoom.players.delete(sessionId);
+    existingRoom.votes.delete(sessionId);
+    if (existingRoom.hostSessionId === sessionId) {
+      existingRoom.hostSessionId = blackRoomPlayerList(existingRoom).find((item) => item.sessionId !== sessionId)?.sessionId || "";
+    }
+    if (existingRoom.players.size === 0) siyahAdamRooms.delete(existingRoomId);
+    else broadcastBlackRoom(existingRoomId);
+  }
+
+  const existingPlayer = blackPlayerBySession(room, sessionId);
+  if (!existingPlayer && room.phase !== BLACK_PHASE.LOBBY && room.phase !== BLACK_PHASE.ENDED) {
+    socket.send(JSON.stringify({ type: "black-error", code: "game-in-progress" }));
+    return;
+  }
+  if (!existingPlayer && blackLivingPlayers(room).length >= BLACK_LIMITS.maxPlayers) {
+    socket.send(JSON.stringify({ type: "black-error", code: "room-full" }));
+    return;
+  }
+
+  const player = existingPlayer || createBlackPlayerFromMessage(sessionId, message);
+  if (message.colorId && normalizeBlackColorId(message.colorId)) {
+    const chosenColor = normalizeBlackColorId(message.colorId);
+    const colorInUse = [...room.players.values()].some((item) => item.sessionId !== sessionId && item.colorId === chosenColor);
+    if (!colorInUse) player.colorId = chosenColor;
+  }
+
+  player.name = safeText(message.name, 40) || player.name;
+  player.nickname = safeText(message.nickname, 24) || player.nickname;
+  player.avatarUrl = safeAvatar(message.avatarUrl) || player.avatarUrl;
+  player.connected = true;
+  player.disconnectedAt = 0;
+  if (room.phase === BLACK_PHASE.LOBBY) {
+    player.ready = Boolean(message.ready);
+    player.alive = true;
+    player.ghost = false;
+  }
+
+  room.players.set(sessionId, player);
+  if (!room.hostSessionId) room.hostSessionId = sessionId;
+  socket.blackSessionId = sessionId;
+  socket.blackRoomId = roomId;
+  queueBlackEvent(room, `${blackPlayerLabel(player)} odaya katıldı.`);
+  broadcastBlackRoom(roomId);
+}
+
+function setBlackReady(socket, message) {
+  const room = siyahAdamRooms.get(socket.blackRoomId);
+  if (!room) return;
+  const player = room.players.get(socket.blackSessionId);
+  if (!player || room.phase !== BLACK_PHASE.LOBBY) return;
+  player.ready = Boolean(message.ready);
+  broadcastBlackRoom(room.id);
+}
+
+function setBlackInput(socket, message) {
+  const room = siyahAdamRooms.get(socket.blackRoomId);
+  if (!room || !socket.blackSessionId) return;
+  const player = room.players.get(socket.blackSessionId);
+  if (!player || !player.connected || !player.alive || player.ghost) return;
+  player.dx = Number(message.dx) || 0;
+  player.dy = Number(message.dy) || 0;
+}
+
+function castBlackVote(socket, message) {
+  const room = siyahAdamRooms.get(socket.blackRoomId);
+  if (!room || room.phase !== BLACK_PHASE.VOTE) return;
+  const player = room.players.get(socket.blackSessionId);
+  if (!player || !player.alive || player.ghost) return;
+  const targetSessionId = safeText(message.targetSessionId, 120);
+  const target = room.players.get(targetSessionId);
+  if (!target || !target.alive || target.ghost || target.sessionId === player.sessionId) return;
+  room.votes.set(player.sessionId, targetSessionId);
+  player.voteTargetSessionId = targetSessionId;
+  queueBlackEvent(room, `${blackPlayerLabel(player)} oy verdi.`);
+  if (blackAlivePlayers(room).every((alivePlayer) => room.votes.has(alivePlayer.sessionId))) {
+    finishBlackVote(room, "Oylar tamamlandı");
+    return;
+  }
+  broadcastBlackRoom(room.id);
+}
+
+function setBlackNightTarget(socket, message) {
+  const room = siyahAdamRooms.get(socket.blackRoomId);
+  if (!room || room.phase !== BLACK_PHASE.NIGHT) return;
+  if (socket.blackSessionId !== room.blackSessionId) return;
+  const targetSessionId = safeText(message.targetSessionId, 120);
+  const target = room.players.get(targetSessionId);
+  const blackPlayer = room.players.get(room.blackSessionId);
+  if (!target || !target.alive || target.ghost || target.sessionId === blackPlayer?.sessionId) return;
+  room.nightTargetSessionId = targetSessionId;
+  queueBlackEvent(room, `Siyah Adam hedef seçti.`);
+  broadcastBlackRoom(room.id);
+}
+
+function startBlackGameBySocket(socket) {
+  const room = siyahAdamRooms.get(socket.blackRoomId);
+  if (!room || socket.blackSessionId !== room.hostSessionId) return;
+  startBlackGame(room);
+}
+
+function callBlackMeeting(socket) {
+  const room = siyahAdamRooms.get(socket.blackRoomId);
+  if (!room || room.phase !== BLACK_PHASE.DAY || room.meetingCallsLeft <= 0) return;
+  const player = room.players.get(socket.blackSessionId);
+  if (!player || !player.alive || player.ghost) return;
+  room.meetingCallsLeft -= 1;
+  queueBlackEvent(room, `${blackPlayerLabel(player)} çember toplantısı çağırdı.`);
+  startBlackVote(room, "Çember çağrıldı");
+}
+
+function leaveBlackRoom(socket) {
+  const roomId = socket.blackRoomId;
+  const sessionId = socket.blackSessionId;
+  if (!roomId || !sessionId) return;
+  const room = siyahAdamRooms.get(roomId);
+  if (!room) {
+    socket.blackRoomId = "";
+    socket.blackSessionId = "";
+    return;
+  }
+
+  const player = room.players.get(sessionId);
+  if (player) {
+    player.connected = false;
+    player.disconnectedAt = Date.now();
+    player.dx = 0;
+    player.dy = 0;
+    player.ready = false;
+    if (room.phase === BLACK_PHASE.LOBBY || room.phase === BLACK_PHASE.ENDED) {
+      room.players.delete(sessionId);
+      room.votes.delete(sessionId);
+    }
+    if (room.hostSessionId === sessionId) {
+      room.hostSessionId = blackRoomPlayerList(room).find((item) => item.sessionId !== sessionId)?.sessionId || "";
+    }
+    queueBlackEvent(room, `${blackPlayerLabel(player)} odadan ayrıldı.`);
+  }
+
+  if (room.players.size === 0 || (room.phase === BLACK_PHASE.ENDED && room.players.size === 0)) {
+    siyahAdamRooms.delete(roomId);
+  } else {
+    broadcastBlackRoom(roomId);
+  }
+
+  socket.blackRoomId = "";
+  socket.blackSessionId = "";
+}
+
+function tickBlackRooms() {
+  const now = Date.now();
+  for (const [roomId, room] of siyahAdamRooms) {
+    for (const player of blackRoomPlayerList(room)) {
+      if (!player.connected && player.disconnectedAt && now - player.disconnectedAt > BLACK_LIMITS.disconnectGraceMs) {
+        if (room.phase !== BLACK_PHASE.LOBBY && room.phase !== BLACK_PHASE.ENDED && player.sessionId === room.blackSessionId) {
+          endBlackGame(room, "crew", "Siyah Adam oyundan çıktı.");
+          break;
+        }
+        room.players.delete(player.sessionId);
+        room.votes.delete(player.sessionId);
+      }
+    }
+
+    if (room.phase === BLACK_PHASE.LOBBY) {
+      if (room.players.size >= BLACK_LIMITS.minPlayers && blackLivingPlayers(room).length === room.players.size && blackLivingPlayers(room).every((player) => player.ready)) {
+        // Host başlatmadıkça bekle.
+      }
+      continue;
+    }
+
+    if (room.phase === BLACK_PHASE.DAY) {
+      updateBlackMovement(room);
+      if (room.phaseEndsAt && now >= room.phaseEndsAt) {
+        startBlackVote(room, "Gündüz bitti");
+      }
+    } else if (room.phase === BLACK_PHASE.VOTE) {
+      if (room.phaseEndsAt && now >= room.phaseEndsAt) {
+        finishBlackVote(room, "Oylama bitti");
+      }
+    } else if (room.phase === BLACK_PHASE.NIGHT) {
+      if (room.phaseEndsAt && now >= room.phaseEndsAt) {
+        finishBlackNight(room, "Gece süresi bitti");
+      }
+    }
+
+    if (room.phase !== BLACK_PHASE.LOBBY && room.phase !== BLACK_PHASE.ENDED) {
+      const shouldBroadcast = !room.broadcastAt || now - room.broadcastAt > 80;
+      if (shouldBroadcast) {
+        room.broadcastAt = now;
+        broadcastBlackRoom(roomId);
+      }
+    }
+  }
+}
+
+function updateBlackMovement(room) {
+  for (const player of blackRoomPlayerList(room)) {
+    if (!player.connected || !player.alive || player.ghost) continue;
+    const speed = BLACK_LIMITS.moveSpeed;
+    player.x = clamp(player.x + player.dx * speed, 56, BLACK_LIMITS.arenaWidth - 56);
+    player.y = clamp(player.y + player.dy * speed, 76, BLACK_LIMITS.arenaHeight - 76);
+  }
+}
+
+function startBlackGame(room) {
+  const activePlayers = blackRoomPlayerList(room).filter((player) => player.connected !== false);
+  if (activePlayers.length < BLACK_LIMITS.minPlayers || activePlayers.length > BLACK_LIMITS.maxPlayers) {
+    queueBlackEvent(room, "Başlatmak için 3-10 aktif oyuncu gerekli.");
+    broadcastBlackRoom(room.id);
+    return;
+  }
+  if (!activePlayers.every((player) => player.ready)) {
+    queueBlackEvent(room, "Herkes hazır olmadan oyun başlamaz.");
+    broadcastBlackRoom(room.id);
+    return;
+  }
+
+  for (const player of blackRoomPlayerList(room)) {
+    if (player.connected === false) {
+      room.players.delete(player.sessionId);
+      continue;
+    }
+    player.alive = true;
+    player.ghost = false;
+    player.ready = false;
+    player.voteTargetSessionId = "";
+    player.blackMarkedTargetSessionId = "";
+    player.disconnectedAt = 0;
+    player.dx = 0;
+    player.dy = 0;
+  }
+
+  room.phase = BLACK_PHASE.DAY;
+  room.round = 1;
+  room.phaseEndsAt = Date.now() + BLACK_LIMITS.dayMs;
+  room.meetingCallsLeft = 2;
+  room.nightTargetSessionId = "";
+  room.votes.clear();
+  room.winner = "";
+  room.lastEvent = "Oyun başladı.";
+  room.events = [];
+  room.blackSessionId = activePlayers[Math.floor(Math.random() * activePlayers.length)]?.sessionId || "";
+
+  for (const player of activePlayers) {
+    player.alive = true;
+    player.ghost = false;
+    player.ready = false;
+    player.voteTargetSessionId = "";
+    player.blackMarkedTargetSessionId = "";
+    player.isBlack = player.sessionId === room.blackSessionId;
+    if (!player.isBlack) {
+      const position = spreadBlackSpawn(room, player.joinedAt);
+      player.x = position.x;
+      player.y = position.y;
+    } else {
+      player.x = BLACK_LIMITS.centerX;
+      player.y = BLACK_LIMITS.centerY;
+    }
+  }
+
+  queueBlackEvent(room, "Siyah Adam gizlendi.");
+  broadcastBlackRoom(room.id);
+}
+
+function startBlackVote(room, reason) {
+  if (room.phase === BLACK_PHASE.ENDED) return;
+  room.phase = BLACK_PHASE.VOTE;
+  room.phaseEndsAt = Date.now() + BLACK_LIMITS.voteMs;
+  room.votes.clear();
+  room.nightTargetSessionId = "";
+  for (const player of blackRoomPlayerList(room)) {
+    player.voteTargetSessionId = "";
+    if (player.alive && !player.ghost) {
+      player.x = moveToMeetingCircle(player, room).x;
+      player.y = moveToMeetingCircle(player, room).y;
+    }
+  }
+  queueBlackEvent(room, reason);
+  broadcastBlackRoom(room.id);
+}
+
+function finishBlackVote(room, reason) {
+  if (room.phase === BLACK_PHASE.ENDED) return;
+  const votes = new Map();
+  for (const [voterSessionId, targetSessionId] of room.votes) {
+    const voter = room.players.get(voterSessionId);
+    const target = room.players.get(targetSessionId);
+    if (!voter || !target || !voter.alive || voter.ghost || !target.alive || target.ghost) continue;
+    votes.set(targetSessionId, (votes.get(targetSessionId) || 0) + 1);
+  }
+
+  const sortedVotes = [...votes.entries()].sort((first, second) => second[1] - first[1]);
+  const topVote = sortedVotes[0] || null;
+  const isTie = sortedVotes.length > 1 && sortedVotes[0][1] === sortedVotes[1][1];
+  if (topVote && !isTie) {
+    const target = room.players.get(topVote[0]);
+    if (target) {
+      target.alive = false;
+      target.ghost = true;
+      target.dx = 0;
+      target.dy = 0;
+      if (target.sessionId === room.blackSessionId) {
+        endBlackGame(room, "crew", `${blackPlayerLabel(target)} bulundu.`);
+        return;
+      }
+      queueBlackEvent(room, `${blackPlayerLabel(target)} çemberde elendi.`);
+    }
+  } else {
+    queueBlackEvent(room, "Oylama berabere bitti.");
+  }
+
+  if (checkBlackVictory(room)) {
+    endBlackGame(room, "black", "Siyah Adam son kalan kişi oldu.");
+    return;
+  }
+
+  room.phase = BLACK_PHASE.NIGHT;
+  room.phaseEndsAt = Date.now() + BLACK_LIMITS.nightMs;
+  room.round += 1;
+  room.nightTargetSessionId = "";
+  for (const player of blackRoomPlayerList(room)) {
+    player.voteTargetSessionId = "";
+  }
+  queueBlackEvent(room, reason);
+  broadcastBlackRoom(room.id);
+}
+
+function finishBlackNight(room, reason) {
+  if (room.phase === BLACK_PHASE.ENDED) return;
+  const blackPlayer = room.players.get(room.blackSessionId);
+  if (!blackPlayer || !blackPlayer.alive || blackPlayer.ghost) {
+    endBlackGame(room, "crew", "Siyah Adam kayboldu.");
+    return;
+  }
+
+  let target = room.nightTargetSessionId ? room.players.get(room.nightTargetSessionId) : null;
+  if (!target || !target.alive || target.ghost || target.sessionId === blackPlayer.sessionId) {
+    const candidates = blackRoomPlayerList(room).filter((player) => player.alive && !player.ghost && player.sessionId !== blackPlayer.sessionId);
+    target = candidates[Math.floor(Math.random() * candidates.length)] || null;
+  }
+
+  if (target) {
+    target.alive = false;
+    target.ghost = true;
+    target.dx = 0;
+    target.dy = 0;
+    queueBlackEvent(room, `${blackPlayerLabel(target)} gece ele geçirildi.`);
+    if (target.sessionId === room.blackSessionId) {
+      endBlackGame(room, "crew", `${blackPlayerLabel(target)} siyah rolden düştü.`);
+      return;
+    }
+  } else {
+    queueBlackEvent(room, "Gece kimse ele geçirilemedi.");
+  }
+
+  if (checkBlackVictory(room)) {
+    endBlackGame(room, "black", "Siyah Adam son kalan kişi oldu.");
+    return;
+  }
+
+  room.phase = BLACK_PHASE.DAY;
+  room.phaseEndsAt = Date.now() + BLACK_LIMITS.dayMs;
+  room.nightTargetSessionId = "";
+  scatterBlackPlayers(room);
+  queueBlackEvent(room, reason);
+  broadcastBlackRoom(room.id);
+}
+
+function endBlackGame(room, winner, reason) {
+  room.phase = BLACK_PHASE.ENDED;
+  room.phaseEndsAt = 0;
+  room.winner = winner;
+  room.lastEvent = reason || (winner === "black" ? "Siyah Adam kazandı." : "Diğerleri kazandı.");
+  room.events = [
+    { id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, text: room.lastEvent, createdAt: new Date().toISOString() },
+    ...room.events,
+  ].slice(0, 8);
+  for (const player of blackRoomPlayerList(room)) {
+    player.ready = false;
+    player.voteTargetSessionId = "";
+    player.blackMarkedTargetSessionId = "";
+    player.dx = 0;
+    player.dy = 0;
+  }
+  broadcastBlackRoom(room.id);
+}
+
+function checkBlackVictory(room) {
+  const living = blackRoomPlayerList(room).filter((player) => player.connected !== false && player.alive && !player.ghost);
+  return living.length <= 1 && living.some((player) => player.sessionId === room.blackSessionId);
+}
+
+function spreadBlackSpawn(room, seed) {
+  const index = blackRoomPlayerList(room).filter((player) => player.alive && !player.ghost).length + (seed % 5);
+  const angle = (index / Math.max(1, room.players.size)) * Math.PI * 2;
+  return {
+    x: clamp(BLACK_LIMITS.centerX + Math.cos(angle) * 320, 80, BLACK_LIMITS.arenaWidth - 80),
+    y: clamp(BLACK_LIMITS.centerY + Math.sin(angle) * 220, 100, BLACK_LIMITS.arenaHeight - 100),
+  };
+}
+
+function scatterBlackPlayers(room) {
+  const alivePlayers = blackRoomPlayerList(room).filter((player) => player.alive && !player.ghost);
+  alivePlayers.forEach((player, index) => {
+    if (player.sessionId === room.blackSessionId) return;
+    const angle = (index / Math.max(1, alivePlayers.length)) * Math.PI * 2;
+    player.x = clamp(BLACK_LIMITS.centerX + Math.cos(angle) * 330, 70, BLACK_LIMITS.arenaWidth - 70);
+    player.y = clamp(BLACK_LIMITS.centerY + Math.sin(angle) * 230, 90, BLACK_LIMITS.arenaHeight - 90);
+  });
+  const blackPlayer = room.players.get(room.blackSessionId);
+  if (blackPlayer && blackPlayer.alive && !blackPlayer.ghost) {
+    blackPlayer.x = BLACK_LIMITS.centerX;
+    blackPlayer.y = BLACK_LIMITS.centerY;
+  }
+}
+
+function moveToMeetingCircle(player, room) {
+  const alivePlayers = blackRoomPlayerList(room).filter((item) => item.alive && !item.ghost);
+  const index = Math.max(0, alivePlayers.findIndex((item) => item.sessionId === player.sessionId));
+  const angle = (index / Math.max(1, alivePlayers.length)) * Math.PI * 2 - Math.PI / 2;
+  return {
+    x: clamp(BLACK_LIMITS.centerX + Math.cos(angle) * 240, 100, BLACK_LIMITS.arenaWidth - 100),
+    y: clamp(BLACK_LIMITS.centerY + Math.sin(angle) * 160, 110, BLACK_LIMITS.arenaHeight - 110),
+  };
+}
+
+function broadcastBlackRoom(roomId) {
+  const room = siyahAdamRooms.get(roomId);
+  if (!room) return;
+  for (const client of siyahAdamSocketServer.clients) {
+    if (client.blackRoomId !== room.id || client.readyState !== 1) continue;
+    const state = publicBlackRoom(room, client.blackSessionId);
+    client.send(JSON.stringify({
+      type: "black-state",
+      state,
+    }));
+  }
 }

@@ -30,6 +30,7 @@ Buradaki hedefim basit: yeni oyunlarımı ve projelerimi aynı çatı altında t
 | **Bardak** | 3D fizik oyunu | Tarayıcıdan oynanabilir |
 | **Eşsiz Zindan** | Zindan aksiyonu | Tarayıcıdan oynanabilir |
 | **Skeleton Wars** | Macera savaşı | Tarayıcıdan oynanabilir |
+| **Siyah Adam** | Sosyal çıkarım | Tarayıcıdan oynanabilir |
 | **Vale** | 3D simülasyon | Tarayıcıdan oynanabilir |
 | **Robot Avcısı** | Laboratuvar FPS | Tarayıcıdan oynanabilir |
 
@@ -59,6 +60,7 @@ hakanumutbey/
 - Site açık kişi, oyunda kişi ve oyun borsa grafikleri canlı API ile güncellenir.
 - Oyunlara yıldız puanı, ziyaretçi defteri, rozetler, haberler, ses efektleri ve galeri filtresi eklidir.
 - Haberler bölümünde herkese açık geri bildirim/talep alanı ve şifreli duyuru formu vardır; duyurular `/api/announcements` ile yayınlanır.
+- Siyah Adam için 3-10 kişilik hazır oda; renk seçimi, hazır olma, çember toplantısı, gece hedefleme ve hayalet akışı hazırlanır.
 - Siyah Adam için hesap sistemi; isim, takma ad, profil resmi, arkadaş isteği, davet ve masaüstü bildirim akışı hazırlanır.
 - Sesli sohbet odası WebRTC ile kurulur; oda kodu giren kullanıcılar doğrudan konuşabilir.
 - Site `hakorocks.akadal.tr` üzerinden herkese açık bir oyun vitrini olarak çalışır.

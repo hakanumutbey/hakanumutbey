@@ -1,0 +1,389 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --bg: #07090d;
+  --panel: rgba(15, 18, 24, 0.92);
+  --line: rgba(255, 255, 255, 0.1);
+  --text: #f3f7f5;
+  --muted: #aab6b3;
+  --green: #89f07b;
+  --cyan: #58d7ff;
+  --gold: #ffd166;
+  --red: #ff637b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  background:
+    radial-gradient(circle at top, rgba(88, 215, 255, 0.12), transparent 30%),
+    radial-gradient(circle at 80% 20%, rgba(255, 97, 123, 0.08), transparent 24%),
+    var(--bg);
+  color: var(--text);
+}
+
+body {
+  overflow-x: hidden;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  min-height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  padding: 0 14px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+}
+
+button:disabled,
+input:disabled,
+select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+input,
+select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 0 12px;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.game-shell {
+  width: min(1480px, 100%);
+  margin: 0 auto;
+  padding: 20px;
+  display: grid;
+  gap: 16px;
+}
+
+.topbar,
+.lobby-panel,
+.panel,
+.status-text {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--panel);
+  backdrop-filter: blur(14px);
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px;
+}
+
+.topbar h1 {
+  margin: 4px 0 8px;
+  font-size: clamp(2rem, 4vw, 4rem);
+  line-height: 0.95;
+}
+
+.topbar p {
+  max-width: 72ch;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.eyebrow {
+  color: var(--green);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.topbar-actions {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.topbar-actions button:first-child,
+#readyButton {
+  border-color: rgba(88, 215, 255, 0.26);
+  background: rgba(88, 215, 255, 0.12);
+}
+
+#startButton {
+  border-color: rgba(137, 240, 123, 0.25);
+  background: rgba(137, 240, 123, 0.12);
+}
+
+.lobby-panel {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.join-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.join-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.status-grid article {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.status-grid span,
+.panel h2,
+.rule-list {
+  color: var(--muted);
+}
+
+.status-grid strong {
+  font-size: 1.2rem;
+}
+
+.room-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.arena-section {
+  position: relative;
+  min-height: 460px;
+}
+
+#arena {
+  width: 100%;
+  height: min(70vh, 760px);
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.08), transparent 32%),
+    linear-gradient(180deg, #111720, #07090d 62%, #050608);
+}
+
+.hud-overlay {
+  position: absolute;
+  inset: 18px 18px auto auto;
+  display: grid;
+  gap: 12px;
+  justify-items: end;
+  pointer-events: none;
+}
+
+.hud-overlay > div {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(10, 12, 16, 0.72);
+}
+
+.hud-overlay strong {
+  display: block;
+  margin-top: 5px;
+  font-size: 1.15rem;
+}
+
+.touch-pad {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  pointer-events: auto;
+}
+
+.touch-pad > div {
+  display: flex;
+  gap: 8px;
+}
+
+.side-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.panel {
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.panel h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.05rem;
+}
+
+.player-list,
+.action-list,
+.event-list {
+  display: grid;
+  gap: 10px;
+}
+
+.player-card,
+.action-card,
+.event-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.player-card.is-black {
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.player-card.is-ghost {
+  opacity: 0.58;
+}
+
+.player-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.avatar-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+}
+
+.player-card strong,
+.action-card strong,
+.event-card strong {
+  color: var(--text);
+}
+
+.player-card small,
+.action-card small,
+.event-card small {
+  color: var(--muted);
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.chip.green {
+  background: rgba(137, 240, 123, 0.15);
+  color: #d9ffd3;
+}
+
+.chip.gold {
+  background: rgba(255, 209, 102, 0.16);
+  color: #fff0bf;
+}
+
+.chip.red {
+  background: rgba(255, 99, 123, 0.16);
+  color: #ffd3d9;
+}
+
+.action-list button {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.status-text {
+  margin: 0;
+  padding: 14px 16px;
+  color: var(--muted);
+}
+
+.rule-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
+  line-height: 1.55;
+}
+
+@media (max-width: 1080px) {
+  .topbar,
+  .join-form,
+  .status-grid,
+  .side-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    flex-direction: column;
+  }
+
+  .topbar-actions {
+    grid-auto-flow: column;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .game-shell {
+    padding: 12px;
+  }
+
+  .topbar-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .hud-overlay {
+    position: static;
+    justify-items: stretch;
+  }
+
+  .hud-overlay > div {
+    width: 100%;
+  }
+}

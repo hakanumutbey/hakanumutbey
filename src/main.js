@@ -59,6 +59,20 @@ const games = [
     stockBase: 188,
   },
   {
+    slug: "siyah-adam",
+    title: "Siyah Adam",
+    path: "/oyunlar/siyah-adam/",
+    type: "Sosyal Çıkarım",
+    status: "Oynanabilir",
+    description: "3 ila 10 kişi ile renk seç, çemberde oy ver ve Siyah Adam'ı geceleri yakala.",
+    longDescription: "Siyah hariç renk seç, çember toplantısında şüpheleri topla, gece olduğunda hedefi belirle ve hayaletleri oyunun dışında bırak. Bu sürümde hazırlık odası, oylama ve 10 saniyelik gece kararı tamamlandı.",
+    accent: "red",
+    controls: "Klavye, fare ve dokunmatik",
+    achievements: ["3 kişi ile oda kur", "Siyah Adam'ı çemberde yakala", "Gece hedefini son saniyede seç"],
+    updates: ["3-10 oyunculuk çok oyunculu oda eklendi", "Renk seçimi ve hazır odası hazırlandı", "Çember toplantısı ve gece hedef akışı tamamlandı"],
+    stockBase: 168,
+  },
+  {
     slug: "vale",
     title: "Vale",
     path: "/oyunlar/vale/",
@@ -93,12 +107,6 @@ const upcomingGames = [
     title: "RHGPO",
     description: "Rüzgarlı havada gemi park etme oyunu; patates ve patates kızartmasıyla hayatta kalma fikri üzerinde çalışılıyor.",
     label: "Yeni fikir",
-    status: "Hazırlanıyor",
-  },
-  {
-    title: "Siyah Adam",
-    description: "Among Us benzeri çok oyunculu gizem oyunu; hesap sistemi ve oturum akışı hazırlanıyor.",
-    label: "Çok oyunculu",
     status: "Hazırlanıyor",
   },
   {
@@ -163,6 +171,24 @@ const badgeDefinitions = [
     title: "Oyuncu",
     description: "Bir oyunu başlattın veya oyun sayfasına girdin.",
     isUnlocked: (state) => state.playedGames.length > 0,
+  },
+  {
+    id: "voice-room",
+    title: "Sesli Oda",
+    description: "Bir sesli odaya girdin.",
+    isUnlocked: (state) => Boolean(state.voiceRoomJoined),
+  },
+  {
+    id: "shadow-seeker",
+    title: "Siyah Adam Kaşifi",
+    description: "Siyah Adam oyununu açtın.",
+    isUnlocked: (state) => state.playedGames.includes("siyah-adam"),
+  },
+  {
+    id: "circle-leader",
+    title: "Çember Lideri",
+    description: "Siyah Adam ve sesli odayı birlikte kullandın.",
+    isUnlocked: (state) => state.playedGames.includes("siyah-adam") && state.voiceRoomJoined,
   },
   {
     id: "skeleton",
@@ -256,7 +282,7 @@ document.querySelector("#app").innerHTML = `
         </div>
       </div>
       <aside class="hero-panel" aria-label="Stüdyo özeti">
-        <strong>6 oyun</strong>
+        <strong>7 oyun</strong>
         <span>Tek domain altında yayında</span>
       </aside>
     </section>
@@ -793,6 +819,7 @@ function renderAccountDashboard() {
             Oyun
             <select name="gameSlug">
               <option value="robot-avcisi" ${selectedInviteGameSlug === "robot-avcisi" ? "selected" : ""}>Robot Avcısı</option>
+              <option value="siyah-adam" ${selectedInviteGameSlug === "siyah-adam" ? "selected" : ""}>Siyah Adam</option>
               <option value="skeleton-wars" ${selectedInviteGameSlug === "skeleton-wars" ? "selected" : ""}>Skeleton Wars</option>
               <option value="vale" ${selectedInviteGameSlug === "vale" ? "selected" : ""}>Vale</option>
             </select>
@@ -1137,6 +1164,7 @@ function ensureBadgeState() {
     ratedGames: [],
     guestbook: false,
     trailerPlayed: false,
+    voiceRoomJoined: false,
   };
   try {
     const stored = JSON.parse(localStorage.getItem("hakorocks-badge-state") || "{}");
@@ -1570,6 +1598,9 @@ async function submitVoiceRoom(event) {
   try {
     await ensureVoiceClient();
     await voiceClient.join(selectedVoiceRoomId);
+    updateBadgeState((state) => {
+      state.voiceRoomJoined = true;
+    });
     status.textContent = `Sesli odaya girildi: ${selectedVoiceRoomId}`;
     await refreshVoiceState();
   } catch (error) {
