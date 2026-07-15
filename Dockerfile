@@ -12,5 +12,5 @@ ENV DATA_DIR=/app/data
 COPY --from=build /app/dist ./dist
 COPY server.mjs ./server.mjs
 RUN mkdir -p /app/data
-EXPOSE 3000
+EXPOSE 8080
 CMD ["node", "server.mjs"]

@@ -9,7 +9,7 @@ import { WebSocketServer } from "ws";
 const root = resolve(fileURLToPath(new URL(".", import.meta.url)));
 const distRoot = join(root, "dist");
 const dataRoot = process.env.DATA_DIR || join(root, ".data");
-const port = Number(process.env.PORT || 3000);
+const port = Number(process.env.PORT || 8080);
 const announcementPasswordHash =
   process.env.ANNOUNCEMENT_PASSWORD_HASH ||
   "7241bb00842e01487a32ea059136a43484969ae967f2dfd50e8ac15a4234d257";
