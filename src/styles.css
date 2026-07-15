@@ -458,18 +458,6 @@ h3 {
   font-weight: 800;
 }
 
-.check-row {
-  display: flex !important;
-  align-items: center;
-  gap: 10px;
-  color: var(--text) !important;
-}
-
-.check-row input {
-  width: 18px;
-  height: 18px;
-}
-
 .account-form input,
 .mini-form input,
 .mini-form select {

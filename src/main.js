@@ -399,7 +399,7 @@ document.querySelector("#app").innerHTML = `
       <div class="section-heading">
         <p class="eyebrow">Siyah Adam hesabı</p>
         <h2 id="social-title">Arkadaş, davet ve profil sistemi burada hazırlanıyor.</h2>
-        <p class="section-note">İlk girişte hesap oluştur; isim, takma ad ve basit robot onayı ister. Profil fotoğrafı eklersen görünür, eklemezsen adının baş harfi kullanılır.</p>
+        <p class="section-note">İlk girişte hesap oluştur; isim, takma ad ve profil fotoğrafı ister. Fotoğraf eklersen görünür, eklemezsen adının baş harfi kullanılır.</p>
       </div>
       <div class="account-layout">
         <article class="account-panel">
@@ -422,10 +422,6 @@ document.querySelector("#app").innerHTML = `
             <label>
               Profil resmi
               <input name="avatar" type="file" accept="image/*" />
-            </label>
-            <label class="check-row">
-              <input name="robotConfirmed" type="checkbox" />
-              Ben robot değilim
             </label>
             <button class="button primary" type="submit">Hesap oluştur</button>
             <p class="form-status" data-account-status aria-live="polite"></p>
@@ -1384,7 +1380,6 @@ async function submitAccount(event) {
     sessionId,
     name: formData.get("name"),
     nickname: formData.get("nickname"),
-    robotConfirmed: formData.get("robotConfirmed") === "on",
   };
   status.textContent = "Kontrol ediliyor...";
   try {
@@ -1408,7 +1403,7 @@ async function submitAccount(event) {
     status.textContent = error?.message === "nickname-taken"
       ? "Bu takma ad alınmış."
       : error?.message === "invalid-account"
-        ? "İsim, takma ad ve robot onayı gerekli."
+        ? "İsim ve takma ad gerekli."
         : error?.message === "avatar-too-large"
           ? "Profil resmi fazla büyük."
           : "Hesap oluşturulamadı.";

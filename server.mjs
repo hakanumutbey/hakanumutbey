@@ -262,8 +262,7 @@ async function handleApi(request, response) {
     const name = safeText(body.name, 40);
     const nickname = safeText(body.nickname, 24);
     const avatarUrl = safeAvatar(body.avatarUrl);
-    const robotConfirmed = body.robotConfirmed === true;
-    if (!sessionId || name.length < 2 || nickname.length < 2 || !robotConfirmed) {
+    if (!sessionId || name.length < 2 || nickname.length < 2) {
       response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
       response.end(JSON.stringify({ error: "invalid-account" }));
       return;
