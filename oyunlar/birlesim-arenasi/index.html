@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="cache-control" content="no-store" />
+    <title>Birleşim Arenası</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="fusion-shell">
+      <header class="hero">
+        <div>
+          <span class="eyebrow">Günlük 2 oyun birleşimi</span>
+          <h1 id="fusionTitle">Birleşim Arenası</h1>
+          <p id="fusionSummary">Her gün iki oyundan özellik alınır ve tek 2 oyunculu mod oluşur.</p>
+        </div>
+        <div class="hero-actions">
+          <a href="/" class="ghost-link">Ana site</a>
+          <button id="startButton" type="button">Başlat</button>
+          <button id="restartButton" type="button">Yenile</button>
+        </div>
+      </header>
+
+      <section class="feature-grid" aria-label="Birleşen oyun özellikleri">
+        <article>
+          <span>Ana oyundan</span>
+          <strong id="baseFeature">Hedef</strong>
+          <p id="baseDescription">Ana oyun arenanın hedefini belirler.</p>
+        </article>
+        <article>
+          <span>İkinci oyundan</span>
+          <strong id="sourceFeature">Kural</strong>
+          <p id="sourceDescription">İkinci oyun özel gücü ve tehlikeyi belirler.</p>
+        </article>
+        <article>
+          <span>Mod</span>
+          <strong>2 oyunculu</strong>
+          <p>Oyuncu 1 ve Oyuncu 2 aynı arenada takım puanı toplar.</p>
+        </article>
+      </section>
+
+      <section class="arena-wrap">
+        <canvas id="arena" width="1280" height="720" aria-label="Birleşim Arenası oyun alanı"></canvas>
+        <div class="arena-hud">
+          <div>
+            <span>Süre</span>
+            <strong id="timeLabel">90</strong>
+          </div>
+          <div>
+            <span>Takım</span>
+            <strong id="teamLabel">0</strong>
+          </div>
+          <div>
+            <span>P1</span>
+            <strong id="p1Label">0</strong>
+          </div>
+          <div>
+            <span>P2</span>
+            <strong id="p2Label">0</strong>
+          </div>
+        </div>
+        <p id="statusText" class="status-text">Başlat'a bas. WASD + Space ve ok tuşları + Enter ile oynanır.</p>
+      </section>
+
+      <section class="control-grid">
+        <article>
+          <h2>Oyuncu 1</h2>
+          <p>WASD hareket, Space birleşim gücü. İlk gamepad de Oyuncu 1'i kontrol eder.</p>
+        </article>
+        <article>
+          <h2>Oyuncu 2</h2>
+          <p>Ok tuşları hareket, Enter birleşim gücü. İkinci gamepad Oyuncu 2'yi kontrol eder.</p>
+        </article>
+      </section>
+
+      <div class="touch-controls" aria-label="Mobil kontroller">
+        <div class="touch-side">
+          <span>P1</span>
+          <button data-touch="p1-up">▲</button>
+          <button data-touch="p1-left">◀</button>
+          <button data-touch="p1-action">●</button>
+          <button data-touch="p1-right">▶</button>
+          <button data-touch="p1-down">▼</button>
+        </div>
+        <div class="touch-side">
+          <span>P2</span>
+          <button data-touch="p2-up">▲</button>
+          <button data-touch="p2-left">◀</button>
+          <button data-touch="p2-action">●</button>
+          <button data-touch="p2-right">▶</button>
+          <button data-touch="p2-down">▼</button>
+        </div>
+      </div>
+    </main>
+
+    <script type="module" src="./game.js"></script>
+  </body>
+</html>

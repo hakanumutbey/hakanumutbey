@@ -144,6 +144,8 @@ const games = [
   },
 ];
 
+const FUSION_GAME_PATH = "/oyunlar/birlesim-arenasi/";
+
 const upcomingGames = [
   {
     title: "Skeleton Wars 2",
@@ -1306,13 +1308,20 @@ function renderTournamentDashboard() {
         <span class="status-pill">Bugünün birleşimi</span>
         <h3>${fusion.base.title} + ${fusion.source.title}</h3>
         <p>
-          Ana oyun <strong>${fusion.base.title}</strong>. İçine <strong>${fusion.source.title}</strong>
-          oyunundan ${fusion.feature} eklenir ve mod çok oyunculu turnuva gibi oynanır.
+          Tek oyun ekranında <strong>${fusion.base.title}</strong> oyunundan ana hedef,
+          <strong>${fusion.source.title}</strong> oyunundan özel kural alınır. Mod her zaman 2 oyunculudur.
         </p>
         <div class="fusion-actions">
-          <a class="button primary" href="${fusion.base.path}" data-play-game="${fusion.base.slug}">Ana oyunu aç</a>
-          <a class="button secondary" href="${fusion.source.path}" data-play-game="${fusion.source.slug}">Eklenen oyunu aç</a>
-          <span class="fusion-state ${fusionComplete ? "is-done" : ""}">${fusionComplete ? "Birleşim tamam" : "İki oyunu da aç"}</span>
+          <a
+            class="button primary"
+            href="${FUSION_GAME_PATH}?base=${fusion.base.slug}&source=${fusion.source.slug}"
+            data-play-game="birlesim-arenasi"
+            data-fusion-base="${fusion.base.slug}"
+            data-fusion-source="${fusion.source.slug}"
+          >Birleşmiş oyunu oyna</a>
+          <a class="button secondary" href="${fusion.base.path}" data-play-game="${fusion.base.slug}">Ana oyuna bak</a>
+          <a class="button secondary" href="${fusion.source.path}" data-play-game="${fusion.source.slug}">Özellik oyununa bak</a>
+          <span class="fusion-state ${fusionComplete ? "is-done" : ""}">${fusionComplete ? "Birleşim tamam" : "Birleşmiş oyun hazır"}</span>
         </div>
       </div>
     </div>
@@ -1558,7 +1567,8 @@ function awardLeaguePoints(eventId, amount, options = {}) {
   const eventKey = `${today}:${eventId}`;
   const next = refreshLeagueState(leagueState);
   next.daily[today] ??= { games: [], actions: [] };
-  if (options.gameSlug) addUnique(next.daily[today].games, options.gameSlug);
+  const gameSlugs = options.gameSlugs || (options.gameSlug ? [options.gameSlug] : []);
+  gameSlugs.filter(Boolean).forEach((gameSlug) => addUnique(next.daily[today].games, gameSlug));
   if (options.action) addUnique(next.daily[today].actions, options.action);
   if (!next.pointEvents.includes(eventKey)) {
     next.pointEvents.push(eventKey);
@@ -1597,7 +1607,13 @@ function isFusionCompleted(dayKey = dailyBadgeKey(), state = leagueState) {
   const fusion = getDailyFusion(dayKey);
   const daily = state.daily?.[dayKey] || {};
   const played = Array.isArray(daily.games) ? daily.games : [];
-  return played.includes(fusion.base.slug) && played.includes(fusion.source.slug);
+  const actions = Array.isArray(daily.actions) ? daily.actions : [];
+  const fusionAction = `fusion:${fusion.base.slug}:${fusion.source.slug}`;
+  return (
+    played.includes("birlesim-arenasi") ||
+    actions.includes(fusionAction) ||
+    (played.includes(fusion.base.slug) && played.includes(fusion.source.slug))
+  );
 }
 
 function getCurrentLeague(state = leagueState) {
@@ -1980,10 +1996,15 @@ function bindGameCards() {
 
     const playLink = target.closest?.("[data-play-game]");
     if (playLink) {
-      updateBadgeState((state) => addUnique(state.playedGames, playLink.dataset.playGame));
+      const fusionBase = playLink.dataset.fusionBase;
+      const fusionSource = playLink.dataset.fusionSource;
+      const gameSlugs = [playLink.dataset.playGame, fusionBase, fusionSource].filter(Boolean);
+      updateBadgeState((state) => {
+        gameSlugs.forEach((gameSlug) => addUnique(state.playedGames, gameSlug));
+      });
       awardLeaguePoints(`game:${playLink.dataset.playGame}`, leaguePointValues.game, {
-        gameSlug: playLink.dataset.playGame,
-        action: "game",
+        gameSlugs,
+        action: fusionBase && fusionSource ? `fusion:${fusionBase}:${fusionSource}` : "game",
       });
     }
   });

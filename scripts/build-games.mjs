@@ -17,6 +17,7 @@ await copyStaticGame("essiz-zindan", ["dev_server.py", "package.json", "package-
 await copyStaticGame("skeleton-wars", ["remotion/node_modules", "remotion/package.json", "remotion/package-lock.json", "remotion/src"]);
 await copyStaticGame("rhgpo");
 await copyStaticGame("siyah-adam");
+await copyStaticGame("birlesim-arenasi");
 await copyRobotAvcisi();
 
 async function buildViteGame(slug) {

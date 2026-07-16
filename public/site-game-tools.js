@@ -9,6 +9,7 @@ const gameTitles = {
   "skeleton-wars": "Skeleton Wars",
   rhgpo: "RHGPO",
   "siyah-adam": "Siyah Adam",
+  "birlesim-arenasi": "Birleşim Arenası",
   vale: "Vale",
   "robot-avcisi": "Robot Avcısı",
 };
@@ -73,6 +74,15 @@ const mobileControlConfigs = {
       { label: "1", code: "Digit1" },
     ],
   },
+  "birlesim-arenasi": {
+    hint: "Sol taraf hareket, sağ taraf bakış. Güç ve P2 düğmeleri birleşim modunda kullanılır.",
+    look: true,
+    actions: [
+      { label: "Güç", code: "Space" },
+      { label: "P2", code: "Enter" },
+      { label: "Tam", code: "KeyF" },
+    ],
+  },
 };
 
 localStorage.setItem(sessionKey, sessionId);
@@ -92,6 +102,14 @@ if (slug) {
     event.preventDefault();
     capturePhoto();
   });
+}
+
+window.addEventListener("hakorocks:fusion-played", (event) => {
+  markFusionPlayed(event.detail?.baseSlug, event.detail?.sourceSlug);
+});
+
+if (window.__hakorocksFusionPlayed) {
+  markFusionPlayed(window.__hakorocksFusionPlayed.baseSlug, window.__hakorocksFusionPlayed.sourceSlug);
 }
 
 function createSessionId() {
@@ -202,7 +220,7 @@ function todayKey() {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function awardLeagueProgress(eventId, amount, gameSlug = "") {
+function awardLeagueProgress(eventId, amount, gameSlug = "", action = "") {
   const dayKey = todayKey();
   const eventKey = `${dayKey}:${eventId}`;
   const state = readLeagueState();
@@ -210,6 +228,7 @@ function awardLeagueProgress(eventId, amount, gameSlug = "") {
   const daily = state.daily && typeof state.daily === "object" ? state.daily : {};
   daily[dayKey] ??= { games: [], actions: [] };
   if (gameSlug && !daily[dayKey].games.includes(gameSlug)) daily[dayKey].games.push(gameSlug);
+  if (action && !daily[dayKey].actions.includes(action)) daily[dayKey].actions.push(action);
   if (!pointEvents.includes(eventKey)) {
     pointEvents.push(eventKey);
     state.points = (Number(state.points) || 0) + amount;
@@ -223,6 +242,14 @@ function markPlayedGame(gameSlug) {
   if (!playedGames.includes(gameSlug)) playedGames.push(gameSlug);
   writeBadgeState({ ...state, playedGames });
   awardLeagueProgress(`game:${gameSlug}`, 35, gameSlug);
+}
+
+function markFusionPlayed(baseSlug, sourceSlug) {
+  if (!baseSlug || !sourceSlug || baseSlug === sourceSlug) return;
+  markPlayedGame("birlesim-arenasi");
+  if (gameTitles[baseSlug]) markPlayedGame(baseSlug);
+  if (gameTitles[sourceSlug]) markPlayedGame(sourceSlug);
+  awardLeagueProgress(`fusion-play:${baseSlug}:${sourceSlug}`, 60, "", `fusion:${baseSlug}:${sourceSlug}`);
 }
 
 function markPhotoCaptured() {
