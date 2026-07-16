@@ -61,6 +61,7 @@ let guestbook = await readJson("guestbook.json", []);
 let feedback = await readJson("feedback.json", []);
 let announcements = await readJson("announcements.json", []);
 let accounts = normalizeAccounts(await readJson("accounts.json", []));
+accounts = await ensureDefaultBotAccounts(accounts);
 let friendRequests = normalizeFriendRequests(await readJson("friend-requests.json", []));
 let invites = normalizeInvites(await readJson("invites.json", []));
 
@@ -672,6 +673,41 @@ function normalizeAccounts(value) {
       friends: Array.isArray(item.friends) ? item.friends.map((friendId) => safeText(friendId, 80)).filter(Boolean) : [],
     }))
     .filter((item) => item.sessionId);
+}
+
+async function ensureDefaultBotAccounts(existingAccounts) {
+  const botSeed = [
+    { id: "acct-bot-1", sessionId: "bot-session-1", name: "Test Bot 1", nickname: "test-bot-1" },
+    { id: "acct-bot-2", sessionId: "bot-session-2", name: "Test Bot 2", nickname: "test-bot-2" },
+    { id: "acct-bot-3", sessionId: "bot-session-3", name: "Test Bot 3", nickname: "test-bot-3" },
+  ];
+  const now = new Date().toISOString();
+  const accountsById = new Map(existingAccounts.map((account) => [account.id, account]));
+  let changed = false;
+  for (const bot of botSeed) {
+    const present = [...accountsById.values()].some((account) => {
+      const sameId = account.id === bot.id;
+      const sameNickname = normalizeNickname(account.nickname) === normalizeNickname(bot.nickname);
+      return sameId || sameNickname;
+    });
+    if (present) continue;
+    const botAccount = {
+      id: bot.id,
+      sessionId: bot.sessionId,
+      name: bot.name,
+      nickname: bot.nickname,
+      avatarUrl: "",
+      voiceRoomId: "",
+      createdAt: now,
+      updatedAt: now,
+      friends: [],
+    };
+    existingAccounts.push(botAccount);
+    accountsById.set(bot.id, botAccount);
+    changed = true;
+  }
+  if (changed) await writeJson("accounts.json", existingAccounts);
+  return existingAccounts;
 }
 
 function normalizeFriendRequests(value) {
