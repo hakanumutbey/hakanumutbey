@@ -4,25 +4,37 @@ const startButton = document.querySelector("#startButton");
 const restartButton = document.querySelector("#restartButton");
 const roundLabel = document.querySelector("#roundLabel");
 const scoreLabel = document.querySelector("#scoreLabel");
+const modeLabel = document.querySelector("#modeLabel");
 const energyLabel = document.querySelector("#energyLabel");
 const windLabel = document.querySelector("#windLabel");
+const crashLabel = document.querySelector("#crashLabel");
 const speedLabel = document.querySelector("#speedLabel");
 const statusLabel = document.querySelector("#statusLabel");
 const hintLabel = document.querySelector("#hintLabel");
+const towControls = document.querySelector("[data-tow-controls]");
 
 const TOTAL_ROUNDS = 5;
 const WORLD = { width: 1280, height: 720 };
 const STORAGE_KEY = "hakorocks-rhgpo-high-score";
 const WIND_NAMES = ["Kuzey", "Kuzeydoğu", "Doğu", "Güneydoğu", "Güney", "Güneybatı", "Batı", "Kuzeybatı"];
+const ROUND_MODES = ["park", "tow"];
 
 const state = {
   phase: "menu",
   round: 1,
+  mode: "park",
   score: 0,
   energy: 100,
+  crashes: 0,
+  ropeStage: 0,
+  ropeOrder: [],
+  engineReady: false,
+  engineOn: false,
   highScore: Number(localStorage.getItem(STORAGE_KEY) || 0),
   message: "Hazır olduğunda Başla'ya bas.",
   nextRoundAt: 0,
+  boardingUntil: 0,
+  danceUntil: 0,
   lastFrame: performance.now(),
   worldScale: 1,
   wind: { x: 1, y: -0.4, strength: 32, timer: 0 },
@@ -35,6 +47,7 @@ const state = {
     radius: 22,
   },
   dock: { x: 980, y: 250, w: 170, h: 220, angle: 0 },
+  goal: { x: 1120, y: 340, r: 34 },
   obstacles: [],
   input: { left: false, right: false, forward: false, reverse: false, dock: false },
   touch: { active: null },
@@ -73,34 +86,60 @@ renderHud();
 requestAnimationFrame(loop);
 
 function startGame() {
-  state.phase = "playing";
-  state.round = 1;
-  state.score = 0;
-  state.energy = 100;
-  state.message = "Rüzgara karşı koy ve limana yanaş.";
-  state.nextRoundAt = 0;
-  spawnRound(true);
+  resetRun();
+  state.phase = "boarding";
+  state.message = "Gemimize bindin. Görev başlıyor.";
+  state.boardingUntil = performance.now() + 900;
   renderHud();
 }
 
 function restartGame() {
+  resetRun();
   state.phase = "menu";
+  state.message = "Hazır olduğunda Başla'ya bas.";
+  renderHud();
+}
+
+function resetRun() {
   state.round = 1;
+  state.mode = "park";
   state.score = 0;
   state.energy = 100;
-  state.message = "Hazır olduğunda Başla'ya bas.";
+  state.crashes = 0;
+  state.ropeStage = 0;
+  state.ropeOrder = [];
+  state.engineReady = false;
+  state.engineOn = false;
   state.nextRoundAt = 0;
+  state.boardingUntil = 0;
+  state.danceUntil = 0;
   state.obstacles = [];
+  state.goal = { x: 1120, y: 340, r: 34 };
   resetShip();
-  renderHud();
 }
 
 function spawnRound(first = false) {
   resetShip();
-  state.dock = makeDock(state.round);
   state.wind = makeWind(state.round);
+  state.mode = getRoundMode(state.round);
+  state.crashes = 0;
+  state.ropeStage = 0;
+  state.ropeOrder = [];
+  state.engineReady = state.mode === "park";
+  state.engineOn = state.mode === "park";
+  state.dock = makeDock(state.round);
+  state.goal = makeGoal(state.round);
   state.obstacles = makeObstacles(state.round);
-  state.message = first ? "Rüzgar sertleşiyor. Limana doğru sür." : `Tur ${state.round}. Yeni rüzgar başladı.`;
+  if (state.mode === "tow") {
+    state.ropeOrder = makeRopeOrder(state.wind);
+    state.message = first
+      ? "Gemide halat sırası başladı. Önce diğer halatı, sonra rüzgar tarafını çek."
+      : `Tur ${state.round}. Motor modunda halatları sırayla çek.`;
+  } else {
+    state.message = first
+      ? "Rüzgar sertleşiyor. Limana doğru sür."
+      : `Tur ${state.round}. Liman parkı başladı.`;
+  }
   state.phase = "playing";
 }
 
@@ -124,6 +163,15 @@ function makeDock(round) {
   };
 }
 
+function makeGoal(round) {
+  const yOptions = [170, 260, 360, 450];
+  return {
+    x: 1110,
+    y: yOptions[(round - 1) % yOptions.length],
+    r: 34,
+  };
+}
+
 function makeWind(round) {
   const index = (round - 1) % windVectors.length;
   const base = windVectors[index];
@@ -143,22 +191,66 @@ function makeObstacles(round) {
   ];
 }
 
+function getRoundMode(round) {
+  return ROUND_MODES[(round - 1) % ROUND_MODES.length];
+}
+
+function makeRopeOrder(wind) {
+  const windward = windwardSide(wind);
+  const opposite = windward === "left" ? "right" : "left";
+  return [opposite, windward];
+}
+
+function windwardSide(wind) {
+  if (Math.abs(wind.x) >= Math.abs(wind.y)) {
+    return wind.x >= 0 ? "left" : "right";
+  }
+  return wind.y >= 0 ? "left" : "right";
+}
+
 function handleKeyDown(event) {
   keys.add(event.code);
   syncKeys();
-  if (event.code === "Space" || event.code === "KeyE") {
-    event.preventDefault();
-    state.input.dock = true;
-  }
   if (state.phase === "menu" && (event.code === "Enter" || event.code === "Space")) {
     startGame();
+    return;
+  }
+  if (state.phase !== "playing") return;
+
+  if (state.mode === "tow" && !state.engineOn) {
+    if (event.code === "KeyQ") {
+      event.preventDefault();
+      pullRope("left");
+      return;
+    }
+    if (event.code === "KeyE") {
+      event.preventDefault();
+      pullRope("right");
+      return;
+    }
+    if (event.code === "KeyM") {
+      event.preventDefault();
+      startEngine();
+      return;
+    }
+  }
+
+  if (state.mode === "tow" && event.code === "KeyM") {
+    event.preventDefault();
+    startEngine();
+    return;
+  }
+
+  if (state.mode !== "tow" && (event.code === "Space" || event.code === "KeyE")) {
+    event.preventDefault();
+    state.input.dock = true;
   }
 }
 
 function handleKeyUp(event) {
   keys.delete(event.code);
   syncKeys();
-  if (event.code === "Space" || event.code === "KeyE") {
+  if (state.mode !== "tow" && (event.code === "Space" || event.code === "KeyE")) {
     state.input.dock = false;
   }
 }
@@ -176,18 +268,27 @@ function setTouch(action, pressed) {
   if (action === "right") state.input.right = pressed;
   if (action === "forward") state.input.forward = pressed;
   if (action === "reverse") state.input.reverse = pressed;
-  if (action === "dock") state.input.dock = pressed;
+  if (action === "dock") state.input.dock = pressed && state.mode !== "tow";
+  if (!pressed) return;
+  if (action === "rope-left") pullRope("left");
+  if (action === "rope-right") pullRope("right");
+  if (action === "engine") startEngine();
 }
 
 function loop(now) {
   const dt = Math.min(0.033, (now - state.lastFrame) / 1000);
   state.lastFrame = now;
 
-  if (state.phase === "playing") {
+  if (state.phase === "boarding" && now >= state.boardingUntil) {
+    spawnRound(true);
+  } else if (state.phase === "playing") {
     updateWind(dt);
     updateShip(dt);
-    updateCollisions();
-    checkDock(now);
+    if (state.mode === "tow") {
+      checkTowGoal(now);
+    } else {
+      checkDock(now);
+    }
     state.energy = Math.max(0, state.energy - dt * (1.6 + state.round * 0.18));
     if (state.energy <= 0) loseGame();
   } else if (state.phase === "transition" && now >= state.nextRoundAt) {
@@ -216,6 +317,32 @@ function updateWind(dt) {
   }
 }
 
+function pullRope(side) {
+  if (state.mode !== "tow" || state.engineOn || state.phase !== "playing") return;
+  const expected = state.ropeOrder[state.ropeStage];
+  if (!expected) return;
+  if (side !== expected) {
+    state.message = "Yanlış halatı çektin. Sıralamayı baştan yap.";
+    state.ropeStage = 0;
+    return;
+  }
+  state.ropeStage += 1;
+  if (state.ropeStage >= state.ropeOrder.length) {
+    state.engineReady = true;
+    state.message = "Halatlar tamam. Motoru çalıştırabilirsin.";
+  } else {
+    state.message = side === "left"
+      ? "Sol halat çekildi. Şimdi rüzgar tarafını çek."
+      : "Sağ halat çekildi. Şimdi rüzgar tarafını çek.";
+  }
+}
+
+function startEngine() {
+  if (state.mode !== "tow" || !state.engineReady || state.engineOn || state.phase !== "playing") return;
+  state.engineOn = true;
+  state.message = "Motor çalıştı. Çıkışa doğru ilerle.";
+}
+
 function updateShip(dt) {
   const ship = state.ship;
   const turnSpeed = 2.4;
@@ -223,25 +350,36 @@ function updateShip(dt) {
   const reverse = 128;
   const windForce = state.wind.strength;
   const drag = 0.985;
+  const towMode = state.mode === "tow";
+  const canDrive = !towMode || state.engineOn;
 
-  if (state.input.left) ship.angle -= turnSpeed * dt;
-  if (state.input.right) ship.angle += turnSpeed * dt;
+  if (canDrive) {
+    if (state.input.left) ship.angle -= turnSpeed * dt;
+    if (state.input.right) ship.angle += turnSpeed * dt;
+  }
 
   const forwardX = Math.cos(ship.angle);
   const forwardY = Math.sin(ship.angle);
-  if (state.input.forward) {
+  if (canDrive && state.input.forward) {
     ship.vx += forwardX * thrust * dt;
     ship.vy += forwardY * thrust * dt;
     state.energy = Math.max(0, state.energy - dt * 2.5);
   }
-  if (state.input.reverse) {
+  if (canDrive && state.input.reverse) {
     ship.vx -= forwardX * reverse * dt;
     ship.vy -= forwardY * reverse * dt;
     state.energy = Math.max(0, state.energy - dt * 1.3);
   }
 
-  ship.vx += state.wind.x * windForce * dt;
-  ship.vy += state.wind.y * windForce * dt;
+  if (towMode && !state.engineOn) {
+    ship.vx += state.wind.x * windForce * dt * 0.12;
+    ship.vy += state.wind.y * windForce * dt * 0.12;
+    ship.vx *= Math.pow(0.98, dt * 60);
+    ship.vy *= Math.pow(0.98, dt * 60);
+  } else {
+    ship.vx += state.wind.x * windForce * dt;
+    ship.vy += state.wind.y * windForce * dt;
+  }
   ship.vx *= Math.pow(drag, dt * 60);
   ship.vy *= Math.pow(drag, dt * 60);
   ship.x += ship.vx * dt;
@@ -250,12 +388,14 @@ function updateShip(dt) {
   if (ship.x < 40 || ship.x > WORLD.width - 40) {
     ship.x = clamp(ship.x, 40, WORLD.width - 40);
     ship.vx *= -0.35;
-    state.energy = Math.max(0, state.energy - 4);
+    if (towMode) registerCrash("Sınır");
+    else state.energy = Math.max(0, state.energy - 4);
   }
   if (ship.y < 40 || ship.y > WORLD.height - 40) {
     ship.y = clamp(ship.y, 40, WORLD.height - 40);
     ship.vy *= -0.35;
-    state.energy = Math.max(0, state.energy - 4);
+    if (towMode) registerCrash("Sınır");
+    else state.energy = Math.max(0, state.energy - 4);
   }
 
   const obstacleHit = state.obstacles.find((obstacle) => distance(ship.x, ship.y, obstacle.x, obstacle.y) < obstacle.r + ship.radius);
@@ -267,13 +407,24 @@ function updateShip(dt) {
     ship.y = obstacleHit.y + (dy / length) * (obstacleHit.r + ship.radius + 1);
     ship.vx *= -0.25;
     ship.vy *= -0.25;
-    state.energy = Math.max(0, state.energy - 8);
-    state.message = "Kayaya dokundun. Direksiyonu düzelt.";
+    if (towMode) {
+      registerCrash("Kaya");
+    } else {
+      state.energy = Math.max(0, state.energy - 8);
+      state.message = "Kayaya dokundun. Direksiyonu düzelt.";
+    }
   }
+
 }
 
-function updateCollisions() {
-  return;
+function registerCrash(reason) {
+  state.crashes += 1;
+  state.energy = Math.max(0, state.energy - 12);
+  state.message = `${reason} çarpması oldu. ${3 - state.crashes} hak kaldı.`;
+  resetShip();
+  if (state.crashes >= 3) {
+    loseGame();
+  }
 }
 
 function checkDock(now) {
@@ -286,13 +437,24 @@ function checkDock(now) {
   }
 }
 
-function completeRound(now) {
+function checkTowGoal(now) {
+  const ship = state.ship;
+  const goalDistance = distance(ship.x, ship.y, state.goal.x, state.goal.y);
+  if (state.engineOn && goalDistance < state.goal.r + ship.radius + 4) {
+    completeRound(now, "tow");
+  }
+}
+
+function completeRound(now, mode = state.mode) {
   const bonus = Math.round(state.energy) + Math.max(0, 90 - Math.round(Math.hypot(state.ship.vx, state.ship.vy)));
   state.score += 100 + bonus + state.round * 18;
-  state.message = `Tur ${state.round} tamamlandı. Limana yanaştın.`;
+  state.message = mode === "tow"
+    ? `Tur ${state.round} tamamlandı. Motor modunda çıkışı geçtin.`
+    : `Tur ${state.round} tamamlandı. Limana yanaştın.`;
   state.round += 1;
   state.phase = "transition";
   state.nextRoundAt = now + 1200;
+  state.danceUntil = now + 1400;
   if (state.score > state.highScore) {
     state.highScore = state.score;
     localStorage.setItem(STORAGE_KEY, String(state.highScore));
@@ -310,7 +472,7 @@ function winGame() {
 
 function loseGame() {
   state.phase = "lost";
-  state.message = "Enerjin bitti. Tekrar dene.";
+  state.message = "Oyun bitti. Tekrar dene.";
   if (state.score > state.highScore) {
     state.highScore = state.score;
     localStorage.setItem(STORAGE_KEY, String(state.highScore));
@@ -319,14 +481,23 @@ function loseGame() {
 
 function renderHud() {
   roundLabel.textContent = `${Math.min(state.round, TOTAL_ROUNDS)} / ${TOTAL_ROUNDS}`;
+  modeLabel.textContent = state.mode === "tow" ? "Motor" : "Liman";
   scoreLabel.textContent = String(state.score);
   energyLabel.textContent = `${Math.round(state.energy)}%`;
   windLabel.textContent = windName(state.wind.x, state.wind.y);
+  crashLabel.textContent = state.mode === "tow" ? `${state.crashes} / 3` : "Hazır";
   speedLabel.textContent = `${Math.round(Math.hypot(state.ship.vx, state.ship.vy))} km/s`;
   statusLabel.textContent = state.message;
+  if (towControls) towControls.hidden = state.phase !== "playing" || state.mode !== "tow";
   hintLabel.textContent =
-    state.phase === "playing"
-      ? "WASD / ok tuşları ile sür, Space veya E ile park et."
+    state.phase === "boarding"
+      ? "Gemimize bindin. Biraz bekle."
+      : state.phase === "playing"
+        ? state.mode === "tow" && !state.engineOn
+          ? `Önce diğer halatı, sonra ${windwardSide(state.wind) === "left" ? "sol" : "sağ"} halatı çek. Sonra motoru çalıştır.`
+          : state.mode === "tow"
+            ? "Motor açık. Rotayı temiz tut ve çıkışa git."
+            : "WASD / ok tuşları ile sür, Space veya E ile park et."
       : state.phase === "won"
         ? `Kazandın. En iyi skor: ${state.highScore}`
         : state.phase === "lost"
@@ -339,10 +510,11 @@ function draw() {
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
   drawBackground();
   drawWater();
+  if (state.mode === "tow") drawGoal();
   drawDock();
   drawWind();
   drawObstacles();
-  drawItems();
+  if (state.mode === "tow") drawRopes();
   drawShip();
   drawOverlayText();
 }
@@ -425,31 +597,47 @@ function drawObstacles() {
   }
 }
 
-function drawItems() {
-  for (const item of state.items) {
-    if (item.taken) continue;
-    ctx.save();
-    ctx.translate(item.x, item.y);
-    if (item.type === "potato") {
-      ctx.fillStyle = "#b98249";
-      ctx.beginPath();
-      ctx.ellipse(0, 0, 16, 12, -0.15, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "rgba(255,255,255,0.22)";
-      ctx.beginPath();
-      ctx.arc(-4, -3, 2, 0, Math.PI * 2);
-      ctx.arc(4, 2, 1.8, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      ctx.fillStyle = "#f8c74f";
-      ctx.beginPath();
-      ctx.roundRect(-18, -8, 36, 16, 4);
-      ctx.fill();
-      ctx.fillStyle = "rgba(255,255,255,0.18)";
-      ctx.fillRect(-16, -2, 32, 2);
-    }
-    ctx.restore();
-  }
+function drawGoal() {
+  ctx.save();
+  ctx.fillStyle = "rgba(85, 214, 255, 0.12)";
+  ctx.beginPath();
+  ctx.arc(state.goal.x, state.goal.y, state.goal.r + 16, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(85, 214, 255, 0.9)";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(state.goal.x, state.goal.y, state.goal.r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.font = "700 18px Inter, sans-serif";
+  ctx.fillText("ÇIKIŞ", state.goal.x - 26, state.goal.y - 44);
+  ctx.restore();
+}
+
+function drawRopes() {
+  const ship = state.ship;
+  const leftX = ship.x - 26;
+  const rightX = ship.x + 26;
+  const y = ship.y - 8;
+  const windSide = windwardSide(state.wind);
+  ctx.save();
+  ctx.strokeStyle = "rgba(255,255,255,0.35)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(leftX, y);
+  ctx.lineTo(leftX - 60, y + (windSide === "left" ? -18 : 18));
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(rightX, y);
+  ctx.lineTo(rightX + 60, y + (windSide === "right" ? -18 : 18));
+  ctx.stroke();
+  ctx.fillStyle = state.ropeStage > 0 ? "#96f06f" : "#ffd166";
+  ctx.font = "700 14px Inter, sans-serif";
+  ctx.fillText("Sol halat", leftX - 76, y + 14);
+  ctx.fillText("Sağ halat", rightX + 10, y + 14);
+  ctx.fillStyle = "rgba(255,255,255,0.8)";
+  ctx.fillText(state.engineReady ? "Motor hazır" : "Halat sırası", ship.x - 48, ship.y - 34);
+  ctx.restore();
 }
 
 function drawShip() {
@@ -474,6 +662,39 @@ function drawShip() {
   ctx.beginPath();
   ctx.arc(-8, 0, 10, 0, Math.PI * 2);
   ctx.fill();
+  drawCaptain(state.phase === "won" || state.danceUntil > performance.now() ? "dance" : "idle");
+  ctx.restore();
+}
+
+function drawCaptain(mode = "idle") {
+  const now = performance.now();
+  const dance = mode === "dance";
+  const bob = dance ? Math.sin(now / 90) * 5 : Math.sin(now / 500) * 1.2;
+  const swing = dance ? Math.sin(now / 75) * 0.9 : 0;
+  ctx.save();
+  ctx.translate(2, -24 + bob);
+  ctx.strokeStyle = "rgba(255,255,255,0.9)";
+  ctx.fillStyle = "rgba(255,209,102,0.9)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(0, -8, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(0, -2);
+  ctx.lineTo(0, 10);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(0, 2);
+  ctx.lineTo(-10 + swing * 5, 0);
+  ctx.moveTo(0, 2);
+  ctx.lineTo(10 - swing * 5, 0);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(0, 10);
+  ctx.lineTo(-7 + swing * 4, 22);
+  ctx.moveTo(0, 10);
+  ctx.lineTo(7 - swing * 4, 22);
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -496,7 +717,13 @@ function drawOverlayText() {
     ctx.font = "900 54px Inter, sans-serif";
     ctx.fillText("RHGPO", 520, 330);
     ctx.font = "700 24px Inter, sans-serif";
-    ctx.fillText("Rüzgara karşı gemiyi park et.", 430, 372);
+    ctx.fillText("Park modu + motor modu, tek liman savaşı.", 390, 372);
+  } else if (state.phase === "boarding") {
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.font = "900 46px Inter, sans-serif";
+    ctx.fillText("Gemiye biniyor...", 430, 330);
+    ctx.font = "700 22px Inter, sans-serif";
+    ctx.fillText("Kaptan hazır. Görev başlıyor.", 440, 368);
   }
   ctx.restore();
 }

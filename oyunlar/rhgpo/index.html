@@ -14,7 +14,7 @@
           <p class="eyebrow">Rüzgarlı havada gemi park etme oyunu</p>
           <h1>RHGPO</h1>
           <p>
-            Limandaki park alanına yanaş, patates ve patates kızartması topla, rüzgara rağmen gemiyi sabitle.
+            Limandaki park alanına yanaş, sonra motor modunda halatları doğru sırayla çek.
             Beş turu tamamlarsan kazanırsın.
           </p>
         </div>
@@ -26,9 +26,11 @@
 
       <section class="hud" aria-label="Oyun bilgileri">
         <article><span>Tur</span><strong id="roundLabel">1 / 5</strong></article>
+        <article><span>Mod</span><strong id="modeLabel">Liman</strong></article>
         <article><span>Skor</span><strong id="scoreLabel">0</strong></article>
         <article><span>Enerji</span><strong id="energyLabel">100%</strong></article>
         <article><span>Rüzgar</span><strong id="windLabel">Kuzeydoğu</strong></article>
+        <article><span>Çarpma</span><strong id="crashLabel">0 / 3</strong></article>
         <article><span>Hız</span><strong id="speedLabel">0 km/s</strong></article>
       </section>
 
@@ -46,6 +48,11 @@
             <button data-action="reverse">▼</button>
             <button data-action="right">▶</button>
           </div>
+          <div class="tow-controls" data-tow-controls hidden aria-label="Halat ve motor kontrolleri">
+            <button data-action="rope-left">Sol halat</button>
+            <button data-action="engine">Motoru çalıştır</button>
+            <button data-action="rope-right">Sağ halat</button>
+          </div>
         </div>
       </section>
 
@@ -53,19 +60,19 @@
         <article class="panel">
           <h2>Kurallar</h2>
           <ul>
-            <li>Gemiyi rüzgar limana doğru sürükler.</li>
-            <li>Patates enerji verir, patates kızartması puan ve enerji verir.</li>
-            <li>Park için dock alanında yavaşlayıp doğru açıya gelmelisin.</li>
-            <li>5 turu bitirirsen oyunu kazanırsın.</li>
+            <li>Park modunda limana yanaşıp doğru açıyla dur.</li>
+            <li>Motor modunda önce halatları doğru sırayla çek, sonra motoru çalıştır.</li>
+            <li>Rüzgarın vurduğu taraftaki halatı en son çek.</li>
+            <li>Üç çarpma olursa oyun biter.</li>
           </ul>
         </article>
         <article class="panel">
           <h2>İpuçları</h2>
           <ul>
-            <li>Rüzgar yönü değişince küçük düzeltmeler yap.</li>
-            <li>Barrel ve kayalara çarparsan enerji kaybedersin.</li>
-            <li>Dock'a son anda dalma; önce hızı düşür.</li>
-            <li>Patatesleri kaçırma, özellikle sert fırtınada.</li>
+            <li>Gemide küçük kaptan figürü seni gösterir.</li>
+            <li>Park başarısında dans sahnesi açılır.</li>
+            <li>Motor modunda önce halatları, sonra gazı düşün.</li>
+            <li>Kayalara çarpmadan rotayı temiz tut.</li>
           </ul>
         </article>
       </section>
