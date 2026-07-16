@@ -16,12 +16,13 @@ const announcementPasswordHash =
 const sessions = new Map();
 const voiceRooms = new Map();
 const siyahAdamRooms = new Map();
-const games = ["annenden-kac", "bardak", "essiz-zindan", "skeleton-wars", "siyah-adam", "vale", "robot-avcisi"];
+const games = ["annenden-kac", "bardak", "essiz-zindan", "skeleton-wars", "rhgpo", "siyah-adam", "vale", "robot-avcisi"];
 const baseValues = {
   "annenden-kac": 128,
   bardak: 96,
   "essiz-zindan": 154,
   "skeleton-wars": 188,
+  rhgpo: 121,
   "siyah-adam": 168,
   vale: 112,
   "robot-avcisi": 173,

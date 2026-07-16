@@ -5,7 +5,7 @@
 <h1 align="center">Hakorocks Studio</h1>
 
 <p align="center">
-  <strong>Hakan Umut Akadal'in oyun stüdyosu, portfolyosu ve yaratıcı kod üssü.</strong>
+  <strong>Hakan Umut Akadal'in Hakorocks Studio oyun stüdyosu, portfolyosu ve yaratıcı kod üssü.</strong>
 </p>
 
 <p align="center">
@@ -16,11 +16,11 @@
 
 ---
 
-## Merhaba, Ben Hakan Umut
+## Kısa Özet
 
-Ben **Hakan Umut Akadal**. 9 yaşındayım ve oyun geliştirmeyi, 3D dünyalar kurmayı, web projeleri yapmayı seviyorum. Bu repo hem GitHub karşılama ekranım hem de **Hakorocks Studio** web sitemin kaynak kodu.
+Bu repo hem GitHub karşılama ekranı hem de **Hakorocks Studio** web sitemin kaynak kodu.
 
-Buradaki hedefim basit: yeni oyunlarımı ve projelerimi aynı çatı altında toplamak, arkadaşlarıma gösterebileceğim profesyonel bir stüdyo vitrini oluşturmak ve her geliştirmeyi hızlıca yayına almak.
+Buradaki hedef basit: yeni oyunları ve projeleri aynı çatı altında toplamak, paylaşılabilir bir stüdyo vitrini oluşturmak ve her geliştirmeyi hızlıca yayına almak.
 
 ## Oyunlarım
 
@@ -30,6 +30,7 @@ Buradaki hedefim basit: yeni oyunlarımı ve projelerimi aynı çatı altında t
 | **Bardak** | 3D fizik oyunu | Tarayıcıdan oynanabilir |
 | **Eşsiz Zindan** | Zindan aksiyonu | Tarayıcıdan oynanabilir |
 | **Skeleton Wars** | Macera savaşı | Tarayıcıdan oynanabilir |
+| **RHGPO** | Deniz simülasyonu | Tarayıcıdan oynanabilir |
 | **Siyah Adam** | Sosyal çıkarım | Tarayıcıdan oynanabilir |
 | **Vale** | 3D simülasyon | Tarayıcıdan oynanabilir |
 | **Robot Avcısı** | Laboratuvar FPS | Tarayıcıdan oynanabilir |

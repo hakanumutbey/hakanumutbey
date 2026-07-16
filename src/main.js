@@ -59,6 +59,20 @@ const games = [
     stockBase: 188,
   },
   {
+    slug: "rhgpo",
+    title: "RHGPO",
+    path: "/oyunlar/rhgpo/",
+    type: "Deniz Simülasyonu",
+    status: "Oynanabilir",
+    description: "Rüzgarlı havada gemiyi park et, patates topla ve kızartmaları kaçırma.",
+    longDescription: "RHGPO'da rüzgar gemiyi sürükler, sen de limandaki park alanına yanaşırken patates ve patates kızartması toplayarak hayatta kalırsın. Her turda rüzgar sertleşir, enerji azalır ve gemiyi düzgün park etmen gerekir.",
+    accent: "sea",
+    controls: "Klavye, fare ve dokunmatik",
+    achievements: ["İlk limana yanaş", "Patatesleri topla", "Beş turu tamamla"],
+    updates: ["Rüzgar sürükleme sistemi eklendi", "Patates ve kızartma toplama döngüsü kuruldu", "Liman park etme hedefleri hazırlandı"],
+    stockBase: 121,
+  },
+  {
     slug: "siyah-adam",
     title: "Siyah Adam",
     path: "/oyunlar/siyah-adam/",
@@ -103,12 +117,6 @@ const games = [
 ];
 
 const upcomingGames = [
-  {
-    title: "RHGPO",
-    description: "Rüzgarlı havada gemi park etme oyunu; patates ve patates kızartmasıyla hayatta kalma fikri üzerinde çalışılıyor.",
-    label: "Yeni fikir",
-    status: "Hazırlanıyor",
-  },
   {
     title: "Skeleton Wars 2",
     description: "Karanlık gözlerden başlayan yeni bölüm için hazırlık klasörü hazır.",
@@ -183,6 +191,12 @@ const badgeDefinitions = [
     title: "Siyah Adam Kaşifi",
     description: "Siyah Adam oyununu açtın.",
     isUnlocked: (state) => state.playedGames.includes("siyah-adam"),
+  },
+  {
+    id: "rhgpo-pilot",
+    title: "RHGPO Pilotu",
+    description: "RHGPO'da limana yanaştın.",
+    isUnlocked: (state) => state.playedGames.includes("rhgpo"),
   },
   {
     id: "circle-leader",
@@ -272,8 +286,8 @@ document.querySelector("#app").innerHTML = `
         <p class="eyebrow">Tarayıcıda oynanan oyunlar ve yaratıcı kod</p>
         <h1 id="hero-title">Hakorocks Studio</h1>
         <p class="hero-copy">
-          Ben Hakan Umut Akadal. 9 yaşındayım; oyunlar, 3D dünyalar ve web projeleri geliştiriyorum.
-          Burası kendi oyun stüdyomun ana üssü.
+          Ben Hakan Umut Akadal. Oyunlar, 3D dünyalar ve web projeleri tek merkezde.
+          Burada tarayıcıda açılan oyunlar, canlı özellikler ve yeni denemeler bir araya geliyor.
         </p>
         <div class="hero-actions">
           <a class="button primary" href="#oyunlar">Oyunları aç</a>
@@ -282,7 +296,7 @@ document.querySelector("#app").innerHTML = `
         </div>
       </div>
       <aside class="hero-panel" aria-label="Stüdyo özeti">
-        <strong>7 oyun</strong>
+        <strong>8 oyun</strong>
         <span>Tek domain altında yayında</span>
       </aside>
     </section>
@@ -305,13 +319,13 @@ document.querySelector("#app").innerHTML = `
         </article>
         <aside class="profile-card" aria-label="Mini profil">
           <span>Mini profil</span>
-          <h3>Hakan Umut</h3>
-          <p>9 yaşında oyun geliştirici. Oyun, proje ve teknoloji keşiflerini burada topluyor.</p>
+          <h3>Hakan Umut Akadal</h3>
+          <p>Oyun, proje ve teknoloji keşiflerini burada topluyor.</p>
           <strong>Herkese açık</strong>
           <small>hakorocks.akadal.tr</small>
         </aside>
         <div class="stats-grid" aria-label="Stüdyo bilgileri">
-          <div><strong>9</strong><span>yaşında geliştirici</span></div>
+          <div><strong>Studio</strong><span>oyun vitrini</span></div>
           <div><strong>3D</strong><span>Babylon.js oyunları</span></div>
           <div><strong>Main</strong><span>push sonrası yayın</span></div>
           <div><strong>Live</strong><span>oyun ve site sayaçları</span></div>
@@ -328,27 +342,25 @@ document.querySelector("#app").innerHTML = `
         <article class="resume-card wide">
           <h3>Merhaba!</h3>
           <p>
-            Ben Hakan Umut Akadal. 5 Ekim'de doğdum. Oyun geliştirmeyi, yeni projeler üretmeyi
-            ve teknolojiyi keşfetmeyi çok seviyorum. Kendi oyunlarımı geliştiriyor ve bunları
-            bu web sitesinde paylaşıyorum.
+            Hakorocks Studio, oyun geliştirme, yeni projeler üretme ve teknolojiyi keşfetme
+            odağında ilerliyor. Kendi oyunlarını geliştiriyor ve bunları bu web sitesinde paylaşıyor.
           </p>
         </article>
         <article class="resume-card">
-          <h3>Aile</h3>
+          <h3>Odak alanları</h3>
           <ul>
-            <li>Anne: İnayet Akadal</li>
-            <li>Baba: Emre Akadal</li>
-            <li>Babaanne: Ayşe Akadal</li>
-            <li>Dede: Yunus Akadal</li>
-            <li>Kardeş: Yok</li>
+            <li>Tarayıcı oyunları</li>
+            <li>Canlı web deneyleri</li>
+            <li>Paylaşılabilir stüdyo vitrini</li>
+            <li>Hızlı yayın akışı</li>
           </ul>
         </article>
         <article class="resume-card">
-          <h3>Madalyalar ve Belgeler</h3>
+          <h3>Notlar</h3>
           <ul>
-            <li>Anadak Kampçılık etkinliğinden madalya.</li>
-            <li>Kavaklı Anaokulu Spor Turnuvası Başarı Madalyası.</li>
-            <li>Büyükşehir İlkokulu "Ben Artık Okuyorum Yazıyorum" Belgesi (2023-2024).</li>
+            <li>Yeni oyunlar ana vitrinde görünür.</li>
+            <li>Haberler ve duyurular canlı güncellenir.</li>
+            <li>Projeler ayrı klasörde düzenli tutulur.</li>
           </ul>
         </article>
       </div>

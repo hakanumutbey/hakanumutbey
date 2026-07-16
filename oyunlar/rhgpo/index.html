@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="cache-control" content="no-store" />
+    <title>RHGPO</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="game-shell">
+      <section class="hero-panel">
+        <div>
+          <p class="eyebrow">Rüzgarlı havada gemi park etme oyunu</p>
+          <h1>RHGPO</h1>
+          <p>
+            Limandaki park alanına yanaş, patates ve patates kızartması topla, rüzgara rağmen gemiyi sabitle.
+            Beş turu tamamlarsan kazanırsın.
+          </p>
+        </div>
+        <div class="hero-actions">
+          <button id="startButton" type="button">Oyuna Başla</button>
+          <button id="restartButton" type="button">Yeniden Başlat</button>
+        </div>
+      </section>
+
+      <section class="hud" aria-label="Oyun bilgileri">
+        <article><span>Tur</span><strong id="roundLabel">1 / 5</strong></article>
+        <article><span>Skor</span><strong id="scoreLabel">0</strong></article>
+        <article><span>Enerji</span><strong id="energyLabel">100%</strong></article>
+        <article><span>Rüzgar</span><strong id="windLabel">Kuzeydoğu</strong></article>
+        <article><span>Hız</span><strong id="speedLabel">0 km/s</strong></article>
+      </section>
+
+      <section class="viewport">
+        <canvas id="gameCanvas" width="1280" height="720" aria-label="RHGPO oyun alanı"></canvas>
+        <div class="overlay">
+          <div>
+            <strong id="statusLabel">Hazır olduğunda Başla'ya bas.</strong>
+            <p id="hintLabel">WASD / ok tuşları ile sür, Space veya E ile park et.</p>
+          </div>
+          <div class="touch-controls" aria-label="Dokunmatik kontroller">
+            <button data-action="left">◀</button>
+            <button data-action="forward">▲</button>
+            <button data-action="dock">E</button>
+            <button data-action="reverse">▼</button>
+            <button data-action="right">▶</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="info-grid">
+        <article class="panel">
+          <h2>Kurallar</h2>
+          <ul>
+            <li>Gemiyi rüzgar limana doğru sürükler.</li>
+            <li>Patates enerji verir, patates kızartması puan ve enerji verir.</li>
+            <li>Park için dock alanında yavaşlayıp doğru açıya gelmelisin.</li>
+            <li>5 turu bitirirsen oyunu kazanırsın.</li>
+          </ul>
+        </article>
+        <article class="panel">
+          <h2>İpuçları</h2>
+          <ul>
+            <li>Rüzgar yönü değişince küçük düzeltmeler yap.</li>
+            <li>Barrel ve kayalara çarparsan enerji kaybedersin.</li>
+            <li>Dock'a son anda dalma; önce hızı düşür.</li>
+            <li>Patatesleri kaçırma, özellikle sert fırtınada.</li>
+          </ul>
+        </article>
+      </section>
+    </main>
+
+    <script type="module" src="./game.js"></script>
+  </body>
+</html>

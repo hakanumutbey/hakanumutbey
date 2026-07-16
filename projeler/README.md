@@ -1,6 +1,6 @@
 # Projeler
 
-Bu klasor Hakan Umut Akadal'in yeni web projeleri, denemeleri ve uygulamalari icin ayrildi.
+Bu klasor yeni web projeleri, denemeler ve uygulamalar icin ayrildi.
 
 Yeni bir proje eklerken:
 
