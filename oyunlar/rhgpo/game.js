@@ -50,10 +50,13 @@ const state = {
   goal: { x: 1120, y: 340, r: 34 },
   obstacles: [],
   input: { left: false, right: false, forward: false, reverse: false, dock: false },
+  gamepad: { left: false, right: false, forward: false, reverse: false, dock: false },
   touch: { active: null },
 };
 
 const keys = new Set();
+const GAMEPAD_DEADZONE = 0.35;
+const gamepadState = { buttons: new Set() };
 const windVectors = [
   { x: 0, y: -1 },
   { x: 0.7, y: -0.7 },
@@ -67,11 +70,19 @@ const windVectors = [
 
 startButton.addEventListener("click", startGame);
 restartButton.addEventListener("click", restartGame);
+canvas.addEventListener("click", () => {
+  if (state.phase === "menu") startGame();
+});
 document.addEventListener("keydown", handleKeyDown);
 document.addEventListener("keyup", handleKeyUp);
 window.addEventListener("resize", resizeCanvas);
+window.addEventListener("load", resizeCanvas);
 window.addEventListener("blur", resetInput);
 window.addEventListener("pagehide", resetInput);
+window.addEventListener("gamepaddisconnected", () => {
+  resetGamepadInput();
+  syncKeys();
+});
 
 document.querySelectorAll("[data-action]").forEach((button) => {
   const action = button.dataset.action;
@@ -256,28 +267,116 @@ function handleKeyUp(event) {
 }
 
 function syncKeys() {
-  state.input.left = keys.has("ArrowLeft") || keys.has("KeyA");
-  state.input.right = keys.has("ArrowRight") || keys.has("KeyD");
-  state.input.forward = keys.has("ArrowUp") || keys.has("KeyW");
-  state.input.reverse = keys.has("ArrowDown") || keys.has("KeyS");
+  state.input.left = keys.has("ArrowLeft") || keys.has("KeyA") || state.touch.active === "left" || state.gamepad.left;
+  state.input.right = keys.has("ArrowRight") || keys.has("KeyD") || state.touch.active === "right" || state.gamepad.right;
+  state.input.forward = keys.has("ArrowUp") || keys.has("KeyW") || state.touch.active === "forward" || state.gamepad.forward;
+  state.input.reverse = keys.has("ArrowDown") || keys.has("KeyS") || state.touch.active === "reverse" || state.gamepad.reverse;
+  state.input.dock = state.mode !== "tow" && (keys.has("Space") || keys.has("KeyE") || state.touch.active === "dock" || state.gamepad.dock);
+}
+
+function resetInput() {
+  keys.clear();
+  resetGamepadInput();
+  state.touch.active = null;
+  syncKeys();
+}
+
+function resetGamepadInput() {
+  gamepadState.buttons = new Set();
+  state.gamepad.left = false;
+  state.gamepad.right = false;
+  state.gamepad.forward = false;
+  state.gamepad.reverse = false;
+  state.gamepad.dock = false;
 }
 
 function setTouch(action, pressed) {
-  state.touch.active = pressed ? action : null;
+  state.touch.active = pressed ? action : state.touch.active === action ? null : state.touch.active;
   if (action === "left") state.input.left = pressed;
   if (action === "right") state.input.right = pressed;
   if (action === "forward") state.input.forward = pressed;
   if (action === "reverse") state.input.reverse = pressed;
   if (action === "dock") state.input.dock = pressed && state.mode !== "tow";
+  syncKeys();
   if (!pressed) return;
   if (action === "rope-left") pullRope("left");
   if (action === "rope-right") pullRope("right");
   if (action === "engine") startEngine();
 }
 
+function pollGamepadInput() {
+  const gamepad = getPrimaryGamepad();
+  if (!gamepad) {
+    if (gamepadState.buttons.size || Object.values(state.gamepad).some(Boolean)) {
+      resetGamepadInput();
+      syncKeys();
+    }
+    return;
+  }
+
+  const nextButtons = new Set();
+  const button = (index, name) => {
+    const control = gamepad.buttons[index];
+    const pressed = Boolean(control?.pressed || control?.value > 0.6);
+    if (pressed) nextButtons.add(name);
+    return pressed;
+  };
+  const primary = button(0, "primary");
+  button(1, "secondary");
+  const leftRope = button(2, "left-rope") || button(4, "left-rope");
+  const rightRope = button(3, "right-rope") || button(5, "right-rope");
+  const rightTrigger = button(7, "right-trigger");
+  button(8, "select");
+  const start = button(9, "start");
+  const dpadUp = button(12, "dpad-up");
+  const dpadDown = button(13, "dpad-down");
+  const dpadLeft = button(14, "dpad-left");
+  const dpadRight = button(15, "dpad-right");
+  const axisX = deadzone(gamepad.axes[0] || 0);
+  const axisY = deadzone(gamepad.axes[1] || 0);
+
+  state.gamepad.left = axisX < 0 || dpadLeft;
+  state.gamepad.right = axisX > 0 || dpadRight;
+  state.gamepad.forward = axisY < 0 || dpadUp;
+  state.gamepad.reverse = axisY > 0 || dpadDown;
+  state.gamepad.dock = primary || rightTrigger;
+
+  if (pressedOnce(nextButtons, "primary") || pressedOnce(nextButtons, "start")) {
+    if (state.phase === "menu") startGame();
+    if (state.phase === "won" || state.phase === "lost") restartGame();
+  }
+  if (pressedOnce(nextButtons, "select") && state.phase !== "menu") restartGame();
+
+  if (state.phase === "playing" && state.mode === "tow") {
+    if (leftRope && pressedOnce(nextButtons, "left-rope")) pullRope("left");
+    if (rightRope && pressedOnce(nextButtons, "right-rope")) pullRope("right");
+    if ((primary && pressedOnce(nextButtons, "primary")) || (start && pressedOnce(nextButtons, "start")) || (rightTrigger && pressedOnce(nextButtons, "right-trigger"))) {
+      startEngine();
+    }
+  }
+
+  gamepadState.buttons = nextButtons;
+  syncKeys();
+}
+
+function getPrimaryGamepad() {
+  if (!navigator.getGamepads) return null;
+  return Array.from(navigator.getGamepads()).find((gamepad) => gamepad?.connected) || null;
+}
+
+function pressedOnce(nextButtons, name) {
+  return nextButtons.has(name) && !gamepadState.buttons.has(name);
+}
+
+function deadzone(value) {
+  return Math.abs(value) >= GAMEPAD_DEADZONE ? value : 0;
+}
+
 function loop(now) {
   const dt = Math.min(0.033, (now - state.lastFrame) / 1000);
   state.lastFrame = now;
+  resizeCanvas();
+  pollGamepadInput();
 
   if (state.phase === "boarding" && now >= state.boardingUntil) {
     spawnRound(true);
@@ -506,8 +605,12 @@ function renderHud() {
 }
 
 function draw() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
   const scale = Math.min(canvas.width / WORLD.width, canvas.height / WORLD.height);
-  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  const offsetX = (canvas.width - WORLD.width * scale) / 2;
+  const offsetY = (canvas.height - WORLD.height * scale) / 2;
+  ctx.setTransform(scale, 0, 0, scale, offsetX, offsetY);
   drawBackground();
   drawWater();
   if (state.mode === "tow") drawGoal();
@@ -648,6 +751,7 @@ function drawShip() {
   ctx.shadowColor = "rgba(0,0,0,0.4)";
   ctx.shadowBlur = 16;
   ctx.fillStyle = "#0f1724";
+  ctx.fillRect(-10, -26, 8, 12);
   ctx.strokeStyle = "rgba(255,255,255,0.35)";
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -658,10 +762,15 @@ function drawShip() {
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
-  ctx.fillStyle = "rgba(85, 214, 255, 0.35)";
+  ctx.fillStyle = "rgba(85, 214, 255, 0.55)";
   ctx.beginPath();
   ctx.arc(-8, 0, 10, 0, Math.PI * 2);
   ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.7)";
+  ctx.beginPath();
+  ctx.moveTo(-2, -24);
+  ctx.lineTo(-2, 22);
+  ctx.stroke();
   drawCaptain(state.phase === "won" || state.danceUntil > performance.now() ? "dance" : "idle");
   ctx.restore();
 }
@@ -731,8 +840,12 @@ function drawOverlayText() {
 function resizeCanvas() {
   const dpr = Math.max(1, window.devicePixelRatio || 1);
   const rect = canvas.getBoundingClientRect();
-  canvas.width = Math.round(rect.width * dpr);
-  canvas.height = Math.round(rect.height * dpr);
+  const cssWidth = rect.width || canvas.clientWidth || WORLD.width;
+  const cssHeight = rect.height || canvas.clientHeight || Math.round(cssWidth * (WORLD.height / WORLD.width));
+  const nextWidth = Math.max(1, Math.round(cssWidth * dpr));
+  const nextHeight = Math.max(1, Math.round(cssHeight * dpr));
+  if (canvas.width !== nextWidth) canvas.width = nextWidth;
+  if (canvas.height !== nextHeight) canvas.height = nextHeight;
   state.worldScale = Math.min(canvas.width / WORLD.width, canvas.height / WORLD.height);
 }
 

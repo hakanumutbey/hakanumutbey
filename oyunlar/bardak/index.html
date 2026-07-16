@@ -452,13 +452,63 @@
 
     @media (max-width: 760px) {
       .hud {
+        left: 10px;
+        right: 10px;
+        top: 58px;
         flex-direction: column;
+        gap: 8px;
       }
 
       .status,
       .controls {
         width: 100%;
         min-width: 0;
+      }
+
+      .status,
+      .controls {
+        padding: 10px;
+      }
+
+      .status h1 {
+        font-size: 22px;
+      }
+
+      #message,
+      .tip {
+        font-size: 12px;
+      }
+
+      .score {
+        gap: 6px;
+      }
+
+      .score span {
+        padding: 6px 7px;
+        font-size: 12px;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      button {
+        min-height: 44px;
+        padding: 8px 9px;
+        font-size: 13px;
+      }
+
+      .intro-logo {
+        width: min(92vw, 520px);
+        max-height: 34vh;
+      }
+
+      .shop-panel,
+      .admin-panel {
+        width: min(100%, calc(100vw - 24px));
+        max-height: calc(100vh - 24px);
+        overflow: auto;
       }
     }
   </style>

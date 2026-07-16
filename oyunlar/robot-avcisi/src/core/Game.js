@@ -122,6 +122,12 @@ export class Game {
         this.combat.shoot();
       }
     });
+    window.addEventListener("hakorocks:fire", () => {
+      if (this.hud.isComputerOpen()) return;
+      this.audio.unlock();
+      this.started = true;
+      this.combat.shoot();
+    });
   }
 
   update() {

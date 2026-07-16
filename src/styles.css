@@ -353,6 +353,523 @@ h3 {
   padding-left: 18px;
 }
 
+.mobile-section {
+  background:
+    linear-gradient(180deg, rgba(53, 210, 255, 0.05), transparent 42%),
+    #0b0f12;
+}
+
+.mobile-showcase {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.72fr) minmax(0, 1.28fr);
+  gap: 18px;
+  align-items: stretch;
+  margin-bottom: 18px;
+}
+
+.phone-preview,
+.mobile-feature-card,
+.mobile-status-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.phone-preview {
+  display: grid;
+  place-items: center;
+  min-height: 520px;
+  padding: 22px;
+  background:
+    linear-gradient(145deg, rgba(53, 210, 255, 0.12), transparent 52%),
+    rgba(255, 255, 255, 0.045);
+}
+
+.phone-screen {
+  width: min(310px, 100%);
+  aspect-ratio: 9 / 16;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  border-radius: 28px;
+  background: #070a0d;
+  box-shadow:
+    0 26px 70px rgba(0, 0, 0, 0.42),
+    inset 0 0 0 8px rgba(255, 255, 255, 0.05);
+}
+
+.phone-scene {
+  display: grid;
+  align-content: end;
+  gap: 8px;
+  min-height: 0;
+  padding: 24px 18px;
+  background:
+    linear-gradient(180deg, rgba(7, 10, 13, 0.12), rgba(7, 10, 13, 0.94)),
+    url("/github_profile_header.png") center / cover;
+}
+
+.phone-scene span {
+  width: fit-content;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: #071012;
+  background: var(--green);
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.phone-scene strong {
+  max-width: 9ch;
+  font-size: 2.3rem;
+  line-height: 0.95;
+}
+
+.phone-controls {
+  display: grid;
+  grid-template-columns: 0.9fr 1fr;
+  gap: 8px;
+  padding: 10px;
+  background: rgba(9, 12, 16, 0.98);
+}
+
+.phone-dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+}
+
+.phone-dpad span:first-child {
+  grid-column: 2;
+}
+
+.phone-dpad span,
+.phone-actions span,
+.phone-look {
+  display: grid;
+  min-height: 34px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  color: #f7f4ea;
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.phone-look {
+  min-height: 76px;
+  color: var(--cyan);
+}
+
+.phone-actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.phone-actions span:first-child {
+  color: #071012;
+  background: var(--cyan);
+}
+
+.mobile-feature-grid,
+.mobile-status-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.status-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.mobile-feature-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mobile-status-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.mobile-feature-card,
+.mobile-status-card {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+}
+
+.mobile-feature-card > span,
+.status-card-tags > span:not(.gamepad-chip) {
+  width: fit-content;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: #071012;
+  background: var(--cyan);
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.status-card-tags > span:not(.gamepad-chip) {
+  background: var(--green);
+}
+
+.mobile-feature-card p,
+.mobile-status-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.58;
+}
+
+.mobile-status-card a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 36px;
+  margin-top: auto;
+  padding: 0 12px;
+  border-radius: 8px;
+  color: #071012;
+  background: var(--green);
+  font-weight: 900;
+}
+
+.tournament-section {
+  background:
+    linear-gradient(180deg, rgba(255, 209, 102, 0.05), transparent 46%),
+    #0e1115;
+}
+
+.tournament-dashboard {
+  display: grid;
+  gap: 18px;
+}
+
+.fusion-panel,
+.league-panel,
+.legendary-panel,
+.tournament-card,
+.special-league {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.fusion-panel {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.45fr) minmax(0, 1fr);
+  min-height: 320px;
+  overflow: hidden;
+}
+
+.fusion-poster {
+  display: grid;
+  place-items: center;
+  min-height: 100%;
+  padding: 24px;
+  font-weight: 900;
+}
+
+.fusion-poster span {
+  max-width: 9ch;
+  font-size: clamp(2rem, 5vw, 4.2rem);
+  line-height: 0.95;
+}
+
+.fusion-copy {
+  display: grid;
+  align-content: center;
+  gap: 16px;
+  padding: 28px;
+}
+
+.fusion-copy p,
+.league-panel p,
+.legendary-panel p,
+.tournament-card p,
+.special-league p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.fusion-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.fusion-state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 209, 102, 0.32);
+  border-radius: 8px;
+  color: var(--gold);
+  font-weight: 900;
+}
+
+.fusion-state.is-done {
+  color: #071012;
+  background: var(--green);
+}
+
+.tournament-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.85fr) minmax(0, 1.15fr);
+  gap: 18px;
+}
+
+.league-panel,
+.legendary-panel,
+.tournament-card,
+.special-league {
+  padding: 20px;
+}
+
+.league-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.league-score {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.league-score strong {
+  color: var(--cyan);
+  font-size: 3rem;
+}
+
+.league-progress {
+  height: 12px;
+  margin: 14px 0;
+  overflow: hidden;
+  border: 1px solid rgba(53, 210, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.league-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--green), var(--cyan), var(--gold));
+}
+
+.league-ladder,
+.league-medal-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.league-ladder span,
+.earned-medal {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 9px;
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.league-ladder span.is-active,
+.earned-medal {
+  color: #071012;
+  background: var(--green);
+}
+
+.league-medal {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  min-height: 38px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: #071012;
+  background: var(--green);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.league-medal b {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 50%;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.league-medal.small {
+  min-height: 32px;
+  padding: 0 8px;
+  font-size: 0.76rem;
+}
+
+.league-medal.is-cyan {
+  background: var(--cyan);
+}
+
+.league-medal.is-copper {
+  background: #d48a4d;
+}
+
+.league-medal.is-diamond {
+  background: #a7efff;
+}
+
+.league-medal.is-legend {
+  background: var(--gold);
+}
+
+.legendary-task-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.legendary-task {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.legendary-task span,
+.tournament-card span {
+  width: fit-content;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: #071012;
+  background: var(--gold);
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.legendary-task.is-done {
+  border-color: rgba(143, 255, 106, 0.34);
+}
+
+.legendary-task.is-done span {
+  background: var(--green);
+}
+
+.legendary-task small {
+  color: var(--muted);
+}
+
+.tournament-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.tournament-card {
+  display: grid;
+  gap: 12px;
+}
+
+.tournament-card strong {
+  color: var(--cyan);
+}
+
+.special-league {
+  display: grid;
+  gap: 14px;
+}
+
+.section-heading.compact {
+  margin-bottom: 0;
+}
+
+.special-list {
+  display: grid;
+  gap: 10px;
+}
+
+.special-person {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.special-person > strong {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 50%;
+  color: #071012;
+  background: var(--cyan);
+}
+
+.special-person h4 {
+  margin: 0;
+}
+
+.special-person span {
+  color: var(--muted);
+}
+
+.special-person em {
+  width: fit-content;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: #071012;
+  background: var(--gold);
+  font-size: 0.74rem;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.special-person.is-user {
+  border-color: rgba(143, 255, 106, 0.4);
+  background: linear-gradient(135deg, rgba(143, 255, 106, 0.12), transparent), rgba(255, 255, 255, 0.055);
+}
+
+.profile-league {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.profile-league > span:last-child {
+  color: var(--muted);
+  font-weight: 800;
+}
+
 .news-section,
 .badges-section,
 .guestbook-section {
@@ -821,6 +1338,14 @@ h3 {
   opacity: 0.62;
 }
 
+.badge-card.is-daily {
+  opacity: 0.9;
+  border-color: rgba(255, 209, 102, 0.3);
+  background:
+    linear-gradient(135deg, rgba(255, 209, 102, 0.12), transparent),
+    rgba(255, 255, 255, 0.055);
+}
+
 .badge-card.is-unlocked {
   opacity: 1;
   border-color: rgba(143, 255, 106, 0.32);
@@ -830,6 +1355,14 @@ h3 {
 }
 
 .badge-card.is-unlocked span {
+  background: var(--green);
+}
+
+.badge-card.is-daily span {
+  background: var(--gold);
+}
+
+.badge-card.is-daily.is-unlocked span {
   background: var(--green);
 }
 
@@ -1105,10 +1638,15 @@ h3 {
   border-color: rgba(53, 210, 255, 0.5);
 }
 
+.game-card-inner {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  min-height: 100%;
+}
+
 .game-card-link {
   display: grid;
   width: 100%;
-  height: 100%;
   grid-template-rows: 180px 1fr;
   padding: 0;
   border: 0;
@@ -1200,6 +1738,11 @@ h3 {
   background: #ff5b6e;
 }
 
+.poster-sea {
+  color: #061116;
+  background: #55d6ff;
+}
+
 .game-body {
   display: grid;
   gap: 12px;
@@ -1212,7 +1755,7 @@ h3 {
   gap: 8px;
 }
 
-.game-meta span {
+.game-meta > span {
   padding: 6px 8px;
   border-radius: 6px;
   color: #d8f8ff;
@@ -1221,19 +1764,95 @@ h3 {
   font-weight: 800;
 }
 
+.gamepad-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: fit-content;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 209, 102, 0.24);
+  border-radius: 6px;
+  color: #fff2c4;
+  background: rgba(255, 209, 102, 0.13);
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.gamepad-chip.compact {
+  color: #071012;
+  background: var(--gold);
+  border-color: rgba(255, 209, 102, 0.35);
+}
+
+.gamepad-icon {
+  position: relative;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 15px;
+  border: 2px solid currentColor;
+  border-radius: 13px 13px 9px 9px;
+}
+
+.gamepad-icon::before,
+.gamepad-icon::after {
+  position: absolute;
+  content: "";
+  background: currentColor;
+}
+
+.gamepad-icon::before {
+  left: 4px;
+  top: 6px;
+  width: 7px;
+  height: 2px;
+  box-shadow:
+    2.5px -2.5px 0 currentColor,
+    2.5px 2.5px 0 currentColor;
+}
+
+.gamepad-icon::after {
+  right: 4px;
+  top: 5px;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  box-shadow: -6px -2px 0 currentColor;
+}
+
 .game-body p,
 .project-card p {
   margin: 0;
   line-height: 1.6;
 }
 
+.detail-link,
 .play-link {
   width: fit-content;
   min-height: 38px;
   margin-top: auto;
   padding: 0 12px;
+  border-radius: 8px;
+  font-weight: 900;
+}
+
+.detail-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cyan);
+  border: 1px solid rgba(53, 210, 255, 0.24);
+  background: rgba(53, 210, 255, 0.08);
+}
+
+.play-link {
   color: #071012;
   background: var(--green);
+}
+
+.game-direct-link {
+  margin: 0 18px 18px;
 }
 
 .projects-section {
@@ -1443,6 +2062,25 @@ h3 {
   font-weight: 800;
 }
 
+.modal-actions {
+  display: grid;
+  gap: 10px;
+  justify-items: end;
+  align-self: end;
+}
+
+.modal-hero .gamepad-chip {
+  max-width: none;
+  color: #071012;
+  background: rgba(255, 255, 255, 0.54);
+  border-color: rgba(7, 16, 18, 0.22);
+}
+
+.modal-hero .gamepad-chip.large {
+  padding: 9px 11px;
+  font-size: 0.86rem;
+}
+
 .modal-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1488,6 +2126,27 @@ h3 {
 .rating-box {
   display: grid;
   gap: 10px;
+}
+
+.mobile-modal-note {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.mobile-modal-note strong {
+  width: fit-content;
+  padding: 7px 9px;
+  border-radius: 6px;
+  color: #071012;
+  background: var(--green);
+  font-size: 0.82rem;
+}
+
+.mobile-modal-note p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
 }
 
 .rating-stars {
@@ -1687,6 +2346,9 @@ h3 {
   }
 
   .about-grid,
+  .mobile-showcase,
+  .fusion-panel,
+  .tournament-layout,
   .game-grid,
   .project-grid,
   .news-grid,
@@ -1702,6 +2364,14 @@ h3 {
     grid-template-columns: 1fr;
   }
 
+  .tournament-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-status-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .photo-grid,
   .modal-photo-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1710,6 +2380,10 @@ h3 {
   .market-card,
   .modal-hero {
     grid-template-columns: 1fr;
+  }
+
+  .modal-actions {
+    justify-items: start;
   }
 }
 
@@ -1757,6 +2431,43 @@ h3 {
 
   .stats-grid {
     grid-template-columns: 1fr;
+  }
+
+  .phone-preview {
+    min-height: auto;
+    padding: 14px;
+  }
+
+  .phone-screen {
+    width: min(260px, 100%);
+  }
+
+  .mobile-feature-grid,
+  .mobile-status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fusion-copy,
+  .league-panel,
+  .legendary-panel,
+  .tournament-card,
+  .special-league {
+    padding: 14px;
+  }
+
+  .league-head,
+  .fusion-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .special-person {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+
+  .special-person .league-medal,
+  .special-person em {
+    grid-column: 2;
   }
 
   .account-panel-head,

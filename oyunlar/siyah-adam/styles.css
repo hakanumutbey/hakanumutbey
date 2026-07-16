@@ -371,19 +371,79 @@ select {
 
 @media (max-width: 700px) {
   .game-shell {
+    padding: 58px 10px 12px;
+    gap: 10px;
+  }
+
+  .topbar,
+  .lobby-panel,
+  .panel,
+  .status-text {
+    border-radius: 14px;
+  }
+
+  .topbar {
     padding: 12px;
+    gap: 10px;
+  }
+
+  .topbar p {
+    display: none;
   }
 
   .topbar-actions {
     grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .topbar-actions button {
+    min-height: 40px;
+    padding: 0 8px;
+  }
+
+  .lobby-panel {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .join-form,
+  .status-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .join-form label {
+    gap: 5px;
+    font-size: 0.82rem;
+  }
+
+  input,
+  select {
+    min-height: 40px;
+    padding: 0 10px;
+  }
+
+  .status-grid article {
+    padding: 10px;
+    border-radius: 12px;
   }
 
   .hud-overlay {
-    position: static;
+    inset: auto 10px 10px 10px;
     justify-items: stretch;
   }
 
   .hud-overlay > div {
     width: 100%;
+  }
+
+  #arena {
+    height: min(52vh, 500px);
+    border-radius: 14px;
+  }
+
+  .touch-pad button {
+    min-width: 48px;
+    min-height: 46px;
   }
 }

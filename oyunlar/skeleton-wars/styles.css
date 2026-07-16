@@ -184,6 +184,7 @@ canvas {
 
 .controls {
   margin-top: 12px;
+  margin-bottom: var(--hakorocks-mobile-bottom-offset, 0px);
   color: #dfd6bd;
   font-size: 14px;
   flex-wrap: wrap;
@@ -216,5 +217,10 @@ canvas {
 
   .hud {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .controls {
+    max-height: 92px;
+    overflow: hidden;
   }
 }

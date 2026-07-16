@@ -254,17 +254,25 @@ canvas.addEventListener("click", (event) => {
   canvas.requestPointerLock?.();
 });
 
-window.addEventListener("mousemove", (event) => {
-  if (document.pointerLockElement !== canvas) return;
-
+function applyLookDelta(dx, dy) {
   const sensitivity = 0.0022;
-  state.lookPitch = clamp(state.lookPitch + event.movementY * sensitivity, -0.58, 0.58);
+  state.lookPitch = clamp(state.lookPitch + dy * sensitivity, -0.58, 0.58);
 
   if (state.mode === "driving") {
-    state.carLookYaw = clamp(state.carLookYaw + event.movementX * sensitivity, -Math.PI, Math.PI);
+    state.carLookYaw = clamp(state.carLookYaw + dx * sensitivity, -Math.PI, Math.PI);
   } else {
-    state.lookYaw += event.movementX * sensitivity;
+    state.lookYaw += dx * sensitivity;
   }
+}
+
+window.addEventListener("mousemove", (event) => {
+  if (document.pointerLockElement !== canvas) return;
+  applyLookDelta(event.movementX, event.movementY);
+});
+
+window.addEventListener("hakorocks:look", (event) => {
+  const detail = event.detail || {};
+  applyLookDelta(Number(detail.dx) || 0, Number(detail.dy) || 0);
 });
 
 window.addEventListener("resize", () => {

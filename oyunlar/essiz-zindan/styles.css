@@ -183,9 +183,49 @@ canvas {
 .hint {
   position: absolute;
   left: 18px;
-  bottom: 16px;
+  bottom: calc(16px + var(--hakorocks-mobile-bottom-offset, 0px));
   color: rgba(243, 223, 189, 0.78);
   font-size: 13px;
+}
+
+@media (max-width: 700px) {
+  .topbar {
+    inset: 58px 10px auto 10px;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .top-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .hearts {
+    gap: 6px;
+    height: 26px;
+  }
+
+  .heart {
+    width: 19px;
+    height: 19px;
+  }
+
+  .rage-meter {
+    width: 142px;
+    height: 22px;
+  }
+
+  .room-badge,
+  .hint,
+  .hud-button {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  .hint {
+    right: 10px;
+    left: 10px;
+  }
 }
 
 .message {

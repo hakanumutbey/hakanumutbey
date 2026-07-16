@@ -50,13 +50,18 @@ const state = {
   colors,
   targetSessionId: "",
   input: { dx: 0, dy: 0 },
+  keyboardInput: { dx: 0, dy: 0 },
+  touchInput: { dx: 0, dy: 0 },
+  gamepadInput: { dx: 0, dy: 0 },
   heartbeatTimer: null,
   reconnectTimer: null,
 };
 
 const sessionId = getSessionId();
+const GAMEPAD_DEADZONE = 0.35;
 let socket = null;
 let account = null;
+const gamepadState = { buttons: new Set() };
 
 populateColorSelect();
 await loadAccount();
@@ -74,6 +79,12 @@ window.addEventListener("beforeunload", () => {
   try {
     socket?.send(JSON.stringify({ type: "leave" }));
   } catch {}
+});
+window.addEventListener("gamepaddisconnected", () => {
+  gamepadState.buttons = new Set();
+  state.gamepadInput.dx = 0;
+  state.gamepadInput.dy = 0;
+  syncMoveInput();
 });
 
 async function loadAccount() {
@@ -357,47 +368,141 @@ function sendHeartbeat() {
 
 function handleKeyDown(event) {
   if (!state.connected) return;
-  if (event.key === "w" || event.key === "ArrowUp") state.input.dy = -1;
-  if (event.key === "s" || event.key === "ArrowDown") state.input.dy = 1;
-  if (event.key === "a" || event.key === "ArrowLeft") state.input.dx = -1;
-  if (event.key === "d" || event.key === "ArrowRight") state.input.dx = 1;
-  sendMove();
+  let handled = false;
+  if (event.key === "w" || event.key === "ArrowUp") {
+    state.keyboardInput.dy = -1;
+    handled = true;
+  }
+  if (event.key === "s" || event.key === "ArrowDown") {
+    state.keyboardInput.dy = 1;
+    handled = true;
+  }
+  if (event.key === "a" || event.key === "ArrowLeft") {
+    state.keyboardInput.dx = -1;
+    handled = true;
+  }
+  if (event.key === "d" || event.key === "ArrowRight") {
+    state.keyboardInput.dx = 1;
+    handled = true;
+  }
+  if (!handled) return;
+  event.preventDefault();
+  syncMoveInput();
 }
 
 function handleKeyUp(event) {
   if (!state.connected) return;
   if (event.key === "w" || event.key === "ArrowUp" || event.key === "s" || event.key === "ArrowDown") {
-    state.input.dy = 0;
+    state.keyboardInput.dy = 0;
   }
   if (event.key === "a" || event.key === "ArrowLeft" || event.key === "d" || event.key === "ArrowRight") {
-    state.input.dx = 0;
+    state.keyboardInput.dx = 0;
   }
-  sendMove();
+  syncMoveInput();
 }
 
 let touchMove = "";
 
 function startTouchMove(direction) {
   touchMove = direction;
-  if (direction === "up") state.input.dy = -1;
-  if (direction === "down") state.input.dy = 1;
-  if (direction === "left") state.input.dx = -1;
-  if (direction === "right") state.input.dx = 1;
-  sendMove();
+  state.touchInput.dx = 0;
+  state.touchInput.dy = 0;
+  if (direction === "up") state.touchInput.dy = -1;
+  if (direction === "down") state.touchInput.dy = 1;
+  if (direction === "left") state.touchInput.dx = -1;
+  if (direction === "right") state.touchInput.dx = 1;
+  syncMoveInput();
 }
 
 function stopTouchMove() {
   touchMove = "";
-  state.input.dx = 0;
-  state.input.dy = 0;
-  sendMove();
+  state.touchInput.dx = 0;
+  state.touchInput.dy = 0;
+  syncMoveInput();
 }
 
 function sendMove() {
   sendAction({ type: "input", dx: state.input.dx, dy: state.input.dy });
 }
 
+function syncMoveInput() {
+  const dx = clampMove(state.keyboardInput.dx + state.touchInput.dx + state.gamepadInput.dx);
+  const dy = clampMove(state.keyboardInput.dy + state.touchInput.dy + state.gamepadInput.dy);
+  if (dx === state.input.dx && dy === state.input.dy) return;
+  state.input.dx = dx;
+  state.input.dy = dy;
+  if (state.connected) sendMove();
+}
+
+function pollGamepadInput() {
+  const gamepad = getPrimaryGamepad();
+  if (!gamepad) {
+    if (gamepadState.buttons.size || state.gamepadInput.dx || state.gamepadInput.dy) {
+      gamepadState.buttons = new Set();
+      state.gamepadInput.dx = 0;
+      state.gamepadInput.dy = 0;
+      syncMoveInput();
+    }
+    return;
+  }
+
+  const nextButtons = new Set();
+  const button = (index, name) => {
+    const control = gamepad.buttons[index];
+    const pressed = Boolean(control?.pressed || control?.value > 0.6);
+    if (pressed) nextButtons.add(name);
+    return pressed;
+  };
+  const primary = button(0, "primary");
+  const secondary = button(1, "secondary");
+  const rightAction = button(3, "right-action");
+  const start = button(9, "start");
+  const dpadUp = button(12, "dpad-up");
+  const dpadDown = button(13, "dpad-down");
+  const dpadLeft = button(14, "dpad-left");
+  const dpadRight = button(15, "dpad-right");
+  const axisX = deadzone(gamepad.axes[0] || 0);
+  const axisY = deadzone(gamepad.axes[1] || 0);
+  const dx = clampMove((axisX < 0 ? -1 : axisX > 0 ? 1 : 0) + (dpadLeft ? -1 : 0) + (dpadRight ? 1 : 0));
+  const dy = clampMove((axisY < 0 ? -1 : axisY > 0 ? 1 : 0) + (dpadUp ? -1 : 0) + (dpadDown ? 1 : 0));
+
+  if (dx !== state.gamepadInput.dx || dy !== state.gamepadInput.dy) {
+    state.gamepadInput.dx = dx;
+    state.gamepadInput.dy = dy;
+    syncMoveInput();
+  }
+  if (primary && pressedOnce(nextButtons, "primary") && state.connected && !readyButton.disabled) {
+    toggleReady();
+  }
+  if (start && pressedOnce(nextButtons, "start") && state.connected && !startButton.disabled) {
+    sendAction({ type: "start" });
+  }
+  if ((secondary && pressedOnce(nextButtons, "secondary")) || (rightAction && pressedOnce(nextButtons, "right-action"))) {
+    if (state.connected && !meetingButton.disabled) sendAction({ type: "call-meeting" });
+  }
+
+  gamepadState.buttons = nextButtons;
+}
+
+function getPrimaryGamepad() {
+  if (!navigator.getGamepads) return null;
+  return Array.from(navigator.getGamepads()).find((gamepad) => gamepad?.connected) || null;
+}
+
+function pressedOnce(nextButtons, name) {
+  return nextButtons.has(name) && !gamepadState.buttons.has(name);
+}
+
+function deadzone(value) {
+  return Math.abs(value) >= GAMEPAD_DEADZONE ? value : 0;
+}
+
+function clampMove(value) {
+  return Math.max(-1, Math.min(1, value));
+}
+
 function draw() {
+  pollGamepadInput();
   const width = arena.width;
   const height = arena.height;
   ctx.clearRect(0, 0, width, height);

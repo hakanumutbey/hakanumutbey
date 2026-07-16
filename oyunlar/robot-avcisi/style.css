@@ -413,7 +413,7 @@ body.reduce-shake .crosshair::after {
 .prompt {
   position: fixed;
   left: 50%;
-  bottom: 28px;
+  bottom: calc(28px + var(--hakorocks-mobile-bottom-offset, 0px));
   max-width: min(720px, calc(100vw - 32px));
   transform: translateX(-50%);
   padding: 10px 14px;
@@ -568,8 +568,27 @@ label {
 
 @media (max-width: 760px) {
   .hud {
-    grid-template-columns: repeat(2, minmax(92px, 1fr));
+    grid-template-columns: repeat(3, minmax(72px, 1fr));
     right: 14px;
+    max-height: 33vh;
+    overflow: hidden;
+  }
+
+  .hud div {
+    padding: 6px 7px;
+  }
+
+  .hud div.wide,
+  .hud div.backpack-panel {
+    display: none;
+  }
+
+  .hud strong {
+    font-size: 10px;
+  }
+
+  .hud span {
+    font-size: 14px;
   }
 
   .terminal-grid,

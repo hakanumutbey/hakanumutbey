@@ -39,6 +39,16 @@ body,
   }
 }
 
+@media (max-width: 699px) {
+  .hud {
+    padding-top: 58px;
+  }
+
+  .level-button {
+    top: 58px;
+  }
+}
+
 .hud__line {
   display: flex;
   flex-wrap: wrap;

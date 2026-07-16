@@ -25,6 +25,7 @@ export class Player {
     this.camera.ellipsoid = new BABYLON.Vector3(0.45, 0.85, 0.45);
     scene.activeCamera = this.camera;
     canvas.addEventListener("pointermove", (event) => this.correctInvertedY(event));
+    window.addEventListener("hakorocks:look", (event) => this.applyVirtualLook(event.detail));
     this.cosmeticMeshes = [];
     this.cosmeticMaterials = new Map();
   }
@@ -41,6 +42,15 @@ export class Player {
     if (!this.invertY || document.pointerLockElement !== this.canvas) return;
     const sensitivity = Math.max(1, Math.abs(this.cameraSensitivity));
     this.camera.cameraRotation.x -= (2 * Number(event.movementY || 0)) / sensitivity;
+  }
+
+  applyVirtualLook(detail = {}) {
+    const sensitivity = Math.max(1, Math.abs(this.cameraSensitivity));
+    const dx = Number(detail.dx) || 0;
+    const dy = Number(detail.dy) || 0;
+    this.camera.cameraRotation.y += dx / sensitivity;
+    this.camera.cameraRotation.x += (this.invertY ? -dy : dy) / sensitivity;
+    this.camera.cameraRotation.x = clamp(this.camera.cameraRotation.x, -1.35, 1.35);
   }
 
   update(input) {

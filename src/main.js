@@ -11,6 +11,8 @@ const games = [
     longDescription: "Ev sessiz gibi görünüyor ama her köşe riskli. Anahtarları topla, zamanı iyi kullan ve yakalanmadan çıkış kapısına ulaş.",
     accent: "mint",
     controls: "Klavye, fare ve mobil dokunmatik",
+    mobileStatus: "Mobil hazır",
+    mobileNote: "Kendi mobil seçim ekranı, dokunmatik hareket düğmeleri ve dokunarak bakış desteği var.",
     achievements: ["3 anahtarı tek seferde topla", "Final seviyesine ulaş", "Zaman gücünü boşa harcama"],
     updates: ["5 seviyeli kaçış sistemi eklendi", "Mobil kontrol butonları hazır", "Anne yüz görseli oyun içine taşındı"],
     stockBase: 128,
@@ -26,6 +28,8 @@ const games = [
     accent: "amber",
     image: "/oyunlar/bardak/assets/hakorocks_studios.png",
     controls: "Fare, klavye ve dokunmatik",
+    mobileStatus: "Dokunarak oynanır",
+    mobileNote: "Bardak seçimi ve menüler dokunmatik için sıkılaştırıldı; üst panel telefonda daha az yer kaplar.",
     achievements: ["İlk denemede başla", "Bardağı dengede tut", "Hakorocks intro sahnesini izle"],
     updates: ["Stüdyo logosu eklendi", "3D sahne ve görsel assetler düzenlendi", "Tarayıcıdan tek tıkla oynanır hale getirildi"],
     stockBase: 96,
@@ -40,6 +44,10 @@ const games = [
     longDescription: "Zindan odalarını geç, öfke gücünü doldur, kılıcını geliştir ve boss savaşına hazırlan. Yayındaki sürümde ölümsüzlük kısayolu kapatıldı.",
     accent: "violet",
     controls: "Klavye, gamepad ve dokunmatik saldırı",
+    controllerBadge: "Gamepad",
+    gamepadNote: "Fiziksel gamepad, klavye ve mobil dokunmatik kontrollerle oynanır.",
+    mobileStatus: "Yeni mobil gamepad",
+    mobileNote: "Sol hareket, sağ bakış alanı, saldırı ve öfke düğmeleri ortak mobil kontrol katmanına bağlandı.",
     achievements: ["20 odayı temizle", "Öfke gücüyle düşmanları dağıt", "Kral savaşına ulaş"],
     updates: ["Ölümsüzlük debug kısayolu kaldırıldı", "Boss özel saldırıları korundu", "Mobil tam ekran düğmesi korundu"],
     stockBase: 154,
@@ -54,6 +62,10 @@ const games = [
     longDescription: "Kardeşini kurtarmak için yola çık. Ok, kılıç ve özel sahnelerle uzun bir macera seni bekliyor.",
     accent: "bone",
     controls: "Klavye, fare ve ekran butonları",
+    controllerBadge: "Mobil gamepad",
+    gamepadNote: "Telefonda ekrandaki oyun kolu ile hareket ve aksiyon düğmeleri kullanılabilir.",
+    mobileStatus: "Yeni mobil gamepad",
+    mobileNote: "Hareket, nişan, yay, kılıç, ateşli ok ve demlik düğmeleri telefonda kullanılabilir.",
     achievements: ["İskelet kralı yen", "Kardeşini kurtar", "Hikaye videosunu tamamla"],
     updates: ["Hazır WebM hikaye videosu korundu", "Skeleton Wars 2 klasörü geleceğe hazır", "Canlı fotoğraf sistemi eklendi"],
     stockBase: 188,
@@ -67,7 +79,11 @@ const games = [
     description: "Park modunda limana yanaş, motor modunda halatları doğru sırayla çek.",
     longDescription: "RHGPO'da önce limana park et, sonra motor modunda rüzgar tarafındaki halatı en son çekerek motoru çalıştır ve çıkışa ilerle. Her turda rüzgar sertleşir, üç çarpma olursa oyun biter.",
     accent: "sea",
-    controls: "Klavye, fare ve dokunmatik",
+    controls: "Klavye, gamepad ve dokunmatik",
+    controllerBadge: "Gamepad",
+    gamepadNote: "Sol analog veya d-pad ile sür, A/RT ile park et; motor modunda X/Y halat, A/Start motor.",
+    mobileStatus: "Mobil hazır",
+    mobileNote: "Liman sürüşü, park etme ve halat kontrolleri için kendi dokunmatik düğmeleri var.",
     achievements: ["İlk limana yanaş", "İlk motor turunu bitir", "Beş turu tamamla"],
     updates: ["Park modu ve motor modu eklendi", "Halat sırası kuralı hazırlandı", "Çarpma bazlı başarısızlık kuruldu"],
     stockBase: 121,
@@ -81,7 +97,11 @@ const games = [
     description: "3 ila 10 kişi ile renk seç, çemberde oy ver ve Siyah Adam'ı geceleri yakala.",
     longDescription: "Siyah hariç renk seç, çember toplantısında şüpheleri topla, gece olduğunda hedefi belirle ve hayaletleri oyunun dışında bırak. Bu sürümde hazırlık odası, oylama ve 10 saniyelik gece kararı tamamlandı.",
     accent: "red",
-    controls: "Klavye, fare ve dokunmatik",
+    controls: "Klavye, gamepad ve dokunmatik",
+    controllerBadge: "Gamepad",
+    gamepadNote: "Sol analog veya d-pad ile hareket edilir; A hazır olur, Start oyunu başlatır.",
+    mobileStatus: "Mobil hazır",
+    mobileNote: "Oda girişi, renk seçimi, çember akışı ve hareket için mobil düzen korunup genişletildi.",
     achievements: ["3 kişi ile oda kur", "Siyah Adam'ı çemberde yakala", "Gece hedefini son saniyede seç"],
     updates: ["3-10 oyunculuk çok oyunculu oda eklendi", "Renk seçimi ve hazır odası hazırlandı", "Çember toplantısı ve gece hedef akışı tamamlandı"],
     stockBase: 168,
@@ -96,6 +116,10 @@ const games = [
     longDescription: "Müşterilerin arabalarını al, doğru yere park et, hasar yapmadan para kazan ve vale işletmeni büyüt.",
     accent: "sky",
     controls: "Klavye ve fare",
+    controllerBadge: "Mobil gamepad",
+    gamepadNote: "Telefonda yürüyüş, sürüş, kamera ve etkileşim için ekrandaki oyun kolu çalışır.",
+    mobileStatus: "Yeni mobil gamepad",
+    mobileNote: "Yürüme, sürüş, kamera, etkileşim, market ve fren/koş düğmeleri mobil oyun koluna bağlandı.",
     achievements: ["İlk müşteriyi memnun et", "Hasarsız park yap", "10 katlı otopark hedefini aç"],
     updates: ["3D park alanı yayınlandı", "Market ve yükseltme sistemi eklendi", "Oyun istatistik paneline bağlandı"],
     stockBase: 112,
@@ -110,6 +134,10 @@ const games = [
     longDescription: "Laboratuvarda hayatta kal, robotları parçala, hurdalarla silah üret ve parti sistemi olan büyük FPS denemesini keşfet.",
     accent: "lime",
     controls: "Klavye, fare ve ayarlanabilir kontroller",
+    controllerBadge: "Mobil gamepad",
+    gamepadNote: "Telefonda FPS hareketi, kamera, ateş ve üretim düğmeleri mobil oyun koluna bağlandı.",
+    mobileStatus: "Yeni mobil gamepad",
+    mobileNote: "FPS kamera, hareket, ateş, etkileşim, fener ve üretim tuşları mobil kontrol panelinden çalışır.",
     achievements: ["İlk robotu yok et", "Yeni silah üret", "Laboratuvar odalarını temizle"],
     updates: ["Babylon.js vendor dosyası üretim build'ine eklendi", "Tek oyunculu tarayıcı erişimi düzeltildi", "Fotoğraf kısayolu desteği eklendi"],
     stockBase: 173,
@@ -143,7 +171,35 @@ const projects = [
   },
 ];
 
+const mobileFeatures = [
+  {
+    title: "Ortak mobil oyun kolu",
+    description: "WASD isteyen oyunlara ekranda hareket, bakış ve aksiyon düğmeleri gelir.",
+    label: "Yeni",
+  },
+  {
+    title: "Tam ekran ve ana sayfa",
+    description: "Oyun içinde H düğmesi ana merkeze döner; tam ekran düğmesi telefonda kolay erişilir.",
+    label: "Hızlı",
+  },
+  {
+    title: "Temiz HUD",
+    description: "Vale, Robot Avcısı ve zindan ekranları telefonda daha az alan kaplayacak şekilde toparlandı.",
+    label: "Mobil",
+  },
+  {
+    title: "Fotoğraf rozeti",
+    description: "Ö tuşu rozeti mobil kontrol panelinin üstüne çıkmaz; oyun fotoğrafları vitrine düşer.",
+    label: "Paylaş",
+  },
+];
+
 const newsItems = [
+  {
+    date: "Mobil",
+    title: "Oyunlara mobil kontrol modu geldi",
+    description: "Eşsiz Zindan, Skeleton Wars, Vale ve Robot Avcısı için ortak dokunmatik oyun kolu eklendi.",
+  },
   {
     date: "Bugün",
     title: "Fotoğraf tuşu görünür oldu",
@@ -236,9 +292,170 @@ const badgeDefinitions = [
   },
 ];
 
+const dailyBadgePool = [
+  {
+    id: "daily-rhgpo",
+    title: "Günün Kaptanı",
+    description: "Bugünün rozetinde RHGPO'yu aç ve limana doğru yola çık.",
+    isUnlocked: (state) => state.playedGames.includes("rhgpo"),
+  },
+  {
+    id: "daily-shadow",
+    title: "Gizli Dedektif",
+    description: "Siyah Adam odasına girerek bugünün sosyal rozetini aç.",
+    isUnlocked: (state) => state.playedGames.includes("siyah-adam"),
+  },
+  {
+    id: "daily-dungeon",
+    title: "Zindan Nöbetçisi",
+    description: "Eşsiz Zindan'ı aç ve bugünün aksiyon rozetini yakala.",
+    isUnlocked: (state) => state.playedGames.includes("essiz-zindan"),
+  },
+  {
+    id: "daily-skeleton",
+    title: "Kemik Savaşçısı",
+    description: "Skeleton Wars oynayanlara bugünün savaş rozeti gelir.",
+    isUnlocked: (state) => state.playedGames.includes("skeleton-wars"),
+  },
+  {
+    id: "daily-vale",
+    title: "Vale Ustası",
+    description: "Vale oyununu aç ve bugünün park görevine başla.",
+    isUnlocked: (state) => state.playedGames.includes("vale"),
+  },
+  {
+    id: "daily-robot",
+    title: "Robot Avcısı Günü",
+    description: "Robot Avcısı'nı açarak laboratuvar rozetini kazan.",
+    isUnlocked: (state) => state.playedGames.includes("robot-avcisi"),
+  },
+  {
+    id: "daily-photo",
+    title: "Günün Fotoğrafçısı",
+    description: "Bir oyun ekranında Ö tuşu ile fotoğraf çek.",
+    isUnlocked: (state) => state.photoCount > 0,
+  },
+  {
+    id: "daily-critic",
+    title: "Yıldız Hakemi",
+    description: "Bir oyuna puan ver ve bugünün eleştirmen rozetini aç.",
+    isUnlocked: (state) => state.ratedGames.length > 0,
+  },
+  {
+    id: "daily-guest",
+    title: "Defter İmzası",
+    description: "Ziyaretçi defterine kısa bir mesaj bırak.",
+    isUnlocked: (state) => Boolean(state.guestbook),
+  },
+  {
+    id: "daily-trailer",
+    title: "Fragman Saati",
+    description: "HAKO ROCKS fragmanını oynat ve bugünün sahne rozetini al.",
+    isUnlocked: (state) => Boolean(state.trailerPlayed),
+  },
+  {
+    id: "daily-mobile",
+    title: "Mobil Oyuncu",
+    description: "Mobil oyun modu bölümünü keşfet ve oyunları telefona hazır gör.",
+    isUnlocked: (state) => Boolean(state.visitedAt),
+  },
+  {
+    id: "daily-collector",
+    title: "Rozet Toplayıcı",
+    description: "En az üç farklı oyunu açarak günlük koleksiyonu büyüt.",
+    isUnlocked: (state) => state.playedGames.length >= 3,
+  },
+];
+
+const DAILY_BADGE_COUNT = 6;
+
+const leagueDefinitions = [
+  { id: "acemi", title: "Acemi", minPoints: 0, short: "A", tone: "green" },
+  { id: "acemi-plus", title: "Acemi+", minPoints: 100, short: "A+", tone: "cyan" },
+  { id: "bakir", title: "Bakır", minPoints: 260, short: "B", tone: "copper" },
+  { id: "elmas", title: "Elmas", minPoints: 520, short: "E", tone: "diamond" },
+  { id: "efsanevi", title: "Efsanevi", minPoints: 900, short: "EF", tone: "legend" },
+];
+
+const leaguePointValues = {
+  game: 35,
+  details: 8,
+  rating: 22,
+  photo: 45,
+  guestbook: 24,
+  trailer: 18,
+  voice: 35,
+  fusion: 60,
+};
+
+const tournamentTemplates = [
+  {
+    id: "hakorocks-cup",
+    title: "Hakorocks Kupası",
+    status: "Kayıt açık",
+    rule: "Bugünün seçilen oyunlarında puan topla, haftalık tabloda yüksel.",
+    prize: "Şampiyon rozeti + özel kişiler adaylığı",
+  },
+  {
+    id: "fusion-cup",
+    title: "Birleşim Arenası",
+    status: "Günlük mod",
+    rule: "Her gün iki oyun birleşir; ana oyuna diğer oyundan özellik eklenir ve mod çok oyunculu sayılır.",
+    prize: "Birleşim madalyası",
+  },
+  {
+    id: "league-sprint",
+    title: "Lig Sıra Atlama",
+    status: "Sürekli",
+    rule: "Oyun aç, fotoğraf çek, puan ver ve görevleri bitirerek Acemi'den Efsanevi'ye çık.",
+    prize: "Lig madalyası ve profil rozeti",
+  },
+];
+
+const fusionFeaturePool = [
+  "çok oyunculu takım yarışı",
+  "ortak skor hedefi",
+  "gece-gündüz görev turu",
+  "boss veya final dalgası",
+  "parkur + savaş karışımı",
+  "harita üstünde gizli hedef",
+  "oyuncular arası yardım puanı",
+  "son dakika oylaması",
+];
+
+const leagueMedalDefinitions = [
+  { id: "ilk-puan", title: "İlk Puan", description: "Lig puanı kazandın.", isEarned: (state) => state.points > 0 },
+  { id: "uc-oyun", title: "3 Oyun", description: "Üç farklı oyun açtın.", isEarned: (_state, badges) => badges.playedGames.length >= 3 },
+  { id: "bes-oyun", title: "5 Oyun", description: "Beş farklı oyun açtın.", isEarned: (_state, badges) => badges.playedGames.length >= 5 },
+  { id: "birlesim", title: "Birleşim Avcısı", description: "Bugünün birleşen iki oyununu da açtın.", isEarned: (state) => isFusionCompleted(dailyBadgeKey(), state) },
+  { id: "efsanevi-gorev", title: "Efsanevi Görev", description: "Günlük 5 efsanevi görevini tamamladın.", isEarned: (state) => areLegendaryTasksComplete(dailyBadgeKey(), state) },
+  { id: "ozel-kisi", title: "Özel Kişi", description: "Özel kişiler ligine girdin.", isEarned: (state) => Boolean(state.eliteMember) },
+];
+
+const specialPeopleBase = [
+  { name: "Hakan Umut", nickname: "hakorocks", league: "Efsanevi", points: 1120 },
+  { name: "Test Bot 1", nickname: "testbot1", league: "Efsanevi", points: 1085 },
+  { name: "Test Bot 2", nickname: "testbot2", league: "Elmas", points: 820 },
+  { name: "Test Bot 3", nickname: "testbot3", league: "Elmas", points: 790 },
+  { name: "Studio Arkadaşı", nickname: "studio", league: "Bakır", points: 560 },
+  { name: "Kupa Oyuncusu", nickname: "kupa", league: "Bakır", points: 540 },
+  { name: "Zindan Ustası", nickname: "zindan", league: "Acemi+", points: 430 },
+  { name: "Robot Takımı", nickname: "robot", league: "Acemi+", points: 410 },
+  { name: "RHGPO Kaptanı", nickname: "kaptan", league: "Acemi", points: 330 },
+  { name: "Siyah Dedektif", nickname: "dedektif", league: "Acemi", points: 315 },
+];
+
+const specialChallengers = [
+  { name: "Yeni Meydan Okuyan", nickname: "challenger", league: "Elmas", points: 760 },
+  { name: "Mobil Şampiyon", nickname: "mobil", league: "Bakır", points: 650 },
+  { name: "Birleşim Uzmanı", nickname: "birlesim", league: "Elmas", points: 780 },
+  { name: "Günlük Görevci", nickname: "gorevci", league: "Bakır", points: 620 },
+];
+
 const sessionId = getSessionId();
 const gameMap = new Map(games.map((game) => [game.slug, game]));
 let badgeState = ensureBadgeState();
+let leagueState = refreshLeagueState(ensureLeagueState());
 let latestStats = createFallbackStats();
 let latestPhotos = [];
 let latestRatings = createFallbackRatings();
@@ -265,7 +482,9 @@ document.querySelector("#app").innerHTML = `
     <nav class="nav" aria-label="Ana menü">
       <a href="#hakkimda">Hakkımda</a>
       <a href="#ozgecmis">Özgeçmiş</a>
+      <a href="#mobil">Mobil</a>
       <a href="#fragman">Fragman</a>
+      <a href="#turnuvalar">Turnuvalar</a>
       <a href="#oyunlar">Oyunlar</a>
       <a href="#canli">Canlı</a>
       <a href="#haberler">Haberler</a>
@@ -291,8 +510,8 @@ document.querySelector("#app").innerHTML = `
         </p>
         <div class="hero-actions">
           <a class="button primary" href="#oyunlar">Oyunları aç</a>
+          <a class="button secondary" href="#mobil">Mobil modu gör</a>
           <a class="button secondary" href="#hesap">Hesap oluştur</a>
-          <a class="button secondary" href="#fragman">Fragmanı izle</a>
         </div>
       </div>
       <aside class="hero-panel" aria-label="Stüdyo özeti">
@@ -363,6 +582,47 @@ document.querySelector("#app").innerHTML = `
             <li>Projeler ayrı klasörde düzenli tutulur.</li>
           </ul>
         </article>
+      </div>
+    </section>
+
+    <section class="section mobile-section" id="mobil" aria-labelledby="mobile-title">
+      <div class="section-heading">
+        <p class="eyebrow">Mobil oyun modu</p>
+        <h2 id="mobile-title">Telefonla oynarken de oyun kolu ekranda.</h2>
+        <p class="section-note">
+          Mobilde zorlanan oyunlar için ortak kontrol paneli eklendi. Hareket, bakış, ateş,
+          etkileşim ve tam ekran düğmeleri artık oyun içinde görünür.
+        </p>
+      </div>
+      <div class="mobile-showcase">
+        <article class="phone-preview" aria-label="Mobil oyun kolu önizlemesi">
+          <div class="phone-screen">
+            <div class="phone-scene">
+              <span>Hakorocks</span>
+              <strong>Mobil oyun modu</strong>
+            </div>
+            <div class="phone-controls">
+              <div class="phone-dpad">
+                <span>W</span>
+                <span>A</span>
+                <span>S</span>
+                <span>D</span>
+              </div>
+              <div class="phone-look">Bakış</div>
+              <div class="phone-actions">
+                <span>Ateş</span>
+                <span>E</span>
+                <span>F</span>
+              </div>
+            </div>
+          </div>
+        </article>
+        <div class="mobile-feature-grid">
+          ${mobileFeatures.map(renderMobileFeature).join("")}
+        </div>
+      </div>
+      <div class="mobile-status-grid">
+        ${games.map(renderMobileStatus).join("")}
       </div>
     </section>
 
@@ -543,10 +803,27 @@ document.querySelector("#app").innerHTML = `
       </div>
     </section>
 
+    <section class="section tournament-section" id="turnuvalar" aria-labelledby="tournament-title">
+      <div class="section-heading">
+        <p class="eyebrow">Turnuvalar ve ligler</p>
+        <h2 id="tournament-title">Günlük oyun birleşimi, ligler ve özel kişiler.</h2>
+        <p class="section-note">
+          Her gün iki oyun birleşir; seçilen ana oyun çok oyunculu turnuva moduna döner ve diğer oyundan özellik alır.
+          Oyun açtıkça puan kazanıp lig atlarsın.
+        </p>
+      </div>
+      <div class="tournament-dashboard" data-tournament-dashboard>
+        ${renderTournamentDashboard()}
+      </div>
+    </section>
+
     <section class="section badges-section" id="rozetler" aria-labelledby="badges-title">
       <div class="section-heading">
         <p class="eyebrow">Görevler ve rozetler</p>
-        <h2 id="badges-title">Siteyi kullandıkça rozetler açılır.</h2>
+        <h2 id="badges-title">Bugünün rozetleri her gün değişir.</h2>
+        <p class="section-note">
+          ${dailyBadgeDateLabel()} için seçilen rozetler üstte görünür; yarın yeni görevler gelir.
+        </p>
       </div>
       <div class="badge-grid" data-badge-grid>
         ${renderBadges()}
@@ -640,6 +917,12 @@ document.querySelector("#app").innerHTML = `
   </section>
 `;
 
+function renderGamepadBadge(game, extraClass = "") {
+  if (!game.controllerBadge) return "";
+  const className = ["gamepad-chip", extraClass].filter(Boolean).join(" ");
+  return `<span class="${className}"><i class="gamepad-icon" aria-hidden="true"></i>${game.controllerBadge}</span>`;
+}
+
 function renderGameCard(game, index) {
   const media = game.image
     ? `<img src="${game.image}" alt="${game.title} oyun görseli" loading="lazy" />`
@@ -647,19 +930,23 @@ function renderGameCard(game, index) {
 
   return `
     <article class="game-card">
-      <button class="game-card-link" type="button" data-game-open="${game.slug}" aria-label="${game.title} detaylarını aç">
-        <div class="game-media">${media}</div>
-        <div class="game-body">
-          <div class="game-meta">
-            <span>${game.type}</span>
-            <span>${game.status}</span>
-            <span>Mobil bilgi</span>
+      <div class="game-card-inner">
+        <button class="game-card-link" type="button" data-game-open="${game.slug}" aria-label="${game.title} detaylarını aç">
+          <div class="game-media">${media}</div>
+          <div class="game-body">
+            <div class="game-meta">
+              <span>${game.type}</span>
+              <span>${game.status}</span>
+              <span>${game.mobileStatus}</span>
+              ${renderGamepadBadge(game)}
+            </div>
+            <h3>${game.title}</h3>
+            <p>${game.description}</p>
+            <span class="detail-link">Detayları aç</span>
           </div>
-          <h3>${game.title}</h3>
-          <p>${game.description}</p>
-          <span class="play-link">Detayları aç</span>
-        </div>
-      </button>
+        </button>
+        <a class="play-link game-direct-link" href="${game.path}" data-play-game="${game.slug}">Oyunu aç</a>
+      </div>
     </article>
   `;
 }
@@ -683,6 +970,30 @@ function renderNewsItem(item) {
       <span>${item.date}</span>
       <h3>${item.title}</h3>
       <p>${item.description}</p>
+    </article>
+  `;
+}
+
+function renderMobileFeature(item) {
+  return `
+    <article class="mobile-feature-card">
+      <span>${item.label}</span>
+      <h3>${item.title}</h3>
+      <p>${item.description}</p>
+    </article>
+  `;
+}
+
+function renderMobileStatus(game) {
+  return `
+    <article class="mobile-status-card">
+      <div class="status-card-tags">
+        <span>${game.mobileStatus}</span>
+        ${renderGamepadBadge(game, "compact")}
+      </div>
+      <h3>${game.title}</h3>
+      <p>${game.mobileNote}</p>
+      <a href="${game.path}" data-play-game="${game.slug}">Oyna</a>
     </article>
   `;
 }
@@ -763,6 +1074,7 @@ function avatarMarkup(account, size = "medium") {
 
 function renderAccountDashboard() {
   const { account, people, incomingRequests, outgoingRequests, invites, friends } = latestSocial;
+  const accountLeague = getCurrentLeague();
   if (!account) {
     return `
       <div class="account-empty">
@@ -787,6 +1099,10 @@ function renderAccountDashboard() {
           <span>Aktif profil</span>
           <h3>${escapeHtml(account.name)}</h3>
           <p>@${escapeHtml(account.nickname)}</p>
+          <div class="profile-league">
+            ${renderLeagueMedal(accountLeague, "small")}
+            <span>${leagueState.points} LP · ${leagueState.medals.length} madalya</span>
+          </div>
         </div>
       </div>
       <div class="account-metrics">
@@ -974,17 +1290,381 @@ function voiceStatusText() {
   return `Sesli oda: ${latestVoice.roomId || selectedVoiceRoomId}`;
 }
 
-function renderBadges() {
-  return badgeDefinitions.map((badge) => {
-    const unlocked = badge.isUnlocked(badgeState);
+function renderTournamentDashboard() {
+  leagueState = refreshLeagueState(leagueState);
+  const fusion = getDailyFusion();
+  const currentLeague = getCurrentLeague();
+  const nextLeague = getNextLeague();
+  const progress = getLeagueProgressPercent();
+  const fusionComplete = isFusionCompleted();
+  return `
+    <div class="fusion-panel">
+      <div class="fusion-poster poster-${fusion.base.accent}">
+        <span>${fusion.base.title}</span>
+      </div>
+      <div class="fusion-copy">
+        <span class="status-pill">Bugünün birleşimi</span>
+        <h3>${fusion.base.title} + ${fusion.source.title}</h3>
+        <p>
+          Ana oyun <strong>${fusion.base.title}</strong>. İçine <strong>${fusion.source.title}</strong>
+          oyunundan ${fusion.feature} eklenir ve mod çok oyunculu turnuva gibi oynanır.
+        </p>
+        <div class="fusion-actions">
+          <a class="button primary" href="${fusion.base.path}" data-play-game="${fusion.base.slug}">Ana oyunu aç</a>
+          <a class="button secondary" href="${fusion.source.path}" data-play-game="${fusion.source.slug}">Eklenen oyunu aç</a>
+          <span class="fusion-state ${fusionComplete ? "is-done" : ""}">${fusionComplete ? "Birleşim tamam" : "İki oyunu da aç"}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="tournament-layout">
+      <section class="league-panel">
+        <div class="league-head">
+          <div>
+            <span class="eyebrow">Lig puanı</span>
+            <h3>${currentLeague.title}</h3>
+          </div>
+          ${renderLeagueMedal(currentLeague)}
+        </div>
+        <div class="league-score">
+          <strong>${leagueState.points}</strong>
+          <span>LP</span>
+        </div>
+        <div class="league-progress" aria-label="Lig ilerlemesi">
+          <span style="width:${progress}%"></span>
+        </div>
+        <p>${nextLeague ? `${nextLeague.title} için ${Math.max(0, nextLeague.minPoints - leagueState.points)} LP kaldı.` : "Efsanevi ligdesin. Günlük 5 görevi bitirirsen özel kişiler adayısın."}</p>
+        <div class="league-ladder">
+          ${leagueDefinitions.map((league) => `
+            <span class="${leagueState.points >= league.minPoints ? "is-active" : ""}">${league.title}</span>
+          `).join("")}
+        </div>
+        <div class="league-medal-row">
+          ${renderEarnedLeagueMedals()}
+        </div>
+      </section>
+
+      <section class="legendary-panel">
+        <div class="league-head">
+          <div>
+            <span class="eyebrow">Efsanevi günlük</span>
+            <h3>5 görev, 1 gün</h3>
+          </div>
+          <span class="status-pill">${areLegendaryTasksComplete() ? "Tamam" : "Devam"}</span>
+        </div>
+        <p class="muted-copy">Efsanevi ligde bu 5 oyun görevini aynı gün bitirmezsen Elmas ligine düşersin.</p>
+        <div class="legendary-task-list">
+          ${renderLegendaryTasks()}
+        </div>
+      </section>
+    </div>
+
+    <div class="tournament-grid">
+      ${tournamentTemplates.map(renderTournamentCard).join("")}
+    </div>
+
+    <section class="special-league">
+      <div class="section-heading compact">
+        <p class="eyebrow">Özel kişiler</p>
+        <h3>Sadece 10 yer var.</h3>
+        <p class="section-note">3 günde bir bir kişi düşme turuna girer ve yeni biri listeye gelir. Efsanevi görevleri bitirenlerin profilinde lig madalyası görünür.</p>
+      </div>
+      <div class="special-list">
+        ${getSpecialPeople().map(renderSpecialPerson).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderTournamentCard(item) {
+  const fusion = getDailyFusion();
+  return `
+    <article class="tournament-card">
+      <span>${item.status}</span>
+      <h3>${item.title}</h3>
+      <p>${item.id === "fusion-cup" ? `${fusion.base.title} + ${fusion.source.title}: ${item.rule}` : item.rule}</p>
+      <strong>${item.prize}</strong>
+    </article>
+  `;
+}
+
+function renderLegendaryTasks(dayKey = dailyBadgeKey(), state = leagueState) {
+  return getLegendaryTasks(dayKey).map((task) => {
+    const done = task.isDone(state);
     return `
-      <article class="badge-card ${unlocked ? "is-unlocked" : ""}">
-        <span>${unlocked ? "Açıldı" : "Kilitli"}</span>
-        <h3>${badge.title}</h3>
-        <p>${badge.description}</p>
+      <article class="legendary-task ${done ? "is-done" : ""}">
+        <span>${done ? "Bitti" : "Bekliyor"}</span>
+        <strong>${task.title}</strong>
+        <small>${task.description}</small>
       </article>
     `;
   }).join("");
+}
+
+function renderSpecialPerson(person, index) {
+  const league = leagueDefinitions.find((item) => item.title === person.league) || leagueDefinitions[0];
+  return `
+    <article class="special-person ${person.isUser ? "is-user" : ""}">
+      <strong>${index + 1}</strong>
+      <div>
+        <h4>${escapeHtml(person.name)}</h4>
+        <span>@${escapeHtml(person.nickname)} · ${person.points} LP</span>
+      </div>
+      ${renderLeagueMedal(league, "small")}
+      ${person.status ? `<em>${escapeHtml(person.status)}</em>` : ""}
+    </article>
+  `;
+}
+
+function renderLeagueMedal(league = getCurrentLeague(), extraClass = "") {
+  return `<span class="league-medal is-${league.tone} ${extraClass}"><b>${league.short}</b>${league.title}</span>`;
+}
+
+function renderEarnedLeagueMedals() {
+  if (!leagueState.medals.length) return `<span class="muted-copy">Henüz madalya yok.</span>`;
+  return leagueState.medals.map((medalId) => {
+    const medal = leagueMedalDefinitions.find((item) => item.id === medalId);
+    if (!medal) return "";
+    return `<span class="earned-medal">${medal.title}</span>`;
+  }).join("");
+}
+
+function renderBadges() {
+  const dailyBadges = getDailyBadges();
+  const dailyCards = dailyBadges.map((badge) => renderBadgeCard(badge, true)).join("");
+  const permanentCards = badgeDefinitions.map((badge) => renderBadgeCard(badge, false)).join("");
+  return `${dailyCards}${permanentCards}`;
+}
+
+function renderBadgeCard(badge, isDaily) {
+  const unlocked = badge.isUnlocked(badgeState);
+  const classes = ["badge-card", isDaily ? "is-daily" : "", unlocked ? "is-unlocked" : ""].filter(Boolean).join(" ");
+  return `
+    <article class="${classes}">
+      <span>${unlocked ? (isDaily ? "Bugün açıldı" : "Açıldı") : (isDaily ? "Bugün" : "Kilitli")}</span>
+      <h3>${badge.title}</h3>
+      <p>${badge.description}</p>
+    </article>
+  `;
+}
+
+function getDailyBadges(dayKey = dailyBadgeKey()) {
+  return dailyBadgePool
+    .map((badge) => ({ ...badge, dailyRank: hashString(`${dayKey}:${badge.id}`) }))
+    .sort((a, b) => a.dailyRank - b.dailyRank)
+    .slice(0, DAILY_BADGE_COUNT);
+}
+
+function dailyBadgeKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function dailyBadgeDateLabel(dayKey = dailyBadgeKey()) {
+  return new Intl.DateTimeFormat("tr-TR", { weekday: "long", day: "2-digit", month: "long" }).format(new Date(`${dayKey}T12:00:00`));
+}
+
+function hashString(value) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function ensureLeagueState() {
+  const fallback = {
+    points: 0,
+    pointEvents: [],
+    daily: {},
+    medals: [],
+    eliteMember: false,
+    eliteRotationKey: "",
+    legendaryActiveDay: "",
+    legendaryCheckDay: "",
+    lastDropMessage: "",
+  };
+  try {
+    const stored = JSON.parse(localStorage.getItem("hakorocks-league-state") || "{}");
+    return {
+      ...fallback,
+      ...stored,
+      points: Number(stored.points) || 0,
+      pointEvents: Array.isArray(stored.pointEvents) ? stored.pointEvents.slice(-120) : [],
+      daily: stored.daily && typeof stored.daily === "object" ? stored.daily : {},
+      medals: Array.isArray(stored.medals) ? stored.medals : [],
+    };
+  } catch {
+    localStorage.setItem("hakorocks-league-state", JSON.stringify(fallback));
+    return fallback;
+  }
+}
+
+function saveLeagueState(state = leagueState) {
+  localStorage.setItem("hakorocks-league-state", JSON.stringify(state));
+}
+
+function refreshLeagueState(state = leagueState) {
+  const next = {
+    ...state,
+    pointEvents: Array.isArray(state.pointEvents) ? state.pointEvents.slice(-120) : [],
+    daily: state.daily && typeof state.daily === "object" ? state.daily : {},
+    medals: Array.isArray(state.medals) ? [...state.medals] : [],
+  };
+  const today = dailyBadgeKey();
+  const current = getCurrentLeague(next);
+  if (current.id === "efsanevi") {
+    const activeDay = next.legendaryActiveDay || today;
+    if (activeDay !== today && next.legendaryCheckDay !== today && !areLegendaryTasksComplete(activeDay, next)) {
+      next.points = Math.min(next.points, leagueDefinitions.find((league) => league.id === "elmas").minPoints + 180);
+      next.eliteMember = false;
+      next.lastDropMessage = "Efsanevi günlük görevler bitmediği için Elmas ligine düştün.";
+    }
+    next.legendaryActiveDay = today;
+    next.legendaryCheckDay = today;
+  }
+  if (getCurrentLeague(next).id === "efsanevi" && areLegendaryTasksComplete(today, next)) {
+    next.eliteMember = true;
+  }
+  const fusion = getDailyFusion(today);
+  const fusionEventKey = `${today}:fusion:${fusion.base.slug}:${fusion.source.slug}`;
+  if (isFusionCompleted(today, next) && !next.pointEvents.includes(fusionEventKey)) {
+    next.pointEvents.push(fusionEventKey);
+    next.points += leaguePointValues.fusion;
+  }
+  const rotationKey = getEliteRotationKey();
+  if (next.eliteMember && next.eliteRotationKey !== rotationKey) {
+    const userDropSlot = hashString(`${sessionId}:${rotationKey}`) % 10;
+    if (userDropSlot === 0 && !areLegendaryTasksComplete(today, next)) {
+      next.eliteMember = false;
+      next.lastDropMessage = "Özel kişiler listesinde 3 günlük düşme turunda seçildin.";
+    }
+    next.eliteRotationKey = rotationKey;
+  }
+  for (const medal of leagueMedalDefinitions) {
+    if (medal.isEarned(next, badgeState) && !next.medals.includes(medal.id)) {
+      next.medals.push(medal.id);
+    }
+  }
+  saveLeagueState(next);
+  return next;
+}
+
+function awardLeaguePoints(eventId, amount, options = {}) {
+  const today = dailyBadgeKey();
+  const eventKey = `${today}:${eventId}`;
+  const next = refreshLeagueState(leagueState);
+  next.daily[today] ??= { games: [], actions: [] };
+  if (options.gameSlug) addUnique(next.daily[today].games, options.gameSlug);
+  if (options.action) addUnique(next.daily[today].actions, options.action);
+  if (!next.pointEvents.includes(eventKey)) {
+    next.pointEvents.push(eventKey);
+    next.points += amount;
+  }
+  leagueState = refreshLeagueState(next);
+  if (isFusionCompleted(today, leagueState)) {
+    awardFusionBonus(today);
+  }
+  renderTournamentPanel();
+  renderSocialDashboard();
+}
+
+function awardFusionBonus(dayKey = dailyBadgeKey()) {
+  const eventKey = `${dayKey}:fusion:${getDailyFusion(dayKey).base.slug}:${getDailyFusion(dayKey).source.slug}`;
+  if (leagueState.pointEvents.includes(eventKey)) return;
+  const next = refreshLeagueState(leagueState);
+  next.pointEvents.push(eventKey);
+  next.points += leaguePointValues.fusion;
+  leagueState = refreshLeagueState(next);
+}
+
+function getDailyFusion(dayKey = dailyBadgeKey()) {
+  const baseIndex = hashString(`${dayKey}:base`) % games.length;
+  let sourceIndex = hashString(`${dayKey}:source`) % (games.length - 1);
+  if (sourceIndex >= baseIndex) sourceIndex += 1;
+  const featureIndex = hashString(`${dayKey}:feature`) % fusionFeaturePool.length;
+  return {
+    base: games[baseIndex],
+    source: games[sourceIndex],
+    feature: fusionFeaturePool[featureIndex],
+  };
+}
+
+function isFusionCompleted(dayKey = dailyBadgeKey(), state = leagueState) {
+  const fusion = getDailyFusion(dayKey);
+  const daily = state.daily?.[dayKey] || {};
+  const played = Array.isArray(daily.games) ? daily.games : [];
+  return played.includes(fusion.base.slug) && played.includes(fusion.source.slug);
+}
+
+function getCurrentLeague(state = leagueState) {
+  return [...leagueDefinitions].reverse().find((league) => (state.points || 0) >= league.minPoints) || leagueDefinitions[0];
+}
+
+function getNextLeague(state = leagueState) {
+  return leagueDefinitions.find((league) => league.minPoints > (state.points || 0)) || null;
+}
+
+function getLeagueProgressPercent(state = leagueState) {
+  const current = getCurrentLeague(state);
+  const next = getNextLeague(state);
+  if (!next) return areLegendaryTasksComplete() ? 100 : 72;
+  const span = next.minPoints - current.minPoints;
+  return Math.max(8, Math.min(100, ((state.points - current.minPoints) / span) * 100));
+}
+
+function getLegendaryTasks(dayKey = dailyBadgeKey()) {
+  return games
+    .map((game) => ({ game, rank: hashString(`${dayKey}:legendary:${game.slug}`) }))
+    .sort((a, b) => a.rank - b.rank)
+    .slice(0, 5)
+    .map(({ game }) => ({
+      id: `legendary:${game.slug}`,
+      title: `${game.title} görevini yap`,
+      description: `${game.title} oyununu bugün aç.`,
+      isDone: (state = leagueState) => {
+        const played = state.daily?.[dayKey]?.games || [];
+        return played.includes(game.slug);
+      },
+    }));
+}
+
+function areLegendaryTasksComplete(dayKey = dailyBadgeKey(), state = leagueState) {
+  return getLegendaryTasks(dayKey).every((task) => task.isDone(state));
+}
+
+function getEliteRotationKey(date = new Date()) {
+  return String(Math.floor(date.getTime() / 259200000));
+}
+
+function getSpecialPeople() {
+  const rotationKey = getEliteRotationKey();
+  const dropIndex = hashString(`drop:${rotationKey}`) % 10;
+  const challengerIndex = hashString(`new:${rotationKey}`) % specialChallengers.length;
+  const list = specialPeopleBase.map((person) => ({ ...person, status: "" }));
+  list[dropIndex] = { ...list[dropIndex], status: "Düşme turunda" };
+  list[(dropIndex + 1) % 10] = { ...specialChallengers[challengerIndex], status: "Yeni gelen" };
+
+  const account = latestSocial.account;
+  if (leagueState.eliteMember || (getCurrentLeague().id === "efsanevi" && areLegendaryTasksComplete())) {
+    list[0] = {
+      name: account?.name || "Sen",
+      nickname: account?.nickname || "oyuncu",
+      league: "Efsanevi",
+      points: leagueState.points,
+      status: "Profil madalyalı",
+      isUser: true,
+    };
+  }
+  return list.slice(0, 10);
+}
+
+function renderTournamentPanel() {
+  const panel = document.querySelector("[data-tournament-dashboard]");
+  if (panel) panel.innerHTML = renderTournamentDashboard();
 }
 
 function renderPhotoFilters() {
@@ -1041,7 +1721,10 @@ function renderModal(game) {
         <h2 id="modal-title">${game.title}</h2>
         <p>${game.longDescription}</p>
       </div>
-      <a class="button primary" href="${game.path}" data-play-game="${game.slug}">Oyunu aç</a>
+      <div class="modal-actions">
+        ${renderGamepadBadge(game, "large")}
+        <a class="button primary" href="${game.path}" data-play-game="${game.slug}">Oyunu aç</a>
+      </div>
     </div>
     <div class="modal-grid">
       <section class="modal-section">
@@ -1059,8 +1742,17 @@ function renderModal(game) {
           <li>Şu an oyunda: ${gameStats.playing ?? 0}</li>
           <li>Toplam açılış: ${gameStats.opens ?? 0}</li>
           <li>Kontrol: ${game.controls}</li>
+          ${game.controllerBadge ? `<li>Gamepad: ${game.controllerBadge}</li>` : ""}
           <li>Fotoğraf çekme tuşu: Ö</li>
         </ul>
+      </section>
+      <section class="modal-section">
+        <h3>Mobil durum</h3>
+        <div class="mobile-modal-note">
+          <strong>${game.mobileStatus}</strong>
+          <p>${game.mobileNote}</p>
+          ${game.gamepadNote ? `<p>${game.gamepadNote}</p>` : ""}
+        </div>
       </section>
       <section class="modal-section">
         <h3>Oyunu puanla</h3>
@@ -1204,7 +1896,9 @@ function updateBadgeState(mutator) {
   mutator(next);
   badgeState = next;
   localStorage.setItem("hakorocks-badge-state", JSON.stringify(badgeState));
+  leagueState = refreshLeagueState(leagueState);
   renderBadgeGrid();
+  renderTournamentPanel();
 }
 
 function addUnique(list, value) {
@@ -1287,6 +1981,10 @@ function bindGameCards() {
     const playLink = target.closest?.("[data-play-game]");
     if (playLink) {
       updateBadgeState((state) => addUnique(state.playedGames, playLink.dataset.playGame));
+      awardLeaguePoints(`game:${playLink.dataset.playGame}`, leaguePointValues.game, {
+        gameSlug: playLink.dataset.playGame,
+        action: "game",
+      });
     }
   });
   document.querySelector("[data-sound-toggle]")?.addEventListener("click", toggleSound);
@@ -1306,6 +2004,7 @@ function openGameModal(slug) {
   updateBadgeState((state) => {
     state.openedGame = true;
   });
+  awardLeaguePoints(`details:${slug}`, leaguePointValues.details, { action: "details" });
   selectedGame = game;
   document.querySelector("[data-modal-content]").innerHTML = renderModal(game);
   const modal = document.querySelector("[data-game-modal]");
@@ -1335,12 +2034,14 @@ async function submitRating(slug, value) {
     });
     latestRatings = await response.json();
     updateBadgeState((state) => addUnique(state.ratedGames, slug));
+    awardLeaguePoints(`rating:${slug}`, leaguePointValues.rating, { action: "rating" });
   } catch {
     latestRatings.games[slug] = {
       average: value,
       count: 1,
     };
     updateBadgeState((state) => addUnique(state.ratedGames, slug));
+    awardLeaguePoints(`rating:${slug}`, leaguePointValues.rating, { action: "rating" });
   }
   if (!document.querySelector("[data-game-modal]").hidden) {
     document.querySelector("[data-modal-content]").innerHTML = renderModal(selectedGame);
@@ -1370,6 +2071,7 @@ async function submitGuestbook(event) {
     updateBadgeState((state) => {
       state.guestbook = true;
     });
+    awardLeaguePoints("guestbook", leaguePointValues.guestbook, { action: "guestbook" });
     renderGuestbookList();
   } catch {
     status.textContent = "Mesaj eklenemedi. Biraz sonra tekrar dene.";
@@ -1428,6 +2130,7 @@ function renderSocialDashboard() {
   const panel = document.querySelector("[data-account-dashboard]");
   if (panel) panel.innerHTML = renderAccountDashboard();
   bindSocialForms();
+  renderTournamentPanel();
 }
 
 function bindSocialForms() {
@@ -1617,6 +2320,7 @@ async function submitVoiceRoom(event) {
     updateBadgeState((state) => {
       state.voiceRoomJoined = true;
     });
+    awardLeaguePoints("voice-room", leaguePointValues.voice, { action: "voice" });
     status.textContent = `Sesli odaya girildi: ${selectedVoiceRoomId}`;
     await refreshVoiceState();
   } catch (error) {
@@ -1988,6 +2692,7 @@ function bindTrailer() {
     updateBadgeState((state) => {
       state.trailerPlayed = true;
     });
+    awardLeaguePoints("trailer", leaguePointValues.trailer, { action: "trailer" });
     stage.classList.remove("is-playing");
     void stage.offsetWidth;
     stage.classList.add("is-playing");
@@ -2073,6 +2778,7 @@ function renderLiveData() {
   renderPhotoGrid();
   renderGuestbookList();
   renderBadgeGrid();
+  renderTournamentPanel();
 }
 
 const header = document.querySelector("[data-header]");
@@ -2084,6 +2790,7 @@ bindGameCards();
 bindTrailer();
 updateSoundButton();
 renderBadgeGrid();
+renderTournamentPanel();
 renderFeedbackFeed();
 renderAnnouncementFeed();
 renderSocialDashboard();
