@@ -800,9 +800,13 @@ function renderAccountDashboard() {
         <h4>Arkadaş ekle</h4>
         <form class="mini-form" data-friend-form>
           <label>
-            Takma ad
-            <input name="targetNickname" maxlength="24" placeholder="Örn: hakan" required />
+            Takma ad veya isim
+            <input name="targetNickname" maxlength="24" placeholder="Örn: hakorocks" list="known-handle-options" required />
           </label>
+          <datalist id="known-handle-options">
+            ${people.map((person) => `<option value="${escapeHtml(person.nickname)}"></option>`).join("")}
+            ${account ? `<option value="${escapeHtml(account.nickname)}"></option>` : ""}
+          </datalist>
           <label>
             Mesaj
             <input name="message" maxlength="120" placeholder="İstersen kısa not bırak" />
@@ -824,8 +828,8 @@ function renderAccountDashboard() {
         <h4>Davetler</h4>
         <form class="mini-form" data-invite-form>
           <label>
-            Arkadaş takma adı
-            <input name="targetNickname" maxlength="24" placeholder="Arkadaşın takma adı" required />
+            Arkadaş takma adı veya isim
+            <input name="targetNickname" maxlength="24" placeholder="Arkadaşın takma adı" list="known-handle-options" required />
           </label>
           <label>
             Oyun

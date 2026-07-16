@@ -415,9 +415,10 @@ async function handleApi(request, response) {
           voiceRoomId: "",
           createdAt: now,
           updatedAt: now,
-          friends: [],
-        };
+        friends: [],
+      };
     if (restored && existing && existing.id !== taken.id) {
+      transferAccountReferences(existing.id, taken.id);
       accounts = accounts.filter((item) => item.id !== existing.id);
     }
     if (!existing && !restored) accounts = [account, ...accounts];
@@ -800,7 +801,7 @@ function accountSnapshot(sessionId) {
 function createFriendRequest(sessionId, targetNickname, message) {
   const source = accountBySessionId(sessionId);
   if (!source) return { error: "account-missing", status: 404 };
-  const target = accounts.find((account) => normalizeNickname(account.nickname) === normalizeNickname(targetNickname));
+  const target = findAccountByHandle(targetNickname);
   if (!target) return { error: "user-not-found", status: 404 };
   if (target.id === source.id) return { error: "self-request", status: 400 };
   if (source.friends.includes(target.id)) return { error: "already-friends", status: 409 };
@@ -854,7 +855,7 @@ function addFriendship(firstId, secondId) {
 function createInvite(sessionId, targetNickname, gameSlug, message) {
   const source = accountBySessionId(sessionId);
   if (!source) return { error: "account-missing", status: 404 };
-  const target = accounts.find((account) => normalizeNickname(account.nickname) === normalizeNickname(targetNickname));
+  const target = findAccountByHandle(targetNickname);
   if (!target) return { error: "user-not-found", status: 404 };
   if (target.id === source.id) return { error: "self-invite", status: 400 };
   if (!source.friends.includes(target.id)) return { error: "not-friends", status: 403 };
@@ -872,6 +873,33 @@ function createInvite(sessionId, targetNickname, gameSlug, message) {
     ...invites,
   ].slice(0, 120);
   return { ok: true };
+}
+
+function findAccountByHandle(value) {
+  const normalized = normalizeNickname(value);
+  if (!normalized) return null;
+  return accounts.find((account) => normalizeNickname(account.nickname) === normalized || normalizeNickname(account.name) === normalized) || null;
+}
+
+function transferAccountReferences(fromId, toId) {
+  if (fromId === toId) return;
+  for (const account of accounts) {
+    if (!account?.friends) continue;
+    account.friends = [...new Set(account.friends.map((friendId) => (friendId === fromId ? toId : friendId)))];
+  }
+  for (const request of friendRequests) {
+    if (request.fromAccountId === fromId) request.fromAccountId = toId;
+    if (request.toAccountId === fromId) request.toAccountId = toId;
+  }
+  for (const invite of invites) {
+    if (invite.fromAccountId === fromId) invite.fromAccountId = toId;
+    if (invite.toAccountId === fromId) invite.toAccountId = toId;
+  }
+  for (const room of voiceRooms.values()) {
+    for (const memberSocket of room.members.values()) {
+      if (memberSocket.voiceAccountId === fromId) memberSocket.voiceAccountId = toId;
+    }
+  }
 }
 
 function voiceSnapshot(sessionId) {
