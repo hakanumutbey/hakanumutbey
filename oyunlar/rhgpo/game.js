@@ -35,7 +35,6 @@ const state = {
     radius: 22,
   },
   dock: { x: 980, y: 250, w: 170, h: 220, angle: 0 },
-  items: [],
   obstacles: [],
   input: { left: false, right: false, forward: false, reverse: false, dock: false },
   touch: { active: null },
@@ -78,7 +77,7 @@ function startGame() {
   state.round = 1;
   state.score = 0;
   state.energy = 100;
-  state.message = "Patatesleri topla ve limana yanaş.";
+  state.message = "Rüzgara karşı koy ve limana yanaş.";
   state.nextRoundAt = 0;
   spawnRound(true);
   renderHud();
@@ -91,7 +90,6 @@ function restartGame() {
   state.energy = 100;
   state.message = "Hazır olduğunda Başla'ya bas.";
   state.nextRoundAt = 0;
-  state.items = [];
   state.obstacles = [];
   resetShip();
   renderHud();
@@ -101,7 +99,6 @@ function spawnRound(first = false) {
   resetShip();
   state.dock = makeDock(state.round);
   state.wind = makeWind(state.round);
-  state.items = makeItems(state.round);
   state.obstacles = makeObstacles(state.round);
   state.message = first ? "Rüzgar sertleşiyor. Limana doğru sür." : `Tur ${state.round}. Yeni rüzgar başladı.`;
   state.phase = "playing";
@@ -136,24 +133,6 @@ function makeWind(round) {
     strength: 28 + round * 7,
     timer: 8 - Math.min(4, round * 0.45),
   };
-}
-
-function makeItems(round) {
-  const items = [];
-  const total = 5 + round;
-  for (let index = 0; index < total; index += 1) {
-    const type = index % 4 === 0 ? "fries" : "potato";
-    items.push({
-      type,
-      x: 280 + Math.random() * 760,
-      y: 120 + Math.random() * 500,
-      vx: (Math.random() - 0.5) * 14,
-      vy: (Math.random() - 0.5) * 14,
-      taken: false,
-      radius: type === "fries" ? 16 : 14,
-    });
-  }
-  return items;
 }
 
 function makeObstacles(round) {
@@ -207,7 +186,6 @@ function loop(now) {
   if (state.phase === "playing") {
     updateWind(dt);
     updateShip(dt);
-    updateItems(dt);
     updateCollisions();
     checkDock(now);
     state.energy = Math.max(0, state.energy - dt * (1.6 + state.round * 0.18));
@@ -294,36 +272,8 @@ function updateShip(dt) {
   }
 }
 
-function updateItems(dt) {
-  for (const item of state.items) {
-    if (item.taken) continue;
-    item.x += (item.vx + state.wind.x * 16) * dt;
-    item.y += (item.vy + state.wind.y * 16) * dt;
-    item.vx *= 0.992;
-    item.vy *= 0.992;
-    if (item.x < 60 || item.x > WORLD.width - 60) item.vx *= -1;
-    if (item.y < 60 || item.y > WORLD.height - 60) item.vy *= -1;
-    item.x = clamp(item.x, 60, WORLD.width - 60);
-    item.y = clamp(item.y, 60, WORLD.height - 60);
-  }
-}
-
 function updateCollisions() {
-  for (const item of state.items) {
-    if (item.taken) continue;
-    if (distance(state.ship.x, state.ship.y, item.x, item.y) < state.ship.radius + item.radius + 6) {
-      item.taken = true;
-      if (item.type === "potato") {
-        state.energy = Math.min(100, state.energy + 14);
-        state.score += 15;
-        state.message = "Patates buldun. Enerji toplandı.";
-      } else {
-        state.energy = Math.min(100, state.energy + 8);
-        state.score += 30;
-        state.message = "Patates kızartması aldın. Bonus geldi.";
-      }
-    }
-  }
+  return;
 }
 
 function checkDock(now) {
@@ -360,7 +310,7 @@ function winGame() {
 
 function loseGame() {
   state.phase = "lost";
-  state.message = "Enerjin bitti. Patates bulup tekrar dene.";
+  state.message = "Enerjin bitti. Tekrar dene.";
   if (state.score > state.highScore) {
     state.highScore = state.score;
     localStorage.setItem(STORAGE_KEY, String(state.highScore));
@@ -546,7 +496,7 @@ function drawOverlayText() {
     ctx.font = "900 54px Inter, sans-serif";
     ctx.fillText("RHGPO", 520, 330);
     ctx.font = "700 24px Inter, sans-serif";
-    ctx.fillText("Patates topla, gemiyi park et.", 470, 372);
+    ctx.fillText("Rüzgara karşı gemiyi park et.", 430, 372);
   }
   ctx.restore();
 }
