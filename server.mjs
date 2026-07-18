@@ -28,6 +28,18 @@ const baseValues = {
   vale: 112,
   "robot-avcisi": 173,
 };
+const averagePlayMinutes = {
+  "annenden-kac": 6,
+  bardak: 4,
+  "essiz-zindan": 11,
+  "skeleton-wars": 9,
+  rhgpo: 7,
+  "siyah-adam": 12,
+  "birlesim-arenasi": 10,
+  vale: 8,
+  "robot-avcisi": 13,
+};
+const voteOptionIds = ["uzay-yarisi", "market-savasi", "okul-gorevi"];
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -61,6 +73,9 @@ let ratings = await readJson("ratings.json", {
 let guestbook = await readJson("guestbook.json", []);
 let feedback = await readJson("feedback.json", []);
 let announcements = await readJson("announcements.json", []);
+let comments = normalizeComments(await readJson("comments.json", []));
+let votes = normalizeVotes(await readJson("votes.json", { voters: {} }));
+let clickScores = normalizeClickScores(await readJson("click-scores.json", []));
 let accounts = normalizeAccounts(await readJson("accounts.json", []));
 accounts = await ensureDefaultBotAccounts(accounts);
 let friendRequests = normalizeFriendRequests(await readJson("friend-requests.json", []));
@@ -194,8 +209,19 @@ async function handleApi(request, response) {
     sendJson(response, currentStats());
     return;
   }
+  if (request.method === "GET" && url.pathname === "/api/health") {
+    sendJson(response, {
+      ok: true,
+      status: "Çalışıyor",
+      buildVersion: process.env.BUILD_VERSION || "local",
+      activeServer: request.headers.host || "local",
+      uptimeSeconds: Math.round(process.uptime()),
+      onlinePlayers: sessions.size,
+    });
+    return;
+  }
   if (request.method === "GET" && url.pathname === "/api/photos") {
-    sendJson(response, photos.slice(0, 40));
+    sendJson(response, photos.slice(0, 40).map(publicPhoto));
     return;
   }
   if (request.method === "GET" && url.pathname === "/api/ratings") {
@@ -212,6 +238,20 @@ async function handleApi(request, response) {
   }
   if (request.method === "GET" && url.pathname === "/api/announcements") {
     sendJson(response, announcements.slice(0, 20));
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/comments") {
+    const slug = games.includes(url.searchParams.get("slug")) ? url.searchParams.get("slug") : "";
+    sendJson(response, commentSnapshot(slug));
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/votes") {
+    sendJson(response, currentVotes());
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/click-game") {
+    const sessionId = safeText(url.searchParams.get("sessionId"), 120);
+    sendJson(response, clickGameSnapshot(sessionId));
     return;
   }
   if (request.method === "GET" && url.pathname === "/api/account") {
@@ -277,11 +317,33 @@ async function handleApi(request, response) {
       title: safeText(body.title, 80) || "Oyun fotoğrafı",
       gameTitle: safeText(body.gameTitle, 80),
       dataUrl,
+      likedBy: [],
       createdAt: new Date().toISOString(),
     };
     photos = [photo, ...photos].slice(0, 60);
     await writeJson("photos.json", photos);
-    sendJson(response, photo);
+    sendJson(response, publicPhoto(photo));
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/photo-like") {
+    const body = await readBody(request, 64_000);
+    const photoId = safeText(body.photoId, 120);
+    const sessionId = safeText(body.sessionId, 120);
+    const photo = photos.find((item) => item.id === photoId);
+    if (!photo || !sessionId) {
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "invalid-photo-like" }));
+      return;
+    }
+    photo.likedBy = Array.isArray(photo.likedBy) ? photo.likedBy.map((item) => safeText(item, 120)).filter(Boolean) : [];
+    const index = photo.likedBy.indexOf(sessionId);
+    if (index >= 0) {
+      photo.likedBy.splice(index, 1);
+    } else {
+      photo.likedBy.push(sessionId);
+    }
+    await writeJson("photos.json", photos);
+    sendJson(response, photos.slice(0, 40).map(publicPhoto));
     return;
   }
   if (request.method === "POST" && url.pathname === "/api/rating") {
@@ -368,6 +430,79 @@ async function handleApi(request, response) {
     announcements = [entry, ...announcements].slice(0, 40);
     await writeJson("announcements.json", announcements);
     sendJson(response, announcements.slice(0, 20));
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/comments") {
+    const body = await readBody(request, 64_000);
+    const slug = games.includes(body.slug) ? body.slug : "";
+    const name = safeText(body.name, 32) || "Oyuncu";
+    const message = safeText(body.message, 220);
+    if (!slug || message.length < 2) {
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "invalid-comment" }));
+      return;
+    }
+    const entry = {
+      id: createRecordId("comment"),
+      slug,
+      name,
+      message,
+      createdAt: new Date().toISOString(),
+    };
+    comments = [entry, ...comments].slice(0, 240);
+    await writeJson("comments.json", comments);
+    sendJson(response, commentSnapshot(slug));
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/votes") {
+    const body = await readBody(request, 64_000);
+    const sessionId = safeText(body.sessionId, 120);
+    const optionId = safeText(body.optionId, 40);
+    if (!sessionId || !voteOptionIds.includes(optionId)) {
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "invalid-vote" }));
+      return;
+    }
+    votes.voters[sessionId] = optionId;
+    await writeJson("votes.json", votes);
+    sendJson(response, currentVotes());
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/click-game") {
+    const body = await readBody(request, 64_000);
+    const sessionId = safeText(body.sessionId, 120);
+    const name = safeText(body.name, 32) || "Oyuncu";
+    const score = Number(body.score);
+    const durationMs = Number(body.durationMs);
+    if (!sessionId || !Number.isInteger(score) || score < 0 || score > 1800 || durationMs < 55_000 || durationMs > 75_000) {
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "invalid-click-score" }));
+      return;
+    }
+    const now = new Date().toISOString();
+    const existing = clickScores.find((entry) => entry.sessionId === sessionId);
+    if (!existing) {
+      clickScores.push({
+        id: createRecordId("click"),
+        sessionId,
+        name,
+        score,
+        durationMs,
+        createdAt: now,
+        updatedAt: now,
+      });
+    } else if (score >= existing.score) {
+      existing.name = name;
+      existing.score = score;
+      existing.durationMs = durationMs;
+      existing.updatedAt = now;
+    } else {
+      existing.name = name;
+      existing.updatedAt = now;
+    }
+    clickScores = sortClickScores(clickScores).slice(0, 120);
+    await writeJson("click-scores.json", clickScores);
+    sendJson(response, clickGameSnapshot(sessionId));
     return;
   }
   if (request.method === "POST" && url.pathname === "/api/account") {
@@ -556,6 +691,19 @@ function currentStats() {
 
   const marketValue = Object.values(gameStats).reduce((sum, item) => sum + item.value, 0) / games.length;
   pushHistory(stock.marketHistory, marketValue);
+  const photoCounts = Object.fromEntries(games.map((slug) => [slug, 0]));
+  let totalPhotoLikes = 0;
+  for (const photo of photos) {
+    if (photoCounts[photo.slug] !== undefined) photoCounts[photo.slug] += 1;
+    totalPhotoLikes += Array.isArray(photo.likedBy) ? photo.likedBy.length : 0;
+  }
+  const mostPlayedGame = maxEntrySlug(games.map((slug) => [slug, gameStats[slug]?.opens || 0]));
+  const weekPopularGame = maxEntrySlug(games.map((slug) => [slug, gameStats[slug]?.value || 0]));
+  const mostPhotoGame = maxEntrySlug(Object.entries(photoCounts));
+  const totalGameTimeMinutes = games.reduce((sum, slug) => {
+    const opens = gameStats[slug]?.opens || 0;
+    return sum + opens * (averagePlayMinutes[slug] || 6);
+  }, activeSessions.length * 3);
   return {
     siteOpen: activeSessions.length,
     playing: Object.values(playingByGame).reduce((sum, count) => sum + count, 0),
@@ -563,7 +711,26 @@ function currentStats() {
     marketValue,
     marketHistory: stock.marketHistory,
     games: gameStats,
+    enriched: {
+      mostPlayedGame,
+      weekPopularGame,
+      mostPhotoGame,
+      totalPlayers: accounts.length,
+      totalGameTimeMinutes,
+      totalBadges: Math.max(0, accounts.length * 2 + Object.values(currentRatings().games).reduce((sum, item) => sum + item.count, 0)),
+      dailyActivePlayers: activeSessions.length,
+      mostPlayedFusion: "birlesim-arenasi",
+      totalPhotoLikes,
+      commentsTotal: comments.length,
+      votesTotal: Object.keys(votes.voters).length,
+      clickGamePlayers: clickScores.length,
+      clickGameBestScore: sortClickScores(clickScores)[0]?.score || 0,
+    },
   };
+}
+
+function maxEntrySlug(entries) {
+  return entries.reduce((best, entry) => (Number(entry[1]) > Number(best[1]) ? entry : best), ["", -1])[0];
 }
 
 function gameStock(slug) {
@@ -584,6 +751,108 @@ function currentRatings() {
         count: item.count,
       }];
     })),
+  };
+}
+
+function publicPhoto(photo) {
+  const likedBy = Array.isArray(photo.likedBy) ? photo.likedBy : [];
+  return {
+    ...photo,
+    likedBy: undefined,
+    likes: likedBy.length,
+  };
+}
+
+function normalizeComments(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item) => item && typeof item === "object")
+    .map((item) => ({
+      id: safeText(item.id, 120) || createRecordId("comment"),
+      slug: games.includes(item.slug) ? item.slug : "",
+      name: safeText(item.name, 32) || "Oyuncu",
+      message: safeText(item.message, 220),
+      createdAt: safeText(item.createdAt, 40) || new Date().toISOString(),
+    }))
+    .filter((item) => item.slug && item.message);
+}
+
+function commentSnapshot(slug = "") {
+  const visible = slug ? comments.filter((comment) => comment.slug === slug) : comments;
+  return {
+    total: comments.length,
+    games: Object.fromEntries(games.map((gameSlug) => [
+      gameSlug,
+      comments.filter((comment) => comment.slug === gameSlug).slice(0, 12),
+    ])),
+    list: visible.slice(0, 30),
+  };
+}
+
+function normalizeVotes(value) {
+  const voters = value && typeof value === "object" && value.voters && typeof value.voters === "object"
+    ? value.voters
+    : {};
+  return {
+    voters: Object.fromEntries(Object.entries(voters)
+      .map(([sessionId, optionId]) => [safeText(sessionId, 120), safeText(optionId, 40)])
+      .filter(([sessionId, optionId]) => sessionId && voteOptionIds.includes(optionId))),
+  };
+}
+
+function currentVotes() {
+  const options = Object.fromEntries(voteOptionIds.map((id) => [id, 0]));
+  for (const optionId of Object.values(votes.voters)) {
+    if (options[optionId] !== undefined) options[optionId] += 1;
+  }
+  return {
+    options,
+    total: Object.keys(votes.voters).length,
+  };
+}
+
+function normalizeClickScores(value) {
+  if (!Array.isArray(value)) return [];
+  return sortClickScores(value
+    .filter((item) => item && typeof item === "object")
+    .map((item) => ({
+      id: safeText(item.id, 120) || createRecordId("click"),
+      sessionId: safeText(item.sessionId, 120),
+      name: safeText(item.name, 32) || "Oyuncu",
+      score: clamp(Math.round(Number(item.score) || 0), 0, 1800),
+      durationMs: clamp(Math.round(Number(item.durationMs) || 60_000), 55_000, 75_000),
+      createdAt: safeText(item.createdAt, 40) || new Date().toISOString(),
+      updatedAt: safeText(item.updatedAt, 40) || safeText(item.createdAt, 40) || new Date().toISOString(),
+    }))
+    .filter((item) => item.sessionId))
+    .slice(0, 120);
+}
+
+function sortClickScores(list) {
+  return [...list].sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return String(a.updatedAt).localeCompare(String(b.updatedAt));
+  });
+}
+
+function clickGameSnapshot(sessionId = "") {
+  const sorted = sortClickScores(clickScores);
+  const personal = sessionId ? sorted.find((entry) => entry.sessionId === sessionId) : null;
+  return {
+    durationSeconds: 60,
+    totalPlayers: sorted.length,
+    personalBest: personal ? publicClickScore(personal, sorted.indexOf(personal) + 1) : null,
+    leaders: sorted.slice(0, 10).map((entry, index) => publicClickScore(entry, index + 1)),
+  };
+}
+
+function publicClickScore(entry, rank) {
+  return {
+    rank,
+    name: entry.name,
+    score: entry.score,
+    durationSeconds: Math.round(entry.durationMs / 1000),
+    updatedAt: entry.updatedAt,
   };
 }
 

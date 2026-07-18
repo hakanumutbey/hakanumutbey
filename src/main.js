@@ -1,4 +1,19 @@
 import "./styles.css";
+import {
+  BUILD_VERSION,
+  communityEvents,
+  devDiaryEntries,
+  developerBlogPosts,
+  gameExtras,
+  musicOptions,
+  notificationCards,
+  randomTasks,
+  seasonInfo,
+  surpriseBoxes,
+  tournamentCalendar,
+  upcomingUpdateCards,
+  voteOptions,
+} from "./studio-roadmap.js";
 
 const games = [
   {
@@ -292,6 +307,60 @@ const badgeDefinitions = [
     description: "HAKO ROCKS fragmanını baştan oynattın.",
     isUnlocked: (state) => Boolean(state.trailerPlayed),
   },
+  {
+    id: "favorite",
+    title: "Favori Seçici",
+    description: "Bir oyunu favorilerine ekledin.",
+    isUnlocked: (state) => (state.favoriteGames || []).length > 0,
+  },
+  {
+    id: "commenter",
+    title: "Yorumcu",
+    description: "Bir oyun için yorum yazdın.",
+    isUnlocked: (state) => (Number(state.commentCount) || 0) > 0,
+  },
+  {
+    id: "voter",
+    title: "Topluluk Oyuncusu",
+    description: "Yeni oyun oylamasına katıldın.",
+    isUnlocked: (state) => Boolean(state.votedIdea),
+  },
+  {
+    id: "photo-like",
+    title: "Fotoğraf Beğenisi",
+    description: "Bir oyun fotoğrafını beğendin.",
+    isUnlocked: (state) => (Number(state.photoLikes) || 0) > 0,
+  },
+  {
+    id: "surprise",
+    title: "Sürpriz Kutusu",
+    description: "Günlük sürpriz kutusunu açtın.",
+    isUnlocked: (state) => Boolean(state.surpriseOpened),
+  },
+  {
+    id: "easter",
+    title: "Gizli İpucu",
+    description: "Hakorocks gizli ipucunu buldun.",
+    isUnlocked: (state) => Boolean(state.easterEggFound),
+  },
+  {
+    id: "launcher",
+    title: "Launcher Pilotu",
+    description: "Hakorocks Launcher merkezini kullandın.",
+    isUnlocked: (state) => Boolean(state.launcherOpened),
+  },
+  {
+    id: "bot-chat",
+    title: "HakoBot Sohbetçisi",
+    description: "HakoBot ile yazılı sohbet ettin.",
+    isUnlocked: (state) => (Number(state.botMessages) || 0) > 0,
+  },
+  {
+    id: "click-master",
+    title: "Kare Ustası",
+    description: "1 dakikalık kare oyununda skor yaptın.",
+    isUnlocked: (state) => (Number(state.clickGameBest) || 0) > 0,
+  },
 ];
 
 const dailyBadgePool = [
@@ -388,6 +457,9 @@ const leaguePointValues = {
   trailer: 18,
   voice: 35,
   fusion: 60,
+  launcher: 10,
+  bot: 16,
+  clickGame: 30,
 };
 
 const tournamentTemplates = [
@@ -464,8 +536,12 @@ let latestRatings = createFallbackRatings();
 let latestGuestbook = [];
 let latestFeedback = [];
 let latestAnnouncements = [];
+let latestComments = createFallbackComments();
+let latestVotes = createFallbackVotes();
+let latestHealth = createFallbackHealth();
 let latestSocial = createFallbackSocial();
 let latestVoice = createFallbackVoice();
+let latestClickGame = createFallbackClickGame();
 let notificationPermission = "Notification" in window ? Notification.permission : "default";
 let selectedGame = games[0];
 let selectedPhotoFilter = "all";
@@ -473,7 +549,27 @@ let selectedInviteGameSlug = localStorage.getItem("hakorocks-invite-game") || "r
 let selectedVoiceRoomId = localStorage.getItem("hakorocks-voice-room") || "hakorocks-oda";
 let voiceClient = null;
 let soundEnabled = localStorage.getItem("hakorocks-sound") !== "off";
+let favoriteGames = ensureFavoriteGames();
+let selectedTheme = localStorage.getItem("hakorocks-theme") || "dark";
+let selectedMusic = localStorage.getItem("hakorocks-music") || musicOptions[0].id;
+let surpriseState = ensureSurpriseState();
+let launcherQuery = "";
+let launcherMode = "all";
+let hakoBotAnswer = "HakoBot hazır. Bir butona basınca sana kısa öneri verir.";
+let hakoBotMessages = ensureHakoBotMessages();
+let micTestStatus = "Mikrofon testi bekliyor.";
+let performanceState = createPerformanceState();
+let clickGameState = createClickGameState();
+let clickGameTimerId = 0;
+let millionHState = {
+  visible: false,
+  copied: false,
+  status: "",
+};
+let millionHTextCache = "";
 let audioContext;
+
+document.documentElement.dataset.theme = selectedTheme;
 
 document.querySelector("#app").innerHTML = `
   <header class="site-header" data-header>
@@ -482,18 +578,12 @@ document.querySelector("#app").innerHTML = `
       <span>Hakorocks Studio</span>
     </a>
     <nav class="nav" aria-label="Ana menü">
-      <a href="#hakkimda">Hakkımda</a>
-      <a href="#ozgecmis">Özgeçmiş</a>
-      <a href="#mobil">Mobil</a>
-      <a href="#fragman">Fragman</a>
-      <a href="#turnuvalar">Turnuvalar</a>
+      <a href="#launcher">Launcher</a>
       <a href="#oyunlar">Oyunlar</a>
+      <a href="#bot">HakoBot</a>
+      <a href="#pulse">Pulse</a>
+      <a href="#mini-oyun">Mini oyun</a>
       <a href="#canli">Canlı</a>
-      <a href="#haberler">Haberler</a>
-      <a href="#hesap">Hesap</a>
-      <a href="#rozetler">Rozetler</a>
-      <a href="#yakinda">Yakında</a>
-      <a href="#defter">Defter</a>
     </nav>
     <button class="nav-sound" type="button" data-sound-toggle aria-pressed="${soundEnabled ? "true" : "false"}">
       Ses: ${soundEnabled ? "Açık" : "Kapalı"}
@@ -511,15 +601,81 @@ document.querySelector("#app").innerHTML = `
           Burada tarayıcıda açılan oyunlar, canlı özellikler ve yeni denemeler bir araya geliyor.
         </p>
         <div class="hero-actions">
-          <a class="button primary" href="#oyunlar">Oyunları aç</a>
-          <a class="button secondary" href="#mobil">Mobil modu gör</a>
-          <a class="button secondary" href="#hesap">Hesap oluştur</a>
+          <a class="button primary" href="#launcher">Launcher'ı aç</a>
+          <a class="button secondary" href="#bot">HakoBot'a sor</a>
+          <button class="button secondary" type="button" data-random-game>Rastgele oyun</button>
         </div>
       </div>
       <aside class="hero-panel" aria-label="Stüdyo özeti">
         <strong>8 oyun</strong>
         <span>Tek domain altında yayında</span>
       </aside>
+    </section>
+
+    <section class="section launcher-section" id="launcher" aria-labelledby="launcher-title">
+      <div class="section-heading">
+        <p class="eyebrow">Hakorocks Launcher</p>
+        <h2 id="launcher-title">Oyun konsolu gibi hızlı seçim merkezi.</h2>
+        <p class="section-note">
+          Devam et, favorilerini aç, rastgele oyuna gir veya arama yap. Oyunlar tek ekranda karşılaştırılır.
+        </p>
+      </div>
+      <div data-launcher-hub>
+        ${renderLauncherHub()}
+      </div>
+    </section>
+
+    <section class="section bot-section" id="bot" aria-labelledby="bot-title">
+      <div class="section-heading">
+        <p class="eyebrow">HakoBot</p>
+        <h2 id="bot-title">Siteyle ilgili soru sorabileceğin yazılı bot.</h2>
+        <p class="section-note">
+          Oyunlar, launcher, rozetler, fotoğraflar, mini oyun, yayın durumu veya aklına gelen basit sorular için yaz.
+        </p>
+      </div>
+      <div data-hakobot-panel>
+        ${renderHakoBotChat()}
+      </div>
+    </section>
+
+    <section class="section pulse-section" id="pulse" aria-labelledby="pulse-title">
+      <div class="section-heading">
+        <p class="eyebrow">Studio Pulse</p>
+        <h2 id="pulse-title">Sitenin canlı enerjisi tek panelde.</h2>
+        <p class="section-note">
+          Oyun önerisi, görev akışı, bot hareketi ve mini oyun hazırlığı burada canlı bir stüdyo ekranı gibi görünür.
+        </p>
+      </div>
+      <div data-pulse-panel>
+        ${renderStudioPulse()}
+      </div>
+    </section>
+
+    <section class="section click-game-section" id="mini-oyun" aria-labelledby="click-game-title">
+      <div class="section-heading">
+        <p class="eyebrow">Mini oyun</p>
+        <h2 id="click-game-title">1 dakikada kareye kaç kez basabilirsin?</h2>
+        <p class="section-note">
+          Süre başlayınca ortadaki kareye hızlıca bas. 60 saniye bitince skorunu liderlik tablosuna gönder.
+        </p>
+      </div>
+      <div data-click-game-panel>
+        ${renderClickGame()}
+      </div>
+    </section>
+
+    <section class="section spotlight-section" id="birlesim" aria-labelledby="spotlight-title">
+      <div class="section-heading">
+        <p class="eyebrow">Günün büyük modu</p>
+        <h2 id="spotlight-title">Bugün iki oyun birleşiyor.</h2>
+        <p class="section-note">
+          Birinci oyundan ana hedefin yarısı, ikinci oyundan özel kuralın yarısı alınır.
+          24 saat sonra yeni birleşim gelir.
+        </p>
+      </div>
+      <div data-spotlight-panel>
+        ${renderFusionSpotlight()}
+      </div>
     </section>
 
     <section class="section intro-section" id="hakkimda" aria-labelledby="about-title">
@@ -803,6 +959,9 @@ document.querySelector("#app").innerHTML = `
           <div data-market-chart class="market-chart"></div>
         </article>
       </div>
+      <div class="enriched-grid" data-enriched-stats>
+        ${renderEnrichedStats()}
+      </div>
     </section>
 
     <section class="section tournament-section" id="turnuvalar" aria-labelledby="tournament-title">
@@ -848,11 +1007,36 @@ document.querySelector("#app").innerHTML = `
         <h2 id="photos-title">Oyunlarda fotoğraf çekme tuşu: Ö.</h2>
         <p class="section-note">Oyun ekranının sağ altındaki rozet sana tuşu hatırlatır; çekilen fotoğraflar burada ve oyun detayında görünür.</p>
       </div>
+      <div data-weekly-photo>
+        ${renderWeeklyPhoto()}
+      </div>
       <div class="filter-bar" aria-label="Fotoğraf filtreleri">
         ${renderPhotoFilters()}
       </div>
       <div class="photo-grid" data-photo-grid>
         ${renderPhotoGallery()}
+      </div>
+    </section>
+
+    <section class="section community-section" id="topluluk" aria-labelledby="community-title">
+      <div class="section-heading">
+        <p class="eyebrow">Topluluk</p>
+        <h2 id="community-title">Yorumlar, oylamalar ve etkinlikler.</h2>
+        <p class="section-note">Yeni oyun fikrine oy ver, son yorumları gör, mikrofonunu test et ve topluluk etkinliklerini takip et.</p>
+      </div>
+      <div data-community-hub>
+        ${renderCommunityHub()}
+      </div>
+    </section>
+
+    <section class="section studio-section" id="studio" aria-labelledby="studio-title">
+      <div class="section-heading">
+        <p class="eyebrow">Studio merkezi</p>
+        <h2 id="studio-title">Geliştirici günlüğü, istatistikler ve eğlence.</h2>
+        <p class="section-note">Günün duyurusu, yakında gelecekler, HakoBot, tema, müzik ve geliştirici modu burada.</p>
+      </div>
+      <div data-studio-hub>
+        ${renderStudioHub()}
       </div>
     </section>
 
@@ -900,6 +1084,10 @@ document.querySelector("#app").innerHTML = `
         ${projects.map(renderProjectCard).join("")}
       </div>
     </section>
+
+    <section class="section million-h-section" id="milyon-h" aria-labelledby="million-h-title">
+      ${renderMillionHSection()}
+    </section>
   </main>
 
   <footer class="site-footer">
@@ -919,6 +1107,853 @@ document.querySelector("#app").innerHTML = `
   </section>
 `;
 
+function renderMillionHSection() {
+  const text = millionHState.visible ? getMillionHText() : "";
+  return `
+    <div class="million-h-panel">
+      <div class="section-heading compact">
+        <p class="eyebrow">1 milyon h</p>
+        <h2 id="million-h-title">Bana tıkla.</h2>
+        <p class="section-note">
+          Düğmeye basınca altta 1.000.000 tane h oluşur. İstersen panoya kopyalayabilirsin.
+        </p>
+      </div>
+      <button class="button primary" type="button" data-million-h-toggle>
+        ${millionHState.visible ? "1.000.000 h hazır" : "Bana tıkla"}
+      </button>
+      ${millionHState.visible ? `
+        <div class="million-h-result">
+          <p class="million-h-warning">
+            Not: Bilgisayar kopyalayamayabilir veya bazı kısmını kopyalamaz. Sebep: metin çok büyük.
+          </p>
+          <button class="button secondary" type="button" data-million-h-copy>Panoya kopyala</button>
+          <p class="form-status" data-million-h-status aria-live="polite">${millionHState.status}</p>
+          <textarea class="million-h-output" readonly spellcheck="false" aria-label="1 milyon tane h">${text}</textarea>
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
+function getMillionHText() {
+  if (!millionHTextCache) millionHTextCache = "h".repeat(1_000_000);
+  return millionHTextCache;
+}
+
+function renderMillionHPanel() {
+  const panel = document.querySelector("#milyon-h");
+  if (panel) panel.innerHTML = renderMillionHSection();
+}
+
+function renderLauncherHub() {
+  const recommended = getLauncherRecommendedGame();
+  const continueGame = getLauncherContinueGame();
+  const launcherGames = getLauncherGames();
+  const activeCount = latestStats.playing ?? 0;
+  return `
+    <div class="launcher-layout">
+      <article class="launcher-console poster-${recommended.accent}">
+        <div class="launcher-console-copy">
+          <span class="status-pill">Bugünün önerisi</span>
+          <h3>${recommended.title}</h3>
+          <p>${recommended.description}</p>
+          <div class="launcher-actions">
+            <button class="button primary" type="button" data-game-open="${recommended.slug}" data-launcher-use>Detayını aç</button>
+            <a class="button secondary" href="${recommended.path}" data-play-game="${recommended.slug}" data-launcher-use>Oyuna gir</a>
+            <button class="button secondary" type="button" data-continue-game data-launcher-use>Devam et: ${continueGame.title}</button>
+          </div>
+        </div>
+        <div class="launcher-console-stats">
+          <div><strong>${games.length}</strong><span>oyun</span></div>
+          <div><strong>${favoriteGames.length}</strong><span>favori</span></div>
+          <div><strong>${activeCount}</strong><span>aktif</span></div>
+        </div>
+      </article>
+
+      <aside class="launcher-radar">
+        <div class="account-box-head">
+          <h3>Görev radarı</h3>
+          <span class="status-pill">${renderLauncherMissionCount()}</span>
+        </div>
+        <div class="launcher-mission-list">
+          ${renderLauncherMissions()}
+        </div>
+      </aside>
+
+      <section class="launcher-library">
+        <div class="launcher-toolbar">
+          <div class="segmented" aria-label="Launcher filtresi">
+            ${[
+              ["all", "Tümü"],
+              ["favorites", "Favoriler"],
+              ["recent", "Son oynanan"],
+              ["hard", "Zorlar"],
+            ].map(([mode, label]) => `
+              <button type="button" data-launcher-mode="${mode}" class="${launcherMode === mode ? "is-active" : ""}">${label}</button>
+            `).join("")}
+          </div>
+          <label class="launcher-search">
+            <span>Oyun ara</span>
+            <input data-launcher-search value="${escapeHtml(launcherQuery)}" maxlength="40" placeholder="Robot, zindan, vale..." />
+          </label>
+          <button class="button secondary" type="button" data-random-game data-launcher-use>Rastgele oyun</button>
+        </div>
+        <div class="launcher-game-grid" data-launcher-grid>
+          ${launcherGames.length ? launcherGames.map(renderLauncherGameCard).join("") : renderLauncherEmpty()}
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function renderLauncherMissionCount() {
+  const missions = getLauncherMissions();
+  return `${missions.filter((mission) => mission.done).length}/${missions.length}`;
+}
+
+function getLauncherMissions() {
+  return [
+    {
+      title: "Launcher merkezini kullan",
+      detail: "Bir oyun detayını, devam et veya rastgele oyunu launcher içinden aç.",
+      done: Boolean(badgeState.launcherOpened),
+    },
+    {
+      title: "Favori oyun seç",
+      detail: "Bir oyunu favorilere ekle.",
+      done: favoriteGames.length > 0,
+    },
+    {
+      title: "HakoBot'a yaz",
+      detail: "Bot bölümünde site veya oyunlar hakkında soru sor.",
+      done: (Number(badgeState.botMessages) || 0) > 0,
+    },
+    {
+      title: "Kare oyununda skor yap",
+      detail: "1 dakikalık mini oyunda liderlik tablosuna gir.",
+      done: (Number(badgeState.clickGameBest) || 0) > 0,
+    },
+  ];
+}
+
+function renderLauncherMissions() {
+  return getLauncherMissions().map((mission) => `
+    <article class="launcher-mission ${mission.done ? "is-done" : ""}">
+      <span>${mission.done ? "Tamam" : "Bekliyor"}</span>
+      <strong>${mission.title}</strong>
+      <small>${mission.detail}</small>
+    </article>
+  `).join("");
+}
+
+function renderLauncherGameCard(game) {
+  const extra = gameExtra(game);
+  const stats = latestStats.games?.[game.slug] ?? createGameStat(game, 0);
+  const isFavorite = favoriteGames.includes(game.slug);
+  const comments = latestComments.games?.[game.slug]?.length ?? 0;
+  const media = game.image
+    ? `<img src="${game.image}" alt="${game.title} oyun kapağı" loading="lazy" />`
+    : `<div class="game-poster poster-${game.accent}" aria-hidden="true"><span>${game.title.slice(0, 2)}</span></div>`;
+  return `
+    <article class="launcher-game-card">
+      <div class="launcher-game-media">${media}</div>
+      <div class="launcher-game-body">
+        <div class="game-meta">
+          <span>${game.type}</span>
+          <span>${extra.difficulty}</span>
+          <span>${extra.averagePlayTime}</span>
+        </div>
+        <h3>${game.title}</h3>
+        <p>${game.description}</p>
+        <div class="launcher-game-stats">
+          <span>${Math.round(stats.value ?? game.stockBase)} index</span>
+          <span>${stats.opens ?? 0} açılış</span>
+          <span>${comments} yorum</span>
+        </div>
+        ${renderProgressBar(extra.progress, "Hazırlık")}
+        <div class="launcher-game-actions">
+          <button class="button primary" type="button" data-game-open="${game.slug}" data-launcher-use>Detay</button>
+          <a class="button secondary" href="${game.path}" data-play-game="${game.slug}" data-launcher-use>Oyna</a>
+          <button class="favorite-button ${isFavorite ? "is-active" : ""}" type="button" data-favorite-game="${game.slug}" aria-pressed="${isFavorite ? "true" : "false"}">
+            ${isFavorite ? "Favoride" : "Favori"}
+          </button>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function renderLauncherEmpty() {
+  return `
+    <article class="launcher-empty">
+      <h3>Bu filtrede oyun yok</h3>
+      <p>Aramayı temizle veya tüm oyunlara dön.</p>
+      <button class="button secondary" type="button" data-launcher-mode="all">Tümünü göster</button>
+    </article>
+  `;
+}
+
+function getLauncherRecommendedGame() {
+  return games[hashString(`${dailyBadgeKey()}:launcher`) % games.length];
+}
+
+function getLauncherContinueGame() {
+  const recent = [...badgeState.playedGames].reverse().find((slug) => gameMap.has(slug));
+  return gameMap.get(recent) || getLauncherRecommendedGame();
+}
+
+function getLauncherGames() {
+  const query = launcherQuery.trim().toLocaleLowerCase("tr-TR");
+  let list = [...games];
+  if (launcherMode === "favorites") {
+    list = favoriteGames.map((slug) => gameMap.get(slug)).filter(Boolean);
+  } else if (launcherMode === "recent") {
+    list = [...new Set([...badgeState.playedGames].reverse())].map((slug) => gameMap.get(slug)).filter(Boolean);
+  } else if (launcherMode === "hard") {
+    list = list.filter((game) => gameExtra(game).difficulty === "Zor");
+  }
+  if (!query) return list;
+  return list.filter((game) => [
+    game.title,
+    game.type,
+    game.description,
+    gameExtra(game).difficulty,
+  ].some((value) => value.toLocaleLowerCase("tr-TR").includes(query)));
+}
+
+function renderHakoBotChat() {
+  return `
+    <div class="hakobot-layout">
+      <article class="hakobot-console">
+        <div class="hakobot-head">
+          <div>
+            <span class="status-pill">Yazılı sohbet</span>
+            <h3>HakoBot</h3>
+          </div>
+          <button class="button secondary" type="button" data-bot-clear>Sohbeti temizle</button>
+        </div>
+        <div class="hakobot-messages" aria-live="polite">
+          ${hakoBotMessages.map(renderHakoBotMessage).join("")}
+        </div>
+        <form class="hakobot-form" data-hakobot-form>
+          <label>
+            Mesaj
+            <input name="message" maxlength="180" placeholder="Örn: En zor oyun hangisi?" autocomplete="off" required />
+          </label>
+          <button class="button primary" type="submit">Gönder</button>
+          <p class="form-status" data-hakobot-status aria-live="polite"></p>
+        </form>
+      </article>
+      <aside class="hakobot-side">
+        <h3>Hızlı sorular</h3>
+        <div class="hakobot-quick-list">
+          ${[
+            "Oyunlar nerede?",
+            "Launcher ne işe yarar?",
+            "En zor oyun hangisi?",
+            "Mini oyun nasıl çalışacak?",
+            "Site canlıya nasıl geçer?",
+            "Rozet nasıl kazanılır?",
+          ].map((question) => `
+            <button type="button" data-bot-quick="${escapeHtml(question)}">${question}</button>
+          `).join("")}
+        </div>
+      </aside>
+    </div>
+  `;
+}
+
+function renderHakoBotMessage(message) {
+  const isBot = message.role === "bot";
+  return `
+    <article class="hakobot-message ${isBot ? "is-bot" : "is-user"}">
+      <strong>${isBot ? "HakoBot" : "Sen"}</strong>
+      <p>${escapeHtml(message.text)}</p>
+    </article>
+  `;
+}
+
+function ensureHakoBotMessages() {
+  const fallback = [{
+    role: "bot",
+    text: "Merhaba, ben HakoBot. Bana oyunları, rozetleri, launcher'ı, mini oyunu veya siteyi sorabilirsin.",
+    createdAt: new Date().toISOString(),
+  }];
+  try {
+    const stored = JSON.parse(localStorage.getItem("hakorocks-bot-messages") || "[]");
+    if (!Array.isArray(stored) || !stored.length) return fallback;
+    return stored
+      .filter((item) => item && typeof item === "object")
+      .map((item) => ({
+        role: item.role === "user" ? "user" : "bot",
+        text: String(item.text || "").slice(0, 240),
+        createdAt: item.createdAt || new Date().toISOString(),
+      }))
+      .filter((item) => item.text)
+      .slice(-18);
+  } catch {
+    return fallback;
+  }
+}
+
+function saveHakoBotMessages() {
+  localStorage.setItem("hakorocks-bot-messages", JSON.stringify(hakoBotMessages.slice(-18)));
+}
+
+function renderHakoBotPanel() {
+  const panel = document.querySelector("[data-hakobot-panel]");
+  if (panel) panel.innerHTML = renderHakoBotChat();
+  bindOnce(document.querySelector("[data-hakobot-form]"), "submit", submitHakoBotChat);
+}
+
+function submitHakoBotChat(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const input = form.elements.message;
+  const message = String(input.value || "").trim();
+  const status = form.querySelector("[data-hakobot-status]");
+  if (message.length < 2) {
+    if (status) status.textContent = "Biraz daha uzun yaz.";
+    return;
+  }
+  pushHakoBotConversation(message);
+  form.reset();
+}
+
+function pushHakoBotConversation(message) {
+  const answer = createHakoBotReply(message);
+  const now = new Date().toISOString();
+  hakoBotMessages = [
+    ...hakoBotMessages,
+    { role: "user", text: message, createdAt: now },
+    { role: "bot", text: answer, createdAt: now },
+  ].slice(-18);
+  hakoBotAnswer = answer;
+  saveHakoBotMessages();
+  updateBadgeState((state) => {
+    state.botMessages = (Number(state.botMessages) || 0) + 1;
+  });
+  awardLeaguePoints(`bot:${dailyBadgeKey()}`, leaguePointValues.bot, { action: "bot" });
+  renderHakoBotPanel();
+  renderStudioPanel();
+  renderLauncherPanel();
+  renderStudioPulsePanel();
+}
+
+function createHakoBotReply(message) {
+  const text = message.toLocaleLowerCase("tr-TR");
+  const hardGames = games.filter((game) => gameExtra(game).difficulty === "Zor").map((game) => game.title).join(", ");
+  const favorite = getMostLovedGame();
+  const fusion = getDailyFusion();
+  if (includesAny(text, ["merhaba", "selam", "günaydın", "gunaydin"])) {
+    return "Merhaba. Hakorocks Studio'da oyunlara bakabilir, yorum yazabilir, fotoğraf beğenebilir ve mini oyunda skor kasabilirsin.";
+  }
+  if (includesAny(text, ["launcher", "başlatıcı", "baslatici", "konsol"])) {
+    return "Launcher oyun seçme merkezi. Favoriler, son oynananlar, zor oyun filtresi, arama ve rastgele oyun aynı yerde durur.";
+  }
+  if (includesAny(text, ["zor", "zorluk", "en zor"])) {
+    return `Zor oyunlar: ${hardGames}. Başlamak için Robot Avcısı iyi bir meydan okuma olur.`;
+  }
+  if (includesAny(text, ["mini", "kare", "tık", "tik", "lider", "skor"])) {
+    return "Mini oyun 1 dakika sürecek. Ortadaki kareye her basışın sayılacak ve skorun liderlik tablosunda diğer oyuncularla karşılaştırılacak.";
+  }
+  if (includesAny(text, ["rozet", "profil", "ödül", "odul", "xp", "lp"])) {
+    return `Rozetler oyun açma, favori seçme, yorum yazma, HakoBot'a yazma ve mini oyun skoru ile açılır. Şu an en sevilen oyunun: ${favorite}.`;
+  }
+  if (includesAny(text, ["foto", "fotoğraf", "fotograf", "beğen", "begen"])) {
+    return "Oyunlarda Ö tuşuyla fotoğraf çekilebilir. Fotoğraflar sitede görünür; beğeniler haftanın fotoğrafını öne çıkarır.";
+  }
+  if (includesAny(text, ["yorum", "topluluk", "oylama"])) {
+    return "Topluluk bölümünde oyun yorumları, yeni oyun oylaması, etkinlikler ve geliştirici blogu var.";
+  }
+  if (includesAny(text, ["birleşim", "birlesim", "günün", "gunun"])) {
+    return `Bugünün birleşimi ${fusion.base.title} + ${fusion.source.title}. Özel kural: ${fusion.feature}.`;
+  }
+  if (includesAny(text, ["yayın", "yayin", "deploy", "coolify", "canlı", "canli", "push"])) {
+    return "Canlıya geçmek için değişiklikler commit + push yapılır. Coolify main branch'ten yeni Docker build alıp siteyi yayınlar.";
+  }
+  if (includesAny(text, ["sen kimsin", "bot", "hakobot"])) {
+    return "Ben HakoBot. Hakorocks Studio içinde çalışan yazılı yardımcıyım; siteyi gezmene ve oyun seçmene yardım ederim.";
+  }
+  if (includesAny(text, ["oyun", "oyna", "nerede", "hangi"])) {
+    return `Sitede ${games.length} oyun var. En hızlı yol Launcher bölümünü açmak. Bugünün önerisi ${getLauncherRecommendedGame().title}.`;
+  }
+  return "Bunu tam bilmiyorum ama siteyle ilgiliyse şöyle deneyebilirsin: oyun adı, rozet, fotoğraf, launcher, mini oyun veya canlı yayın diye sor.";
+}
+
+function includesAny(text, words) {
+  return words.some((word) => text.includes(word));
+}
+
+function renderStudioPulse() {
+  const recommended = getLauncherRecommendedGame();
+  const fusion = getDailyFusion();
+  const missions = getLauncherMissions();
+  const doneCount = missions.filter((mission) => mission.done).length;
+  const pulsePercent = Math.max(12, Math.min(100, Math.round((doneCount / missions.length) * 100) + (latestStats.playing || 0) * 4));
+  return `
+    <div class="pulse-layout">
+      <article class="pulse-stage">
+        <div class="pulse-orbit" aria-hidden="true">
+          <span>H</span>
+        </div>
+        <div class="pulse-copy">
+          <span class="status-pill">Canlı stüdyo</span>
+          <h3>${recommended.title}</h3>
+          <p>Bugünün önerisi launcher'da hazır. Birleşim modu ${fusion.base.title} + ${fusion.source.title} olarak çalışıyor.</p>
+          <div class="pulse-meter">
+            <div><span style="width:${pulsePercent}%"></span></div>
+            <strong>%${pulsePercent}</strong>
+          </div>
+        </div>
+      </article>
+
+      <aside class="pulse-feed-panel">
+        <div class="account-box-head">
+          <h3>Canlı akış</h3>
+          <span class="status-pill">${latestHealth.status}</span>
+        </div>
+        <div class="pulse-feed">
+          ${getPulseFeedItems().map((item) => `
+            <article>
+              <span>${item.label}</span>
+              <strong>${item.value}</strong>
+              <small>${item.detail}</small>
+            </article>
+          `).join("")}
+        </div>
+      </aside>
+
+      <section class="pulse-action-panel">
+        <a class="button primary" href="#launcher">Launcher'a git</a>
+        <a class="button secondary" href="#bot">HakoBot'a yaz</a>
+        <a class="button secondary" href="#mini-oyun">Mini oyuna hazırlan</a>
+        <button class="button secondary" type="button" data-random-game>Rastgele oyun seç</button>
+      </section>
+    </div>
+  `;
+}
+
+function getPulseFeedItems() {
+  const fusion = getDailyFusion();
+  const commentsTotal = latestComments.total || 0;
+  return [
+    {
+      label: "Aktif oyuncu",
+      value: String(latestStats.playing ?? 0),
+      detail: `${latestStats.siteOpen ?? 1} cihaz stüdyoda açık.`,
+    },
+    {
+      label: "Bot mesajı",
+      value: String(badgeState.botMessages || 0),
+      detail: "HakoBot sohbet rozeti için sayılır.",
+    },
+    {
+      label: "Görev durumu",
+      value: renderLauncherMissionCount(),
+      detail: "Launcher görev radarındaki ilerleme.",
+    },
+    {
+      label: "Yorumlar",
+      value: String(commentsTotal),
+      detail: "Oyun detaylarında görünen toplam yorum.",
+    },
+    {
+      label: "Kare skoru",
+      value: String(latestClickGame.personalBest?.score ?? badgeState.clickGameBest ?? 0),
+      detail: "1 dakikalık mini oyundaki en iyi skorun.",
+    },
+    {
+      label: "Birleşim",
+      value: `${fusion.base.title} + ${fusion.source.title}`,
+      detail: fusion.feature,
+    },
+  ];
+}
+
+function renderStudioPulsePanel() {
+  const panel = document.querySelector("[data-pulse-panel]");
+  if (panel) panel.innerHTML = renderStudioPulse();
+}
+
+function renderClickGame() {
+  const seconds = Math.ceil(clickGameState.remainingMs / 1000);
+  const nameValue = getClickGameName();
+  return `
+    <div class="click-game-layout">
+      <article class="click-arena">
+        <div class="click-game-head">
+          <div>
+            <span class="status-pill">${clickGameState.running ? "Oyun başladı" : clickGameState.ended ? "Süre bitti" : "Hazır"}</span>
+            <h3>Kare Sayacı</h3>
+          </div>
+          <div class="click-counters">
+            <div><span>Süre</span><strong data-click-time>${formatClickTime(seconds)}</strong></div>
+            <div><span>Skor</span><strong data-click-score>${clickGameState.score}</strong></div>
+            <div><span>En iyi</span><strong>${latestClickGame.personalBest?.score ?? badgeState.clickGameBest ?? 0}</strong></div>
+          </div>
+        </div>
+
+        <div class="click-square-stage">
+          <button class="click-square" type="button" data-click-square ${clickGameState.running ? "" : "disabled"} aria-label="Ortadaki kareye bas">
+            <span>${clickGameState.running ? clickGameState.score : "Başla"}</span>
+          </button>
+        </div>
+
+        <div class="click-controls">
+          <button class="button primary" type="button" data-click-start ${clickGameState.running ? "disabled" : ""}>
+            ${clickGameState.ended ? "Tekrar başlat" : "60 saniyeyi başlat"}
+          </button>
+          <button class="button secondary" type="button" data-click-reset>Temizle</button>
+          <p class="form-status" data-click-status aria-live="polite">${clickGameState.status}</p>
+        </div>
+
+        <form class="click-submit-form" data-click-submit-form>
+          <label>
+            Liderlik adı
+            <input name="name" maxlength="32" value="${escapeHtml(nameValue)}" placeholder="Adın" ${clickGameState.ended ? "" : "disabled"} required />
+          </label>
+          <button class="button secondary" type="submit" ${clickGameState.ended && !clickGameState.submitted ? "" : "disabled"}>
+            Skoru gönder
+          </button>
+        </form>
+      </article>
+
+      <aside class="click-leaderboard">
+        <div class="account-box-head">
+          <h3>Liderlik tablosu</h3>
+          <span class="status-pill">${latestClickGame.totalPlayers || 0} oyuncu</span>
+        </div>
+        <div class="click-personal">
+          <span>Senin en iyi skorun</span>
+          <strong>${latestClickGame.personalBest?.score ?? badgeState.clickGameBest ?? 0}</strong>
+        </div>
+        <div class="click-leader-list">
+          ${renderClickLeaders()}
+        </div>
+      </aside>
+    </div>
+  `;
+}
+
+function renderClickLeaders() {
+  const leaders = latestClickGame.leaders || [];
+  if (!leaders.length) {
+    return `
+      <article class="click-leader empty">
+        <strong>İlk skor bekleniyor</strong>
+        <span>60 saniyelik turu bitir ve ilk sıraya yerleş.</span>
+      </article>
+    `;
+  }
+  return leaders.map((leader) => `
+    <article class="click-leader">
+      <strong>${leader.rank}</strong>
+      <div>
+        <span>${escapeHtml(leader.name)}</span>
+        <small>${formatDate(leader.updatedAt)}</small>
+      </div>
+      <em>${leader.score}</em>
+    </article>
+  `).join("");
+}
+
+function renderClickGamePanel() {
+  const panel = document.querySelector("[data-click-game-panel]");
+  if (panel) panel.innerHTML = renderClickGame();
+  bindDynamicForms();
+}
+
+function getClickGameName() {
+  return latestSocial.account?.nickname
+    || localStorage.getItem("hakorocks-click-name")
+    || "Hakorocks Oyuncusu";
+}
+
+function formatClickTime(seconds) {
+  const safeSeconds = Math.max(0, Number(seconds) || 0);
+  return `${String(Math.floor(safeSeconds / 60)).padStart(2, "0")}:${String(safeSeconds % 60).padStart(2, "0")}`;
+}
+
+function revealMillionH() {
+  millionHState = {
+    visible: true,
+    copied: false,
+    status: "1.000.000 tane h oluşturuldu.",
+  };
+  renderMillionHPanel();
+  requestAnimationFrame(() => {
+    document.querySelector(".million-h-output")?.focus();
+  });
+}
+
+async function copyMillionH() {
+  const text = getMillionHText();
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      copyMillionHFallback();
+    }
+    millionHState = {
+      ...millionHState,
+      copied: true,
+      status: "Panoya kopyalandı. Çok büyük olduğu için yapıştırırken bilgisayar zorlanabilir.",
+    };
+  } catch {
+    const copied = copyMillionHFallback();
+    millionHState = {
+      ...millionHState,
+      copied,
+      status: copied
+        ? "Eski yöntemle kopyalandı. Çok büyük olduğu için bazı programlar tamamını alamayabilir."
+        : "Kopyalama başarısız oldu. Metin çok büyük olabilir; istersen kutudan elle seçebilirsin.",
+    };
+  }
+  renderMillionHPanel();
+}
+
+function copyMillionHFallback() {
+  const output = document.querySelector(".million-h-output");
+  if (!output) return false;
+  output.focus();
+  output.select();
+  output.setSelectionRange(0, output.value.length);
+  try {
+    return document.execCommand("copy");
+  } catch {
+    return false;
+  }
+}
+
+function startClickGame() {
+  clearInterval(clickGameTimerId);
+  clickGameState = {
+    durationMs: 60_000,
+    remainingMs: 60_000,
+    score: 0,
+    running: true,
+    ended: false,
+    submitted: false,
+    startedAt: performance.now(),
+    status: "Süre başladı. Ortadaki kareye bas.",
+  };
+  renderClickGamePanel();
+  clickGameTimerId = setInterval(tickClickGame, 100);
+}
+
+function tickClickGame() {
+  if (!clickGameState.running) return;
+  const elapsed = performance.now() - clickGameState.startedAt;
+  clickGameState.remainingMs = Math.max(0, clickGameState.durationMs - elapsed);
+  updateClickGameReadout();
+  if (clickGameState.remainingMs <= 0) finishClickGame();
+}
+
+function updateClickGameReadout() {
+  const timeNode = document.querySelector("[data-click-time]");
+  const scoreNode = document.querySelector("[data-click-score]");
+  if (timeNode) timeNode.textContent = formatClickTime(Math.ceil(clickGameState.remainingMs / 1000));
+  if (scoreNode) scoreNode.textContent = String(clickGameState.score);
+  const squareLabel = document.querySelector("[data-click-square] span");
+  if (squareLabel) squareLabel.textContent = clickGameState.running ? String(clickGameState.score) : "Başla";
+}
+
+function pressClickSquare() {
+  if (!clickGameState.running) return;
+  clickGameState.score += 1;
+  updateClickGameReadout();
+  if (clickGameState.score % 25 === 0) playTone(560, 0.05);
+}
+
+function finishClickGame() {
+  clearInterval(clickGameTimerId);
+  clickGameState = {
+    ...clickGameState,
+    remainingMs: 0,
+    running: false,
+    ended: true,
+    status: `Süre bitti. Skorun ${clickGameState.score}. Liderlik tablosuna gönderebilirsin.`,
+  };
+  updateBadgeState((state) => {
+    state.clickGameBest = Math.max(Number(state.clickGameBest) || 0, clickGameState.score);
+  });
+  awardLeaguePoints(`click-game:${dailyBadgeKey()}`, leaguePointValues.clickGame, { action: "click-game" });
+  renderClickGamePanel();
+  renderLauncherPanel();
+  renderStudioPulsePanel();
+}
+
+function resetClickGame() {
+  clearInterval(clickGameTimerId);
+  clickGameState = createClickGameState();
+  renderClickGamePanel();
+}
+
+async function submitClickGameScore(event) {
+  event.preventDefault();
+  if (!clickGameState.ended || clickGameState.submitted) return;
+  const form = event.currentTarget;
+  const status = document.querySelector("[data-click-status]");
+  const formData = new FormData(form);
+  const name = String(formData.get("name") || "").trim() || getClickGameName();
+  localStorage.setItem("hakorocks-click-name", name);
+  if (status) status.textContent = "Skor gönderiliyor...";
+  try {
+    const response = await fetch("/api/click-game", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId,
+        name,
+        score: clickGameState.score,
+        durationMs: clickGameState.durationMs,
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "click-score-failed");
+    latestClickGame = data;
+    clickGameState = {
+      ...clickGameState,
+      submitted: true,
+      status: "Skor liderlik tablosuna gönderildi.",
+    };
+    updateBadgeState((state) => {
+      state.clickGameBest = Math.max(Number(state.clickGameBest) || 0, clickGameState.score);
+    });
+    renderClickGamePanel();
+  } catch {
+    if (status) status.textContent = "Skor gönderilemedi. Tekrar dene.";
+  }
+}
+
+function renderFusionSpotlight() {
+  const fusion = getDailyFusion();
+  const fusionStats = latestStats.games?.["birlesim-arenasi"] ?? { playing: 0, opens: 0 };
+  const likedFusions = getTopFusions();
+  return `
+    <div class="spotlight-layout">
+      <article class="spotlight-card poster-${fusion.base.accent}">
+        <div class="spotlight-copy">
+          <span class="status-pill">24 saatlik mod</span>
+          <h3>${fusion.base.title} + ${fusion.source.title}</h3>
+          <p>
+            ${fusion.base.title} ana hedefiyle başla; ${fusion.source.title} içinden gelen
+            <strong>${fusion.feature}</strong> kuralı modu değiştirir.
+          </p>
+          <div class="spotlight-actions">
+            <a
+              class="button primary"
+              href="${FUSION_GAME_PATH}?base=${fusion.base.slug}&source=${fusion.source.slug}"
+              data-play-game="birlesim-arenasi"
+              data-fusion-base="${fusion.base.slug}"
+              data-fusion-source="${fusion.source.slug}"
+            >Birleşimi oyna</a>
+            <button class="button secondary" type="button" data-random-game>Rastgele oyun</button>
+          </div>
+        </div>
+        <div class="spotlight-meter" aria-label="Birleşim bilgileri">
+          <div><strong data-fusion-countdown>${fusionCountdownText()}</strong><span>yeni birleşime kaldı</span></div>
+          <div><strong>${fusionStats.playing ?? 0}</strong><span>şu an oynayan</span></div>
+          <div><strong>${fusionStats.opens ?? 0}</strong><span>bugünkü açılış</span></div>
+        </div>
+      </article>
+      <aside class="spotlight-side">
+        <section class="mini-panel">
+          <h3>Birleşim görevleri</h3>
+          <div class="legendary-task-list">
+            ${renderFusionTasks()}
+          </div>
+        </section>
+        <section class="mini-panel">
+          <h3>Geçmiş birleşimler</h3>
+          <div class="archive-list">
+            ${getFusionArchive().map((item) => `
+              <span>${item.day}: ${item.base.title} + ${item.source.title}</span>
+            `).join("")}
+          </div>
+        </section>
+        <section class="mini-panel">
+          <h3>En sevilen birleşimler</h3>
+          <div class="archive-list">
+            ${likedFusions.map((item) => `
+              <span>${item.base.title} + ${item.source.title} · ${item.likes} beğeni</span>
+            `).join("")}
+          </div>
+        </section>
+      </aside>
+    </div>
+  `;
+}
+
+function renderFusionTasks(dayKey = dailyBadgeKey()) {
+  const fusion = getDailyFusion(dayKey);
+  const daily = leagueState.daily?.[dayKey] || {};
+  const played = Array.isArray(daily.games) ? daily.games : [];
+  const tasks = [
+    { title: `${fusion.base.title} ana kuralını dene`, done: played.includes(fusion.base.slug) },
+    { title: `${fusion.source.title} özellik kuralını dene`, done: played.includes(fusion.source.slug) },
+    { title: "Birleşim Arenası'nı aç", done: played.includes("birlesim-arenasi") || isFusionCompleted(dayKey) },
+  ];
+  return tasks.map((task) => `
+    <article class="legendary-task ${task.done ? "is-done" : ""}">
+      <span>${task.done ? "Bitti" : "Görev"}</span>
+      <strong>${task.title}</strong>
+      <small>Birleşim rozeti için gerekli.</small>
+    </article>
+  `).join("");
+}
+
+function getFusionArchive(count = 5) {
+  return Array.from({ length: count }, (_, index) => {
+    const date = new Date();
+    date.setDate(date.getDate() - index - 1);
+    const dayKey = dailyBadgeKey(date);
+    const fusion = getDailyFusion(dayKey);
+    return {
+      day: dailyBadgeDateLabel(dayKey),
+      ...fusion,
+    };
+  });
+}
+
+function getTopFusions() {
+  return getFusionArchive(8)
+    .map((item) => ({
+      ...item,
+      likes: 12 + (hashString(`${item.base.slug}:${item.source.slug}:likes`) % 88),
+    }))
+    .sort((a, b) => b.likes - a.likes)
+    .slice(0, 3);
+}
+
+function fusionCountdownText(date = new Date()) {
+  const next = new Date(date);
+  next.setHours(24, 0, 0, 0);
+  const remaining = Math.max(0, next.getTime() - date.getTime());
+  const hours = Math.floor(remaining / 3_600_000);
+  const minutes = Math.floor((remaining % 3_600_000) / 60_000);
+  return `${String(hours).padStart(2, "0")}s ${String(minutes).padStart(2, "0")}dk`;
+}
+
+function renderSpotlightPanel() {
+  const panel = document.querySelector("[data-spotlight-panel]");
+  if (panel) panel.innerHTML = renderFusionSpotlight();
+}
+
+function renderLauncherPanel() {
+  const panel = document.querySelector("[data-launcher-hub]");
+  if (panel) panel.innerHTML = renderLauncherHub();
+  bindDynamicForms();
+}
+
+function markLauncherUsed() {
+  updateBadgeState((state) => {
+    state.launcherOpened = true;
+  });
+  awardLeaguePoints(`launcher:${dailyBadgeKey()}`, leaguePointValues.launcher, { action: "launcher" });
+}
+
 function renderGamepadBadge(game, extraClass = "") {
   if (!game.controllerBadge) return "";
   const className = ["gamepad-chip", extraClass].filter(Boolean).join(" ");
@@ -926,6 +1961,9 @@ function renderGamepadBadge(game, extraClass = "") {
 }
 
 function renderGameCard(game, index) {
+  const extra = gameExtra(game);
+  const isFavorite = favoriteGames.includes(game.slug);
+  const commentCount = latestComments.games?.[game.slug]?.length ?? 0;
   const media = game.image
     ? `<img src="${game.image}" alt="${game.title} oyun görseli" loading="lazy" />`
     : `<div class="game-poster poster-${game.accent}" aria-hidden="true"><span>${String(index + 1).padStart(2, "0")}</span></div>`;
@@ -940,14 +1978,26 @@ function renderGameCard(game, index) {
               <span>${game.type}</span>
               <span>${game.status}</span>
               <span>${game.mobileStatus}</span>
+              <span class="updated-chip">Yeni: ${extra.lastUpdated}</span>
               ${renderGamepadBadge(game)}
             </div>
             <h3>${game.title}</h3>
             <p>${game.description}</p>
+            <div class="game-card-stats">
+              <span>${extra.difficulty}</span>
+              <span>${extra.averagePlayTime}</span>
+              <span>${commentCount} yorum</span>
+            </div>
+            ${renderProgressBar(extra.progress)}
             <span class="detail-link">Detayları aç</span>
           </div>
         </button>
-        <a class="play-link game-direct-link" href="${game.path}" data-play-game="${game.slug}">Oyunu aç</a>
+        <div class="game-card-actions">
+          <a class="play-link" href="${game.path}" data-play-game="${game.slug}">Oyunu aç</a>
+          <button class="favorite-button ${isFavorite ? "is-active" : ""}" type="button" data-favorite-game="${game.slug}" aria-pressed="${isFavorite ? "true" : "false"}">
+            ${isFavorite ? "Favoride" : "Favori"}
+          </button>
+        </div>
       </div>
     </article>
   `;
@@ -1066,6 +2116,118 @@ function createFallbackVoice() {
   };
 }
 
+function createFallbackClickGame() {
+  return {
+    durationSeconds: 60,
+    totalPlayers: 0,
+    personalBest: null,
+    leaders: [],
+  };
+}
+
+function createClickGameState() {
+  return {
+    durationMs: 60_000,
+    remainingMs: 60_000,
+    score: 0,
+    running: false,
+    ended: false,
+    submitted: false,
+    status: "Hazır. Başlatınca 60 saniye sayacak.",
+  };
+}
+
+function createFallbackComments() {
+  return {
+    total: 0,
+    games: Object.fromEntries(games.map((game) => [game.slug, []])),
+    list: [],
+  };
+}
+
+function createFallbackVotes() {
+  return {
+    options: Object.fromEntries(voteOptions.map((option) => [option.id, 0])),
+    total: 0,
+  };
+}
+
+function createFallbackHealth() {
+  return {
+    ok: true,
+    status: "Yerel",
+    buildVersion: BUILD_VERSION,
+    activeServer: "tarayıcı",
+    uptimeSeconds: 0,
+    onlinePlayers: 0,
+  };
+}
+
+function ensureFavoriteGames() {
+  try {
+    const stored = JSON.parse(localStorage.getItem("hakorocks-favorites") || "[]");
+    return Array.isArray(stored) ? stored.filter((slug) => gameMap.has(slug)) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveFavoriteGames() {
+  localStorage.setItem("hakorocks-favorites", JSON.stringify(favoriteGames));
+}
+
+function ensureSurpriseState() {
+  const today = dailyBadgeKey();
+  try {
+    const stored = JSON.parse(localStorage.getItem("hakorocks-surprise") || "{}");
+    return {
+      dayKey: stored.dayKey || "",
+      opened: Boolean(stored.opened && stored.dayKey === today),
+      message: stored.dayKey === today ? (stored.message || "") : "",
+    };
+  } catch {
+    return { dayKey: "", opened: false, message: "" };
+  }
+}
+
+function saveSurpriseState() {
+  localStorage.setItem("hakorocks-surprise", JSON.stringify(surpriseState));
+}
+
+function createPerformanceState() {
+  return {
+    fps: 0,
+    ping: 0,
+    memory: "Ölçülmedi",
+  };
+}
+
+function gameExtra(game) {
+  return gameExtras[game.slug] || {
+    progress: 55,
+    difficulty: "Orta",
+    averagePlayTime: "6 dk",
+    lastUpdated: "Yayında",
+    hiddenAchievements: ["Gizli görev"],
+    wiki: {
+      characters: [game.title],
+      weapons: ["Kontrol sistemi"],
+      craft: ["Oyna + keşfet = yeni fikir"],
+    },
+    changelog: game.updates || [],
+  };
+}
+
+function renderProgressBar(value, label = "Tamamlama") {
+  const percent = Math.max(0, Math.min(100, Number(value) || 0));
+  return `
+    <div class="progress-box" aria-label="${label}">
+      <div class="progress-head"><span>${label}</span><strong>%${percent}</strong></div>
+      <div class="progress-track"><span style="width:${percent}%"></span></div>
+    </div>
+  `;
+}
+
 function avatarMarkup(account, size = "medium") {
   const letter = (account?.nickname || account?.name || "H").trim().charAt(0).toUpperCase();
   const avatarUrl = account?.avatarUrl || "";
@@ -1112,6 +2274,7 @@ function renderAccountDashboard() {
         <div><strong>${incomingRequests.length}</strong><span>istek</span></div>
         <div><strong>${invites.length}</strong><span>davet</span></div>
       </div>
+      ${renderProfileExtension()}
     </div>
     <div class="account-social-grid">
       <section class="account-box">
@@ -1290,6 +2453,78 @@ function voiceStatusText() {
   if (!voiceClient) return "Sesli sohbet hazır değil.";
   if (!voiceClient.connected) return "Sesli oda bağlı değil.";
   return `Sesli oda: ${latestVoice.roomId || selectedVoiceRoomId}`;
+}
+
+function renderProfileExtension() {
+  const completion = getProfileCompletion();
+  const mostLoved = getMostLovedGame();
+  const recentPlayed = [...badgeState.playedGames].slice(-4).reverse();
+  const rareBadges = badgeDefinitions.filter((badge) => badge.isUnlocked(badgeState)).slice(-4);
+  const recentPhotos = latestPhotos.slice(0, 3);
+  const rewardReady = badgeState.dailyRewardClaimedDay !== dailyBadgeKey();
+  return `
+    <div class="profile-dashboard-grid">
+      <article>
+        <span>Giriş serisi</span>
+        <strong>${badgeState.dailyStreak || 1} gün</strong>
+      </article>
+      <article>
+        <span>Günlük ödül</span>
+        <button class="button secondary" type="button" data-daily-reward ${rewardReady ? "" : "disabled"}>
+          ${rewardReady ? "Ödülü al" : "Alındı"}
+        </button>
+      </article>
+      <article>
+        <span>En sevilen oyun</span>
+        <strong>${mostLoved}</strong>
+      </article>
+      <article>
+        <span>Profil tamamlama</span>
+        ${renderProgressBar(completion, "Profil")}
+      </article>
+      <article class="wide">
+        <span>Nadir rozet vitrini</span>
+        <div class="profile-chip-row">
+          ${rareBadges.length ? rareBadges.map((badge) => `<em>${badge.title}</em>`).join("") : "<em>Henüz rozet bekliyor</em>"}
+        </div>
+      </article>
+      <article class="wide">
+        <span>Son oynananlar</span>
+        <div class="profile-chip-row">
+          ${recentPlayed.length ? recentPlayed.map((slug) => `<em>${gameTitle(slug)}</em>`).join("") : "<em>Henüz oyun açılmadı</em>"}
+        </div>
+      </article>
+      <article class="wide">
+        <span>Son fotoğraflar</span>
+        <div class="profile-chip-row">
+          ${recentPhotos.length ? recentPhotos.map((photo) => `<em>${escapeHtml(photo.gameTitle || gameTitle(photo.slug))}</em>`).join("") : "<em>Fotoğraf bekleniyor</em>"}
+        </div>
+      </article>
+    </div>
+  `;
+}
+
+function getProfileCompletion() {
+  const checks = [
+    Boolean(latestSocial.account),
+    badgeState.playedGames.length > 0,
+    badgeState.ratedGames.length > 0,
+    (badgeState.favoriteGames || []).length > 0,
+    (Number(badgeState.commentCount) || 0) > 0,
+    badgeState.photoCount > 0,
+    Boolean(badgeState.guestbook),
+    Boolean(badgeState.votedIdea),
+  ];
+  return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+}
+
+function getMostLovedGame() {
+  const favorite = favoriteGames[0] || badgeState.favoriteGames?.[0];
+  if (favorite) return gameTitle(favorite);
+  const rated = badgeState.ratedGames[0];
+  if (rated) return gameTitle(rated);
+  const played = badgeState.playedGames[badgeState.playedGames.length - 1];
+  return played ? gameTitle(played) : "Henüz seçilmedi";
 }
 
 function renderTournamentDashboard() {
@@ -1724,16 +2959,18 @@ function renderRating(game) {
 }
 
 function renderModal(game) {
+  const extra = gameExtra(game);
   const gameStats = latestStats.games?.[game.slug] ?? createGameStat(game, 0);
   const photos = latestPhotos.filter((photo) => photo.slug === game.slug).slice(0, 4);
   const chartValues = gameStats.history?.length ? gameStats.history : createHistory(game.stockBase);
   const change = gameStats.change ?? 0;
   const changeClass = change >= 0 ? "up" : "down";
+  const comments = latestComments.games?.[game.slug] || [];
 
   return `
     <div class="modal-hero poster-${game.accent}">
       <div>
-        <span>${game.type}</span>
+        <span>${game.type} · ${extra.difficulty} · ${extra.averagePlayTime}</span>
         <h2 id="modal-title">${game.title}</h2>
         <p>${game.longDescription}</p>
       </div>
@@ -1742,6 +2979,15 @@ function renderModal(game) {
         <a class="button primary" href="${game.path}" data-play-game="${game.slug}">Oyunu aç</a>
       </div>
     </div>
+    <section class="modal-section full modal-progress">
+      <h3>Oyun ilerlemesi</h3>
+      ${renderProgressBar(extra.progress, "Tamamlama yüzdesi")}
+      <div class="info-strip">
+        <span>Zorluk: ${extra.difficulty}</span>
+        <span>Ortalama süre: ${extra.averagePlayTime}</span>
+        <span>Son güncelleme: ${extra.lastUpdated}</span>
+      </div>
+    </section>
     <div class="modal-grid">
       <section class="modal-section">
         <h3>Oyun borsası</h3>
@@ -1779,8 +3025,34 @@ function renderModal(game) {
         <ul class="clean-list">${game.achievements.map((item) => `<li>${item}</li>`).join("")}</ul>
       </section>
       <section class="modal-section">
+        <h3>Gizli başarımlar</h3>
+        <ul class="clean-list">${extra.hiddenAchievements.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      </section>
+      <section class="modal-section">
         <h3>Geliştirme notları</h3>
-        <ul class="clean-list">${game.updates.map((item) => `<li>${item}</li>`).join("")}</ul>
+        <ul class="clean-list">${extra.changelog.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      </section>
+      <section class="modal-section">
+        <h3>Oyun wiki'si</h3>
+        ${renderGameWiki(extra)}
+      </section>
+      <section class="modal-section">
+        <h3>Oyun yorumları</h3>
+        <form class="mini-form" data-comment-form data-comment-game="${game.slug}">
+          <label>
+            İsim
+            <input name="name" maxlength="32" placeholder="Adın" />
+          </label>
+          <label>
+            Yorum
+            <input name="message" maxlength="220" placeholder="${game.title} için kısa yorum" required />
+          </label>
+          <button class="button primary" type="submit">Yorum ekle</button>
+          <p class="form-status" data-comment-status aria-live="polite"></p>
+        </form>
+        <div class="comment-list">
+          ${renderGameComments(comments)}
+        </div>
       </section>
     </div>
     <section class="modal-section full">
@@ -1792,12 +3064,288 @@ function renderModal(game) {
   `;
 }
 
+function renderGameWiki(extra) {
+  const groups = [
+    ["Karakterler", extra.wiki.characters],
+    ["Silahlar / araçlar", extra.wiki.weapons],
+    ["Craft tarifi", extra.wiki.craft],
+  ];
+  return `
+    <div class="wiki-grid">
+      ${groups.map(([title, items]) => `
+        <div>
+          <strong>${title}</strong>
+          <ul class="clean-list">${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderGameComments(comments) {
+  if (!comments.length) return `<p class="muted-copy">Bu oyuna ilk yorumu sen yazabilirsin.</p>`;
+  return comments.slice(0, 6).map((comment) => `
+    <article class="comment-card">
+      <strong>${escapeHtml(comment.name || "Oyuncu")}</strong>
+      <p>${escapeHtml(comment.message || "")}</p>
+      <small>${formatDate(comment.createdAt)}</small>
+    </article>
+  `).join("");
+}
+
 function renderPhoto(photo) {
   return `
     <figure class="photo-card">
       <img src="${photo.dataUrl}" alt="${escapeHtml(photo.title || "Oyun fotoğrafı")}" loading="lazy" />
-      <figcaption>${escapeHtml(photo.gameTitle || photo.title || "Oyun fotoğrafı")}</figcaption>
+      <figcaption>
+        <span>${escapeHtml(photo.gameTitle || photo.title || "Oyun fotoğrafı")}</span>
+        <button class="photo-like" type="button" data-photo-like="${escapeHtml(photo.id)}">Beğen · ${photo.likes || 0}</button>
+      </figcaption>
     </figure>
+  `;
+}
+
+function renderWeeklyPhoto() {
+  const photo = [...latestPhotos].sort((a, b) => (b.likes || 0) - (a.likes || 0))[0];
+  if (!photo) {
+    return `
+      <article class="weekly-photo empty">
+        <span>Haftanın fotoğrafı</span>
+        <h3>İlk fotoğrafı bekliyor</h3>
+        <p>Oyunlarda Ö tuşu ile fotoğraf çekilince en çok beğenilen görsel burada öne çıkar.</p>
+      </article>
+    `;
+  }
+  return `
+    <article class="weekly-photo">
+      <img src="${photo.dataUrl}" alt="${escapeHtml(photo.title || "Haftanın fotoğrafı")}" loading="lazy" />
+      <div>
+        <span>Haftanın fotoğrafı</span>
+        <h3>${escapeHtml(photo.gameTitle || gameTitle(photo.slug))}</h3>
+        <p>${photo.likes || 0} beğeni ile fotoğraf yarışmasında önde.</p>
+        <button class="button secondary" type="button" data-photo-like="${escapeHtml(photo.id)}">Beğen</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderCommunityHub() {
+  return `
+    <div class="community-layout">
+      <section class="community-panel">
+        <div class="account-box-head">
+          <h3>Yeni oyun oylaması</h3>
+          <span class="status-pill">${latestVotes.total || 0} oy</span>
+        </div>
+        <div class="vote-list">
+          ${voteOptions.map(renderVoteOption).join("")}
+        </div>
+      </section>
+      <section class="community-panel">
+        <h3>Son oyun yorumları</h3>
+        <div class="comment-list">
+          ${renderRecentComments()}
+        </div>
+      </section>
+      <section class="community-panel">
+        <div class="account-box-head">
+          <h3>Mikrofon testi</h3>
+          <button class="button secondary" type="button" data-mic-test>Test et</button>
+        </div>
+        <p class="muted-copy" data-mic-status>${micTestStatus}</p>
+      </section>
+      <section class="community-panel">
+        <h3>Topluluk etkinlikleri</h3>
+        <div class="archive-list">
+          ${communityEvents.map((event) => `<span>${event.title} · ${event.reward}</span>`).join("")}
+        </div>
+      </section>
+      <section class="community-panel wide">
+        <h3>Geliştirici blogu</h3>
+        <div class="archive-list">
+          ${developerBlogPosts.map((post) => `<span>${post}</span>`).join("")}
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function renderVoteOption(option) {
+  const count = latestVotes.options?.[option.id] || 0;
+  const percent = latestVotes.total ? Math.round((count / latestVotes.total) * 100) : 0;
+  const selected = badgeState.votedIdea === option.id;
+  return `
+    <article class="vote-card ${selected ? "is-selected" : ""}">
+      <div>
+        <strong>${option.title}</strong>
+        <p>${option.description}</p>
+      </div>
+      ${renderProgressBar(percent, `${count} oy`)}
+      <button class="button secondary" type="button" data-vote-option="${option.id}">
+        ${selected ? "Senin oyun" : "Oy ver"}
+      </button>
+    </article>
+  `;
+}
+
+function renderRecentComments() {
+  const list = latestComments.list || [];
+  if (!list.length) return `<p class="muted-copy">Henüz oyun yorumu yok. Bir oyun detayını açıp ilk yorumu yazabilirsin.</p>`;
+  return list.slice(0, 8).map((comment) => `
+    <article class="comment-card">
+      <strong>${escapeHtml(comment.name || "Oyuncu")} · ${gameTitle(comment.slug)}</strong>
+      <p>${escapeHtml(comment.message || "")}</p>
+      <small>${formatDate(comment.createdAt)}</small>
+    </article>
+  `).join("");
+}
+
+function renderStudioHub() {
+  return `
+    <div class="studio-layout">
+      <section class="studio-panel">
+        <h3>Geliştirici günlüğü</h3>
+        <div class="timeline-list">
+          ${devDiaryEntries.map((entry) => `
+            <article>
+              <span>${entry.date}</span>
+              <strong>${entry.title}</strong>
+              <p>${entry.text}</p>
+            </article>
+          `).join("")}
+        </div>
+      </section>
+      <section class="studio-panel">
+        <h3>Bildirim merkezi</h3>
+        <div class="archive-list">
+          ${notificationCards.map((item) => `<span>${item}</span>`).join("")}
+        </div>
+      </section>
+      <section class="studio-panel">
+        <h3>Günün duyurusu</h3>
+        ${renderDailyAnnouncement()}
+      </section>
+      <section class="studio-panel">
+        <h3>Yakında gelecek güncellemeler</h3>
+        <div class="archive-list">
+          ${upcomingUpdateCards.map((item) => `<span>${item.title} · ${item.status}</span>`).join("")}
+        </div>
+      </section>
+      <section class="studio-panel wide">
+        <h3>İstatistikler</h3>
+        ${renderEnrichedStats()}
+      </section>
+      <section class="studio-panel">
+        <h3>Turnuva takvimi</h3>
+        <div class="archive-list">
+          ${tournamentCalendar.map((item) => `<span>${item.day}: ${item.title} · ${item.prize}</span>`).join("")}
+        </div>
+      </section>
+      <section class="studio-panel">
+        <h3>Sezon sistemi</h3>
+        <p class="muted-copy">${seasonInfo.title}</p>
+        <div class="archive-list">
+          <span>Sezon ödülü: ${seasonInfo.reward}</span>
+          <span>Turnuva ödülü: ${seasonInfo.tournamentReward}</span>
+        </div>
+      </section>
+      <section class="studio-panel">
+        <h3>Eğlence</h3>
+        ${renderFunPanel()}
+      </section>
+      <section class="studio-panel wide">
+        <h3>Geliştirici modu</h3>
+        ${renderDeveloperMode()}
+      </section>
+    </div>
+  `;
+}
+
+function renderDailyAnnouncement() {
+  const latest = latestAnnouncements[0];
+  if (latest) {
+    return `
+      <article class="announcement-card">
+        <span>${formatDate(latest.createdAt)}</span>
+        <h3>${escapeHtml(latest.title)}</h3>
+        <p>${escapeHtml(latest.message)}</p>
+      </article>
+    `;
+  }
+  return `
+    <article class="announcement-card empty">
+      <span>Bugün</span>
+      <h3>Hakorocks Studio yayında</h3>
+      <p>Yeni oyun yorumları, birleşim görevleri ve fotoğraf yarışması açık.</p>
+    </article>
+  `;
+}
+
+function renderFunPanel() {
+  const task = randomTasks[hashString(dailyBadgeKey()) % randomTasks.length];
+  const selectedMusicItem = musicOptions.find((item) => item.id === selectedMusic) || musicOptions[0];
+  return `
+    <div class="fun-panel">
+      <div class="segmented">
+        <button type="button" data-theme-mode="dark" class="${selectedTheme === "dark" ? "is-active" : ""}">Koyu</button>
+        <button type="button" data-theme-mode="light" class="${selectedTheme === "light" ? "is-active" : ""}">Açık</button>
+      </div>
+      <label class="mini-select">
+        Müzik
+        <select data-music-select>
+          ${musicOptions.map((item) => `<option value="${item.id}" ${item.id === selectedMusic ? "selected" : ""}>${item.title}</option>`).join("")}
+        </select>
+      </label>
+      <button class="button secondary" type="button" data-music-preview>${selectedMusicItem.title} çal</button>
+      <button class="button secondary" type="button" data-hakobot>HakoBot önerisi</button>
+      <p class="muted-copy" data-hakobot-answer>${hakoBotAnswer}</p>
+      <div class="daily-task"><strong>Günün rastgele görevi</strong><span>${task}</span></div>
+      <button class="button primary" type="button" data-surprise-box ${surpriseState.opened ? "disabled" : ""}>
+        ${surpriseState.opened ? "Sürpriz açıldı" : "Günlük sürpriz kutusu"}
+      </button>
+      <p class="muted-copy" data-surprise-message>${surpriseState.message || "Sürpriz kutusu her gün bir kez açılır."}</p>
+      <button class="button secondary" type="button" data-easter-egg>Gizli ipucu</button>
+    </div>
+  `;
+}
+
+function renderDeveloperMode() {
+  return `
+    <div class="dev-grid">
+      <article><span>FPS</span><strong data-dev-fps>${performanceState.fps || 0}</strong></article>
+      <article><span>Ping</span><strong data-dev-ping>${performanceState.ping || 0} ms</strong></article>
+      <article><span>Bellek</span><strong data-dev-memory>${performanceState.memory}</strong></article>
+      <article><span>Sunucu</span><strong>${latestHealth.status}</strong></article>
+      <article><span>Build</span><strong>${latestHealth.buildVersion || BUILD_VERSION}</strong></article>
+      <article><span>Aktif sunucu</span><strong>${latestHealth.activeServer}</strong></article>
+      <article><span>Çevrimiçi oyuncu</span><strong>${latestStats.playing || 0}</strong></article>
+      <article><span>Site oturumu</span><strong>${latestStats.siteOpen || 0}</strong></article>
+    </div>
+  `;
+}
+
+function renderEnrichedStats() {
+  const enriched = latestStats.enriched || {};
+  const totalGameTime = Number(enriched.totalGameTimeMinutes) || 0;
+  const items = [
+    ["En çok oynanan oyun", gameTitle(enriched.mostPlayedGame)],
+    ["Haftanın popüler oyunu", gameTitle(enriched.weekPopularGame)],
+    ["En çok fotoğraf çekilen oyun", gameTitle(enriched.mostPhotoGame)],
+    ["Toplam oyuncu", enriched.totalPlayers ?? 0],
+    ["Toplam oyun süresi", `${Math.round(totalGameTime)} dk`],
+    ["Toplam kazanılan rozet", enriched.totalBadges ?? 0],
+    ["Günlük aktif oyuncu", enriched.dailyActivePlayers ?? latestStats.siteOpen ?? 0],
+    ["En çok oynanan birleşim", gameTitle(enriched.mostPlayedFusion || "birlesim-arenasi")],
+  ];
+  return `
+    <div class="studio-stat-grid">
+      ${items.map(([label, value]) => `
+        <article>
+          <span>${label}</span>
+          <strong>${value}</strong>
+        </article>
+      `).join("")}
+    </div>
   `;
 }
 
@@ -1880,24 +3428,53 @@ function createFallbackRatings() {
 }
 
 function ensureBadgeState() {
+  const today = dailyBadgeKey();
   const fallback = {
     visitedAt: new Date().toISOString(),
+    lastVisitDay: today,
+    dailyStreak: 1,
+    dailyRewardClaimedDay: "",
     openedGame: false,
     playedGames: [],
     photoCount: 0,
+    photoLikes: 0,
     ratedGames: [],
+    favoriteGames: [],
+    commentCount: 0,
     guestbook: false,
     trailerPlayed: false,
     voiceRoomJoined: false,
+    votedIdea: "",
+    surpriseOpened: false,
+    easterEggFound: false,
+    launcherOpened: false,
+    botMessages: 0,
+    clickGameBest: 0,
   };
   try {
     const stored = JSON.parse(localStorage.getItem("hakorocks-badge-state") || "{}");
+    const storedLastVisit = stored.lastVisitDay || today;
+    const yesterday = new Date(`${today}T12:00:00`);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayKey = dailyBadgeKey(yesterday);
+    const dailyStreak = storedLastVisit === today
+      ? Number(stored.dailyStreak) || 1
+      : storedLastVisit === yesterdayKey
+        ? (Number(stored.dailyStreak) || 0) + 1
+        : 1;
     const state = {
       ...fallback,
       ...stored,
+      lastVisitDay: today,
+      dailyStreak,
       playedGames: Array.isArray(stored.playedGames) ? stored.playedGames : [],
       ratedGames: Array.isArray(stored.ratedGames) ? stored.ratedGames : [],
+      favoriteGames: Array.isArray(stored.favoriteGames) ? stored.favoriteGames : [],
       photoCount: Number(stored.photoCount) || 0,
+      photoLikes: Number(stored.photoLikes) || 0,
+      commentCount: Number(stored.commentCount) || 0,
+      botMessages: Number(stored.botMessages) || 0,
+      clickGameBest: Number(stored.clickGameBest) || 0,
     };
     localStorage.setItem("hakorocks-badge-state", JSON.stringify(state));
     return state;
@@ -1908,17 +3485,50 @@ function ensureBadgeState() {
 }
 
 function updateBadgeState(mutator) {
-  const next = { ...badgeState, playedGames: [...badgeState.playedGames], ratedGames: [...badgeState.ratedGames] };
+  const next = {
+    ...badgeState,
+    playedGames: [...badgeState.playedGames],
+    ratedGames: [...badgeState.ratedGames],
+    favoriteGames: Array.isArray(badgeState.favoriteGames) ? [...badgeState.favoriteGames] : [],
+  };
   mutator(next);
   badgeState = next;
   localStorage.setItem("hakorocks-badge-state", JSON.stringify(badgeState));
   leagueState = refreshLeagueState(leagueState);
   renderBadgeGrid();
   renderTournamentPanel();
+  renderLauncherPanel();
+  renderStudioPulsePanel();
 }
 
 function addUnique(list, value) {
   if (!list.includes(value)) list.push(value);
+}
+
+function gameTitle(slug) {
+  return gameMap.get(slug)?.title || slug || "Yok";
+}
+
+function renderWeeklyPhotoPanel() {
+  const panel = document.querySelector("[data-weekly-photo]");
+  if (panel) panel.innerHTML = renderWeeklyPhoto();
+}
+
+function renderCommunityPanel() {
+  const panel = document.querySelector("[data-community-hub]");
+  if (panel) panel.innerHTML = renderCommunityHub();
+  bindDynamicForms();
+}
+
+function renderStudioPanel() {
+  const panel = document.querySelector("[data-studio-hub]");
+  if (panel) panel.innerHTML = renderStudioHub();
+  bindDynamicForms();
+}
+
+function renderEnrichedStatsPanel() {
+  const panel = document.querySelector("[data-enriched-stats]");
+  if (panel) panel.innerHTML = renderEnrichedStats();
 }
 
 function escapeHtml(value) {
@@ -1966,9 +3576,6 @@ function renderSparkline(values) {
 }
 
 function bindGameCards() {
-  document.querySelectorAll("[data-game-open]").forEach((button) => {
-    button.addEventListener("click", () => openGameModal(button.dataset.gameOpen));
-  });
   document.querySelectorAll("[data-modal-close]").forEach((button) => {
     button.addEventListener("click", closeGameModal);
   });
@@ -1979,6 +3586,80 @@ function bindGameCards() {
     const target = event.target;
     const soundTarget = target.closest?.("button, a");
     if (soundTarget) playUiSound();
+
+    const launcherAction = target.closest?.("[data-launcher-use]");
+    if (launcherAction) {
+      markLauncherUsed();
+    }
+
+    const launcherModeButton = target.closest?.("[data-launcher-mode]");
+    if (launcherModeButton) {
+      launcherMode = launcherModeButton.dataset.launcherMode || "all";
+      if (launcherMode === "all") launcherQuery = "";
+      renderLauncherPanel();
+      return;
+    }
+
+    const continueButton = target.closest?.("[data-continue-game]");
+    if (continueButton) {
+      const game = getLauncherContinueGame();
+      openGameModal(game.slug);
+      return;
+    }
+
+    const botQuickButton = target.closest?.("[data-bot-quick]");
+    if (botQuickButton) {
+      pushHakoBotConversation(botQuickButton.dataset.botQuick || "");
+      return;
+    }
+
+    const botClearButton = target.closest?.("[data-bot-clear]");
+    if (botClearButton) {
+      hakoBotMessages = [{
+        role: "bot",
+        text: "Sohbet temizlendi. Bana oyunlar, launcher, mini oyun veya rozetler hakkında soru sorabilirsin.",
+        createdAt: new Date().toISOString(),
+      }];
+      saveHakoBotMessages();
+      renderHakoBotPanel();
+      return;
+    }
+
+    const clickStartButton = target.closest?.("[data-click-start]");
+    if (clickStartButton) {
+      startClickGame();
+      return;
+    }
+
+    const clickResetButton = target.closest?.("[data-click-reset]");
+    if (clickResetButton) {
+      resetClickGame();
+      return;
+    }
+
+    const clickSquare = target.closest?.("[data-click-square]");
+    if (clickSquare) {
+      pressClickSquare();
+      return;
+    }
+
+    const millionHToggle = target.closest?.("[data-million-h-toggle]");
+    if (millionHToggle) {
+      revealMillionH();
+      return;
+    }
+
+    const millionHCopy = target.closest?.("[data-million-h-copy]");
+    if (millionHCopy) {
+      void copyMillionH();
+      return;
+    }
+
+    const gameOpenButton = target.closest?.("[data-game-open]");
+    if (gameOpenButton) {
+      openGameModal(gameOpenButton.dataset.gameOpen);
+      return;
+    }
 
     const ratingButton = target.closest?.("[data-rate-game]");
     if (ratingButton) {
@@ -1991,6 +3672,72 @@ function bindGameCards() {
       selectedPhotoFilter = filterButton.dataset.photoFilter;
       renderPhotoFilterBar();
       renderPhotoGrid();
+      return;
+    }
+
+    const favoriteButton = target.closest?.("[data-favorite-game]");
+    if (favoriteButton) {
+      toggleFavoriteGame(favoriteButton.dataset.favoriteGame);
+      return;
+    }
+
+    const randomButton = target.closest?.("[data-random-game]");
+    if (randomButton) {
+      openRandomGame();
+      return;
+    }
+
+    const photoLikeButton = target.closest?.("[data-photo-like]");
+    if (photoLikeButton) {
+      likePhoto(photoLikeButton.dataset.photoLike);
+      return;
+    }
+
+    const voteButton = target.closest?.("[data-vote-option]");
+    if (voteButton) {
+      submitVote(voteButton.dataset.voteOption);
+      return;
+    }
+
+    const rewardButton = target.closest?.("[data-daily-reward]");
+    if (rewardButton) {
+      claimDailyReward();
+      return;
+    }
+
+    const micButton = target.closest?.("[data-mic-test]");
+    if (micButton) {
+      testMicrophone();
+      return;
+    }
+
+    const themeButton = target.closest?.("[data-theme-mode]");
+    if (themeButton) {
+      setTheme(themeButton.dataset.themeMode);
+      return;
+    }
+
+    const musicPreview = target.closest?.("[data-music-preview]");
+    if (musicPreview) {
+      playSelectedMusic();
+      return;
+    }
+
+    const hakoBotButton = target.closest?.("[data-hakobot]");
+    if (hakoBotButton) {
+      askHakoBot();
+      return;
+    }
+
+    const surpriseButton = target.closest?.("[data-surprise-box]");
+    if (surpriseButton) {
+      openSurpriseBox();
+      return;
+    }
+
+    const easterButton = target.closest?.("[data-easter-egg]");
+    if (easterButton) {
+      revealEasterEgg();
       return;
     }
 
@@ -2016,7 +3763,25 @@ function bindGameCards() {
   document.querySelector("[data-friend-form]")?.addEventListener("submit", submitFriendRequest);
   document.querySelector("[data-invite-form]")?.addEventListener("submit", submitInvite);
   document.querySelector("[data-notification-permission]")?.addEventListener("click", requestNotificationPermission);
+  document.querySelector("[data-music-select]")?.addEventListener("change", handleMusicSelect);
   document.addEventListener("click", handleAccountActions);
+  bindDynamicForms();
+}
+
+function bindDynamicForms() {
+  document.querySelectorAll("[data-comment-form]").forEach((form) => bindOnce(form, "submit", submitComment));
+  bindOnce(document.querySelector("[data-music-select]"), "change", handleMusicSelect);
+  bindOnce(document.querySelector("[data-launcher-search]"), "input", handleLauncherSearch);
+  bindOnce(document.querySelector("[data-hakobot-form]"), "submit", submitHakoBotChat);
+  bindOnce(document.querySelector("[data-click-submit-form]"), "submit", submitClickGameScore);
+}
+
+function handleLauncherSearch(event) {
+  launcherQuery = event.currentTarget.value || "";
+  renderLauncherPanel();
+  const input = document.querySelector("[data-launcher-search]");
+  input?.focus();
+  input?.setSelectionRange(launcherQuery.length, launcherQuery.length);
 }
 
 function openGameModal(slug) {
@@ -2028,6 +3793,7 @@ function openGameModal(slug) {
   awardLeaguePoints(`details:${slug}`, leaguePointValues.details, { action: "details" });
   selectedGame = game;
   document.querySelector("[data-modal-content]").innerHTML = renderModal(game);
+  bindDynamicForms();
   const modal = document.querySelector("[data-game-modal]");
   modal.hidden = false;
   document.body.classList.add("modal-open");
@@ -2036,6 +3802,188 @@ function openGameModal(slug) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sessionId, slug }),
   }).catch(() => {});
+}
+
+function renderGameGrid() {
+  const grid = document.querySelector(".game-grid");
+  if (grid) grid.innerHTML = games.map(renderGameCard).join("");
+}
+
+function toggleFavoriteGame(slug) {
+  if (!gameMap.has(slug)) return;
+  if (favoriteGames.includes(slug)) {
+    favoriteGames = favoriteGames.filter((item) => item !== slug);
+  } else {
+    favoriteGames = [slug, ...favoriteGames].slice(0, 8);
+  }
+  saveFavoriteGames();
+  updateBadgeState((state) => {
+    state.favoriteGames = favoriteGames;
+  });
+  renderGameGrid();
+  renderLauncherPanel();
+  renderSocialDashboard();
+}
+
+function openRandomGame() {
+  const game = games[hashString(`${Date.now()}:${sessionId}`) % games.length];
+  openGameModal(game.slug);
+}
+
+async function submitComment(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const slug = form.dataset.commentGame;
+  const status = form.querySelector("[data-comment-status]");
+  const formData = new FormData(form);
+  const payload = {
+    slug,
+    name: formData.get("name"),
+    message: formData.get("message"),
+  };
+  if (status) status.textContent = "Yorum gönderiliyor...";
+  try {
+    const response = await fetch("/api/comments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "comment-failed");
+    latestComments = data;
+    form.reset();
+    updateBadgeState((state) => {
+      state.commentCount = (Number(state.commentCount) || 0) + 1;
+    });
+    if (status) status.textContent = "Yorum eklendi.";
+    document.querySelector("[data-modal-content]").innerHTML = renderModal(selectedGame);
+    bindDynamicForms();
+    renderGameGrid();
+  } catch {
+    if (status) status.textContent = "Yorum eklenemedi. Tekrar dene.";
+  }
+}
+
+async function likePhoto(photoId) {
+  if (!photoId) return;
+  try {
+    const response = await fetch("/api/photo-like", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId, photoId }),
+    });
+    latestPhotos = await response.json();
+    updateBadgeState((state) => {
+      state.photoLikes = (Number(state.photoLikes) || 0) + 1;
+    });
+    renderPhotoGrid();
+    renderWeeklyPhotoPanel();
+    renderStudioPanel();
+  } catch {
+    latestPhotos = latestPhotos.map((photo) => photo.id === photoId ? { ...photo, likes: (photo.likes || 0) + 1 } : photo);
+    renderPhotoGrid();
+    renderWeeklyPhotoPanel();
+  }
+}
+
+async function submitVote(optionId) {
+  if (!voteOptions.some((option) => option.id === optionId)) return;
+  try {
+    const response = await fetch("/api/votes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId, optionId }),
+    });
+    latestVotes = await response.json();
+    updateBadgeState((state) => {
+      state.votedIdea = optionId;
+    });
+    renderCommunityPanel();
+  } catch {
+    latestVotes.options[optionId] = (latestVotes.options[optionId] || 0) + 1;
+    latestVotes.total += 1;
+    updateBadgeState((state) => {
+      state.votedIdea = optionId;
+    });
+    renderCommunityPanel();
+  }
+}
+
+function claimDailyReward() {
+  const today = dailyBadgeKey();
+  if (badgeState.dailyRewardClaimedDay === today) return;
+  updateBadgeState((state) => {
+    state.dailyRewardClaimedDay = today;
+  });
+  awardLeaguePoints(`daily-reward:${today}`, 20, { action: "daily-reward" });
+  renderSocialDashboard();
+}
+
+async function testMicrophone() {
+  micTestStatus = "Mikrofon izni bekleniyor...";
+  renderCommunityPanel();
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream.getTracks().forEach((track) => track.stop());
+    micTestStatus = "Mikrofon çalışıyor.";
+  } catch {
+    micTestStatus = "Mikrofon izni verilmedi veya cihaz bulunamadı.";
+  }
+  renderCommunityPanel();
+}
+
+function setTheme(theme) {
+  selectedTheme = theme === "light" ? "light" : "dark";
+  localStorage.setItem("hakorocks-theme", selectedTheme);
+  document.documentElement.dataset.theme = selectedTheme;
+  renderStudioPanel();
+}
+
+function handleMusicSelect(event) {
+  selectedMusic = event.currentTarget.value;
+  localStorage.setItem("hakorocks-music", selectedMusic);
+  renderStudioPanel();
+}
+
+function playSelectedMusic() {
+  const item = musicOptions.find((option) => option.id === selectedMusic) || musicOptions[0];
+  playTone(item.frequency, 0.18);
+}
+
+function askHakoBot() {
+  const fusion = getDailyFusion();
+  const options = [
+    `Bugün ${fusion.base.title} + ${fusion.source.title} birleşimini dene.`,
+    "Bir oyuna yorum yazarsan Yorumcu rozeti açılır.",
+    "Fotoğraf beğenisi haftanın fotoğrafını belirler.",
+    `Bugünün rastgele görevi: ${randomTasks[hashString(`${dailyBadgeKey()}:task`) % randomTasks.length]}`,
+  ];
+  hakoBotAnswer = options[hashString(`${Date.now()}:hakobot`) % options.length];
+  renderStudioPanel();
+}
+
+function openSurpriseBox() {
+  if (surpriseState.opened) return;
+  const message = surpriseBoxes[hashString(`${dailyBadgeKey()}:surprise`) % surpriseBoxes.length];
+  surpriseState = {
+    dayKey: dailyBadgeKey(),
+    opened: true,
+    message,
+  };
+  saveSurpriseState();
+  updateBadgeState((state) => {
+    state.surpriseOpened = true;
+  });
+  awardLeaguePoints(`surprise:${dailyBadgeKey()}`, 12, { action: "surprise" });
+  renderStudioPanel();
+}
+
+function revealEasterEgg() {
+  hakoBotAnswer = "Gizli ipucu: Hakorocks Studio'da en hızlı rozet yolu yorum + favori + fotoğraf beğenisi.";
+  updateBadgeState((state) => {
+    state.easterEggFound = true;
+  });
+  renderStudioPanel();
 }
 
 function closeGameModal() {
@@ -2707,6 +4655,22 @@ function playUiSound(type = "click") {
   oscillator.stop(audioContext.currentTime + 0.12);
 }
 
+function playTone(frequency = 340, duration = 0.12) {
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) return;
+  audioContext ??= new AudioContext();
+  const oscillator = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+  oscillator.type = "square";
+  oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+  gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.045, audioContext.currentTime + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + duration);
+  oscillator.connect(gain).connect(audioContext.destination);
+  oscillator.start();
+  oscillator.stop(audioContext.currentTime + duration + 0.02);
+}
+
 function bindTrailer() {
   const stage = document.querySelector("[data-trailer-stage]");
   document.querySelector("[data-trailer-play]")?.addEventListener("click", () => {
@@ -2751,15 +4715,19 @@ async function refreshLiveData() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    const [statsResponse, photosResponse, ratingsResponse, guestbookResponse, feedbackResponse, announcementsResponse, accountResponse, voiceResponse] = await Promise.all([
+    const [statsResponse, photosResponse, ratingsResponse, guestbookResponse, feedbackResponse, announcementsResponse, commentsResponse, votesResponse, healthResponse, accountResponse, voiceResponse, clickGameResponse] = await Promise.all([
       fetch("/api/stats"),
       fetch("/api/photos"),
       fetch("/api/ratings"),
       fetch("/api/guestbook"),
       fetch("/api/feedback"),
       fetch("/api/announcements"),
+      fetch("/api/comments"),
+      fetch("/api/votes"),
+      fetch("/api/health"),
       fetch(`/api/account?sessionId=${encodeURIComponent(sessionId)}`),
       fetch(`/api/voice?sessionId=${encodeURIComponent(sessionId)}`),
+      fetch(`/api/click-game?sessionId=${encodeURIComponent(sessionId)}`),
     ]);
     latestStats = await statsResponse.json();
     latestPhotos = await photosResponse.json();
@@ -2767,25 +4735,36 @@ async function refreshLiveData() {
     latestGuestbook = await guestbookResponse.json();
     latestFeedback = await feedbackResponse.json();
     latestAnnouncements = await announcementsResponse.json();
+    latestComments = await commentsResponse.json();
+    latestVotes = await votesResponse.json();
+    latestHealth = await healthResponse.json();
     latestSocial = await accountResponse.json();
     latestVoice = await voiceResponse.json();
+    latestClickGame = await clickGameResponse.json();
     if (latestVoice.roomId) {
       selectedVoiceRoomId = latestVoice.roomId;
       localStorage.setItem("hakorocks-voice-room", selectedVoiceRoomId);
     }
   } catch {
     latestStats = createFallbackStats();
+    latestComments = createFallbackComments();
+    latestVotes = createFallbackVotes();
+    latestHealth = createFallbackHealth();
     latestSocial = createFallbackSocial();
     latestVoice = createFallbackVoice();
+    latestClickGame = createFallbackClickGame();
   }
 
   renderLiveData();
   renderAnnouncementFeed();
   renderFeedbackFeed();
+  renderCommunityPanel();
+  renderStudioPanel();
   renderSocialDashboard();
   maybeNotifySocialChanges();
   if (!document.querySelector("[data-game-modal]").hidden) {
     document.querySelector("[data-modal-content]").innerHTML = renderModal(selectedGame);
+    bindDynamicForms();
   }
 }
 
@@ -2797,9 +4776,15 @@ function renderLiveData() {
   document.querySelector("[data-market-chart]").innerHTML = renderSparkline(latestStats.marketHistory ?? createHistory(100));
 
   renderPhotoGrid();
+  renderWeeklyPhotoPanel();
   renderGuestbookList();
   renderBadgeGrid();
   renderTournamentPanel();
+  renderSpotlightPanel();
+  renderEnrichedStatsPanel();
+  renderLauncherPanel();
+  renderStudioPulsePanel();
+  if (!clickGameState.running) renderClickGamePanel();
 }
 
 const header = document.querySelector("[data-header]");
@@ -2814,9 +4799,16 @@ renderBadgeGrid();
 renderTournamentPanel();
 renderFeedbackFeed();
 renderAnnouncementFeed();
+renderCommunityPanel();
+renderStudioPanel();
 renderSocialDashboard();
+renderStudioPulsePanel();
+renderClickGamePanel();
 refreshLiveData();
 setInterval(refreshLiveData, 10000);
+startPerformanceMonitor();
+startRevealAnimations();
+setInterval(refreshPerformancePing, 15000);
 
 function maybeNotifySocialChanges() {
   if (!("Notification" in window) || notificationPermission !== "granted" || !latestSocial.account) return;
@@ -2841,6 +4833,86 @@ function maybeNotifySocialChanges() {
 
   localStorage.setItem("hakorocks-seen-requests", JSON.stringify([...seenRequests]));
   localStorage.setItem("hakorocks-seen-invites", JSON.stringify([...seenInvites]));
+}
+
+function startPerformanceMonitor() {
+  let frames = 0;
+  let last = performance.now();
+  const tick = (now) => {
+    frames += 1;
+    if (now - last >= 1000) {
+      performanceState.fps = frames;
+      frames = 0;
+      last = now;
+      const memory = performance.memory;
+      if (memory?.usedJSHeapSize) {
+        performanceState.memory = `${Math.round(memory.usedJSHeapSize / 1024 / 1024)} MB`;
+      }
+      const fpsNode = document.querySelector("[data-dev-fps]");
+      const memoryNode = document.querySelector("[data-dev-memory]");
+      if (fpsNode) fpsNode.textContent = String(performanceState.fps);
+      if (memoryNode) memoryNode.textContent = performanceState.memory;
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+async function refreshPerformancePing() {
+  const start = performance.now();
+  try {
+    const response = await fetch("/api/health");
+    latestHealth = await response.json();
+    performanceState.ping = Math.round(performance.now() - start);
+  } catch {
+    performanceState.ping = 0;
+  }
+  const pingNode = document.querySelector("[data-dev-ping]");
+  if (pingNode) pingNode.textContent = `${performanceState.ping} ms`;
+  renderStudioPanel();
+}
+
+function startRevealAnimations() {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  document.documentElement.classList.add("motion-ready");
+  const selector = [
+    ".section",
+    ".game-card",
+    ".launcher-game-card",
+    ".community-panel",
+    ".studio-panel",
+    ".badge-card",
+    ".photo-card",
+    ".pulse-feed article",
+    ".click-arena",
+    ".click-leaderboard",
+    ".click-leader",
+  ].join(",");
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add("is-visible");
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { rootMargin: "0px 0px -80px 0px", threshold: 0.08 });
+  const register = (root = document) => {
+    root.querySelectorAll(selector).forEach((element) => {
+      if (element.dataset.revealBound === "1") return;
+      element.dataset.revealBound = "1";
+      element.classList.add("reveal-item");
+      observer.observe(element);
+    });
+  };
+  register();
+  const mutationObserver = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (node.nodeType === Node.ELEMENT_NODE) register(node);
+      });
+    });
+  });
+  mutationObserver.observe(document.querySelector("#app"), { childList: true, subtree: true });
 }
 
 function fileToDataUrl(file) {
