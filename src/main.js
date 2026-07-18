@@ -1442,11 +1442,39 @@ function pushHakoBotConversation(message) {
 
 function createHakoBotReply(message) {
   const text = message.toLocaleLowerCase("tr-TR");
+  const compactText = text.replace(/\s+/g, " ").trim();
   const hardGames = games.filter((game) => gameExtra(game).difficulty === "Zor").map((game) => game.title).join(", ");
   const favorite = getMostLovedGame();
   const fusion = getDailyFusion();
+  const mentionedGame = games.find((game) => includesAny(text, [
+    game.title.toLocaleLowerCase("tr-TR"),
+    game.slug,
+    game.slug.replaceAll("-", " "),
+  ]));
+  if (!compactText) {
+    return "Bir şey yazarsan cevap verebilirim. Oyun, rozet, mini oyun, fotoğraf veya canlı yayın diye sorabilirsin.";
+  }
   if (includesAny(text, ["merhaba", "selam", "günaydın", "gunaydin"])) {
     return "Merhaba. Hakorocks Studio'da oyunlara bakabilir, yorum yazabilir, fotoğraf beğenebilir ve mini oyunda skor kasabilirsin.";
+  }
+  if (includesAny(text, ["nasılsın", "nasilsin", "iyi misin", "napıyon", "napıyorsun", "ne yapıyorsun"])) {
+    return "Ben iyiyim. Şu an Hakorocks Studio için oyun önerisi, rozet bilgisi, canlı yayın durumu ve mini oyun yardımı verebilirim.";
+  }
+  if (includesAny(text, ["teşekkür", "tesekkur", "sağ ol", "sag ol", "eyvallah"])) {
+    return "Rica ederim. Yeni bir oyun fikri, site bölümü veya mini oyun taktiği sorabilirsin.";
+  }
+  if (includesAny(text, ["yardım", "yardim", "help", "ne sorabilirim", "komut", "komutlar"])) {
+    return "Bana şunları sorabilirsin: en zor oyun, mini oyun nasıl çalışır, rozet nasıl kazanılır, fotoğraf nerede, canlıya nasıl geçer, bugünün birleşimi ne.";
+  }
+  if (includesAny(text, ["komik", "şaka", "saka", "espri"])) {
+    return "Hakorocks şakası: 1 milyon h yazdık ama Google bile 'bu kadar heyecan fazla' dedi.";
+  }
+  if (includesAny(text, ["1 milyon", "1000000", "milyon h", "bana tıkla", "bana tikla", "panoya", "kopyala"])) {
+    return "En alttaki Bana tıkla alanı 1.000.000 tane h üretir. Panoya kopyala düğmesi var ama metin çok büyük olduğu için bazı yerler kabul etmeyebilir.";
+  }
+  if (mentionedGame) {
+    const extra = gameExtra(mentionedGame);
+    return `${mentionedGame.title}: ${mentionedGame.description} Zorluk: ${extra.difficulty}, ortalama süre: ${extra.averagePlayTime}. Launcher'dan detayını açabilirsin.`;
   }
   if (includesAny(text, ["launcher", "başlatıcı", "baslatici", "konsol"])) {
     return "Launcher oyun seçme merkezi. Favoriler, son oynananlar, zor oyun filtresi, arama ve rastgele oyun aynı yerde durur.";
@@ -1472,13 +1500,25 @@ function createHakoBotReply(message) {
   if (includesAny(text, ["yayın", "yayin", "deploy", "coolify", "canlı", "canli", "push"])) {
     return "Canlıya geçmek için değişiklikler commit + push yapılır. Coolify main branch'ten yeni Docker build alıp siteyi yayınlar.";
   }
+  if (includesAny(text, ["pulse", "enerji", "akış", "akis", "canlı akış", "canli akis"])) {
+    return "Studio Pulse, sitenin canlı enerji paneli. Önerilen oyun, görev durumu, yorumlar, bot mesajları ve mini oyun skorunu tek yerde gösterir.";
+  }
+  if (includesAny(text, ["tema", "ışık", "isik", "karanlık", "karanlik", "müzik", "muzik", "ses"])) {
+    return "Studio merkezinde tema ve müzik seçenekleri var. Üstteki Ses düğmesi arayüz biplerini açıp kapatır.";
+  }
+  if (includesAny(text, ["arkadaş", "arkadas", "davet", "hesap", "profil resmi", "takma ad"])) {
+    return "Hesap bölümünde profil oluşturabilir, takma ad seçebilir, arkadaş isteği ve oyun daveti gönderebilirsin.";
+  }
+  if (includesAny(text, ["ne var", "özellik", "ozellik", "neler var", "site ne"])) {
+    return "Sitede Launcher, HakoBot, Studio Pulse, mini oyun, liderlik tablosu, fotoğraf alanı, yorumlar, rozetler ve oyun vitrini var.";
+  }
   if (includesAny(text, ["sen kimsin", "bot", "hakobot"])) {
     return "Ben HakoBot. Hakorocks Studio içinde çalışan yazılı yardımcıyım; siteyi gezmene ve oyun seçmene yardım ederim.";
   }
   if (includesAny(text, ["oyun", "oyna", "nerede", "hangi"])) {
     return `Sitede ${games.length} oyun var. En hızlı yol Launcher bölümünü açmak. Bugünün önerisi ${getLauncherRecommendedGame().title}.`;
   }
-  return "Bunu tam bilmiyorum ama siteyle ilgiliyse şöyle deneyebilirsin: oyun adı, rozet, fotoğraf, launcher, mini oyun veya canlı yayın diye sor.";
+  return `Bunu tam çözemedim ama yardımcı olayım: "${message.slice(0, 60)}" için oyunlar, rozetler, mini oyun, fotoğraf, Pulse veya canlı yayın tarafından birini sorarsan daha net cevap veririm.`;
 }
 
 function includesAny(text, words) {
