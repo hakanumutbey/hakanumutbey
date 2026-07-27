@@ -5289,12 +5289,19 @@ function renderAdminAuth() {
       <li class="auth-stage active">
         <h3>3. Aşama — Ben Robot Değilim</h3>
         <form data-auth-form="stage3" data-auth-stage3-form>
-          <label class="admin-check">
-            <input type="checkbox" name="notrobot" required />
-            Ben robot değilim
-          </label>
           ${authRecaptchaSiteKey ? `<div data-recaptcha></div>` : `
-            <label>
+            <div class="fake-recaptcha" data-fake-recaptcha>
+              <label class="fr-check">
+                <input type="checkbox" name="notrobot" required />
+                <span class="fr-box" aria-hidden="true"></span>
+                <span class="fr-label">Ben robot değilim</span>
+              </label>
+              <div class="fr-badge" aria-hidden="true">
+                <span class="fr-logo">reCAPTCHA</span>
+                <span class="fr-links">Gizlilik - Şartlar</span>
+              </div>
+            </div>
+            <label class="fr-question">
               ${escapeHtml(authChallengeQuestion || "Soru yükleniyor...")}
               <input name="answer" inputmode="numeric" maxlength="10" placeholder="Cevap" autocomplete="off" required />
             </label>`}
