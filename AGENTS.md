@@ -41,7 +41,7 @@ Bu repo `hakanumutbey` GitHub profil reposu ve ayni zamanda `https://hakorocks.a
 
 ## Dikkat edilmesi gerekenler
 
-- Mevcut oyunlar: `annenden-kac`, `bardak`, `essiz-zindan`, `skeleton-wars`, `vale`, `robot-avcisi`.
+- Mevcut oyunlar: `annenden-kac`, `bardak`, `essiz-zindan`, `skeleton-wars`, `rhgpo`, `siyah-adam`, `vale`, `robot-avcisi`, `birlesim-arenasi`, `hentw`, `hentw2`, `hentw3`.
 - Oyunlarin browser erisimi bozulmamalidir.
 - Root `README.md` GitHub profil karşılama ekranidir; sik, Turkce ve proje durumunu anlatan bir vitrin olarak korunmalidir.
 - Buyuk refactor yerine calisan yapiyi koruyan net ve odakli degisiklikler tercih edilmelidir.

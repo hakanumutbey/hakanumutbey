@@ -2917,6 +2917,21 @@ h3 {
   background: #55d6ff;
 }
 
+.poster-cosmos {
+  color: #06121a;
+  background: #3de0ff;
+}
+
+.poster-venom {
+  color: #06130b;
+  background: #44ff88;
+}
+
+.poster-crimson {
+  color: #fff2f4;
+  background: #ff4466;
+}
+
 .game-body {
   display: grid;
   gap: 12px;

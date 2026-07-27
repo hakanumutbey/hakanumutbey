@@ -1,0 +1,1657 @@
+/**
+ * HENTW 3 — uzun kaçış · kamera · savaş · 3 adım hack · seri sonu
+ */
+import * as THREE from "three";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import {
+  QUEST,
+  QUEST_LABELS,
+  advanceQuest,
+  distXZ,
+  canInteract,
+  COLOR_ORDER,
+  COLOR_ORDER_2,
+  HACK_LETTERS,
+  BINARY_PAPER,
+  binaryMatches,
+  nextHackStep,
+  createFighter,
+  applyDamage,
+  allDead,
+} from "./gameLogic.js";
+
+const $ = (id) => document.getElementById(id);
+const canvas = $("game");
+const titleScreen = $("title-screen");
+const uiEl = $("ui");
+const questTextEl = $("quest-text");
+const promptEl = $("prompt");
+const dialogueEl = $("dialogue");
+const dSpeaker = $("d-speaker");
+const dText = $("d-text");
+const toastEl = $("toast");
+const wakeOverlay = $("wake-overlay");
+const storyOverlay = $("story-overlay");
+const storyText = $("story-text");
+const endScreen = $("end-screen");
+const colorUi = $("color-ui");
+const colorButtons = $("color-buttons");
+const colorOrderLabel = $("color-order-label");
+const colorStatus = $("color-status");
+const hideUi = $("hide-ui");
+const hideBar = $("hide-bar");
+const hideStatus = $("hide-status");
+const runUi = $("run-ui");
+const runBar = $("run-bar");
+const hackUi = $("hack-ui");
+const hackTimer = $("hack-timer");
+const hackStepLabel = $("hack-step-label");
+const hackBody = $("hack-body");
+const hackFail = $("hack-fail");
+const paperNote = $("paper-note");
+const paperBinary = $("paper-binary");
+
+// combat hud (optional)
+let combatHud = $("combat-hud");
+if (!combatHud) {
+  combatHud = document.createElement("div");
+  combatHud.id = "combat-hud";
+  combatHud.className = "hidden";
+  combatHud.innerHTML =
+    '<div class="lab">SAVAŞ</div><div>Can: <span id="hp-text">100</span></div><div id="hp-bar-wrap"><div id="hp-bar"></div></div><div>Düşman: <span id="enemy-count">0</span></div>';
+  uiEl?.appendChild(combatHud);
+}
+const hpText = $("hp-text");
+const hpBar = $("hp-bar");
+const enemyCountEl = $("enemy-count");
+
+const MODE = {
+  TITLE: "title",
+  WAKE: "wake",
+  PLAY: "play",
+  COLOR: "color",
+  HIDE: "hide",
+  RUN: "run",
+  HACK: "hack",
+  ESCAPE: "escape",
+  END: "end",
+};
+
+const SPEED = 5.8;
+const R = 2.5;
+const keys = new Set();
+
+const POS = {
+  robot: { x: 1.2, z: -0.5 },
+  colorDoor: { x: 0, z: 10 },
+  keycard: { x: -3, z: 14 },
+  hide1: { x: 3.2, z: 20 },
+  run1: { x: 0, z: 28 },
+  fight: { x: 0, z: 36 },
+  battery: { x: -2.5, z: 42 },
+  color2: { x: 0, z: 50 },
+  hide2: { x: 3, z: 58 },
+  run2: { x: 0, z: 66 },
+  pc: { x: 0, z: 74 },
+  escape: { x: 0, z: 82 },
+};
+
+const state = {
+  mode: MODE.TITLE,
+  quest: QUEST.WAKE,
+  dialogueOpen: false,
+  dialogueAfter: null,
+  toastT: 0,
+  pointer: false,
+  rmbLook: false,
+  wakeT: 0,
+  colorProgress: 0,
+  colorWhich: 1,
+  colorLocked: true,
+  colorOrder: null,
+  colorCountdown: null,
+  hideProgress: 0,
+  hideInZone: false,
+  hideWhich: 1,
+  runT: 0,
+  runWhich: 1,
+  hackStep: 1,
+  hackLetterI: 0,
+  hackTime: 1,
+  hackMaxTime: 8,
+  escapeT: 0,
+  hasKeycard: false,
+  hasBattery: false,
+  canShoot: false,
+  playerHp: 100,
+  playerMaxHp: 100,
+  shootCd: 0,
+  hitCd: 0,
+  combat: false,
+};
+
+const enemies = [];
+const bullets = [];
+
+// ---------- Renderer (bright ship) ----------
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  antialias: true,
+  preserveDrawingBuffer: true,
+});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.5;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a2238);
+scene.fog = new THREE.FogExp2(0x243048, 0.01);
+
+const camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.1, 200);
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.35, 0.5, 0.75);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+scene.add(new THREE.AmbientLight(0xc8d8f0, 0.9));
+scene.add(new THREE.HemisphereLight(0xe8f0ff, 0x4a5060, 1.15));
+const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+sun.position.set(8, 16, 10);
+scene.add(sun);
+const fill = new THREE.DirectionalLight(0xaaccff, 0.65);
+fill.position.set(-10, 5, -6);
+scene.add(fill);
+const redAlert = new THREE.PointLight(0xff6688, 1.3, 30, 1.4);
+redAlert.position.set(0, 3, 20);
+scene.add(redAlert);
+const playerLight = new THREE.PointLight(0xfff2e0, 2.4, 16, 1.4);
+scene.add(playerLight);
+
+// Long corridor floor
+const floor = new THREE.Mesh(
+  new THREE.BoxGeometry(11, 0.2, 100),
+  new THREE.MeshStandardMaterial({ color: 0x3a4560, metalness: 0.35, roughness: 0.55 })
+);
+floor.position.set(0, -0.1, 40);
+floor.receiveShadow = true;
+scene.add(floor);
+
+function wall(x, z, w, d) {
+  const m = new THREE.Mesh(
+    new THREE.BoxGeometry(w, 4.2, d),
+    new THREE.MeshStandardMaterial({ color: 0x2a3448, metalness: 0.3, roughness: 0.65 })
+  );
+  m.position.set(x, 2.1, z);
+  scene.add(m);
+}
+wall(-5.5, 40, 0.4, 100);
+wall(5.5, 40, 0.4, 100);
+
+for (let z = 0; z < 90; z += 3) {
+  const isRed = z % 9 === 0;
+  const strip = new THREE.Mesh(
+    new THREE.BoxGeometry(2.4, 0.1, 0.5),
+    new THREE.MeshStandardMaterial({
+      color: isRed ? 0xff8899 : 0xaad4ff,
+      emissive: isRed ? 0xff4466 : 0x66aaff,
+      emissiveIntensity: 2.2,
+    })
+  );
+  strip.position.set(0, 3.9, z);
+  scene.add(strip);
+  const pl = new THREE.PointLight(isRed ? 0xff6688 : 0xccddff, 1.5, 11, 1.4);
+  pl.position.set(0, 3.3, z);
+  scene.add(pl);
+}
+
+// Cell bars
+const cell = new THREE.Group();
+cell.position.set(0, 0, -2);
+for (let i = -3; i <= 3; i++) {
+  const bar = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.06, 0.06, 3.2, 6),
+    new THREE.MeshStandardMaterial({ color: 0xa0b0c0, metalness: 0.8 })
+  );
+  bar.position.set(i * 0.55, 1.6, 0);
+  cell.add(bar);
+}
+scene.add(cell);
+
+// Stars window
+{
+  const g = new THREE.Group();
+  g.position.set(5.4, 2.2, 6);
+  const glass = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.8, 2),
+    new THREE.MeshBasicMaterial({ color: 0x0a1530 })
+  );
+  g.add(glass);
+  for (let i = 0; i < 50; i++) {
+    const s = new THREE.Mesh(
+      new THREE.SphereGeometry(0.025, 4, 4),
+      new THREE.MeshBasicMaterial({ color: 0xffffff })
+    );
+    s.position.set((Math.random() - 0.5) * 2.4, (Math.random() - 0.5) * 1.6, 0.05);
+    g.add(s);
+  }
+  scene.add(g);
+}
+
+function ring(col, em) {
+  const r = new THREE.Mesh(
+    new THREE.TorusGeometry(0.7, 0.05, 8, 28),
+    new THREE.MeshStandardMaterial({ color: col, emissive: em, emissiveIntensity: 1.5 })
+  );
+  r.rotation.x = Math.PI / 2;
+  r.position.y = 0.05;
+  return r;
+}
+
+function makeRobot() {
+  const g = new THREE.Group();
+  g.position.set(POS.robot.x, 0, POS.robot.z);
+  const mat = new THREE.MeshStandardMaterial({ color: 0x9aa8ba, metalness: 0.65 });
+  const t = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.75, 0.4), mat);
+  t.position.y = 0.95;
+  g.add(t);
+  const h = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.3, 0.34), mat);
+  h.position.y = 1.5;
+  g.add(h);
+  const eye = new THREE.Mesh(
+    new THREE.SphereGeometry(0.07, 8, 8),
+    new THREE.MeshStandardMaterial({
+      color: 0x5ee7ff,
+      emissive: 0x1188aa,
+      emissiveIntensity: 1.5,
+    })
+  );
+  eye.position.set(0, 1.5, 0.18);
+  g.add(eye);
+  g.add(ring(0xb07cff, 0x6030aa));
+  scene.add(g);
+  return g;
+}
+
+function makeDoor(z, title = true) {
+  const g = new THREE.Group();
+  g.position.set(0, 0, z);
+  const d = new THREE.Mesh(
+    new THREE.BoxGeometry(2.5, 3.1, 0.28),
+    new THREE.MeshStandardMaterial({ color: 0x3a4060, metalness: 0.5 })
+  );
+  d.position.y = 1.55;
+  g.add(d);
+  g.userData.door = d;
+  const cols = [
+    [0x3d8bff, -0.7],
+    [0x44dd77, -0.25],
+    [0xff4455, 0.25],
+    [0xffdd44, 0.7],
+  ];
+  cols.forEach(([c, x]) => {
+    const p = new THREE.Mesh(
+      new THREE.BoxGeometry(0.35, 0.35, 0.1),
+      new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.7 })
+    );
+    p.position.set(x, 2.3, 0.2);
+    g.add(p);
+  });
+  g.add(ring(0x8866ff, 0x5533aa));
+  scene.add(g);
+  return g;
+}
+
+function makePickup(x, z, color, em) {
+  const g = new THREE.Group();
+  g.position.set(x, 0, z);
+  const box = new THREE.Mesh(
+    new THREE.BoxGeometry(0.55, 0.4, 0.75),
+    new THREE.MeshStandardMaterial({
+      color,
+      emissive: em,
+      emissiveIntensity: 1.6,
+      metalness: 0.4,
+    })
+  );
+  box.position.y = 0.3;
+  g.add(box);
+  // Üstte yanıp sönen işaret
+  const beacon = new THREE.Mesh(
+    new THREE.SphereGeometry(0.18, 10, 10),
+    new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      emissive: em,
+      emissiveIntensity: 2.5,
+    })
+  );
+  beacon.position.y = 1.1;
+  g.add(beacon);
+  g.userData.beacon = beacon;
+  g.add(ring(color, em));
+  g.add(new THREE.PointLight(color, 2.5, 10));
+  scene.add(g);
+  return g;
+}
+
+function makePC() {
+  const g = new THREE.Group();
+  g.position.set(POS.pc.x, 0, POS.pc.z);
+  const desk = new THREE.Mesh(
+    new THREE.BoxGeometry(2.4, 0.15, 1.3),
+    new THREE.MeshStandardMaterial({ color: 0x3a3a4a, metalness: 0.5 })
+  );
+  desk.position.y = 1.0;
+  g.add(desk);
+  const mon = new THREE.Mesh(
+    new THREE.BoxGeometry(1.5, 1.0, 0.12),
+    new THREE.MeshStandardMaterial({
+      color: 0x152030,
+      emissive: 0x3366aa,
+      emissiveIntensity: 1.0,
+    })
+  );
+  mon.position.set(0, 1.75, -0.35);
+  g.add(mon);
+  const paper = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.55, 0.38),
+    new THREE.MeshStandardMaterial({ color: 0xf5e6c8, side: THREE.DoubleSide })
+  );
+  paper.rotation.x = -Math.PI / 2;
+  paper.position.set(0.7, 1.09, 0.25);
+  g.add(paper);
+  g.add(ring(0x66aaff, 0x2266aa));
+  g.add(new THREE.PointLight(0x66aaff, 1.8, 10));
+  scene.add(g);
+  return g;
+}
+
+function makeEscape() {
+  const g = new THREE.Group();
+  g.position.set(POS.escape.x, 0, POS.escape.z);
+  g.visible = false;
+  const pad = new THREE.Mesh(
+    new THREE.CylinderGeometry(2.4, 2.6, 0.15, 24),
+    new THREE.MeshStandardMaterial({ color: 0x3a5070, metalness: 0.6 })
+  );
+  pad.position.y = 0.08;
+  g.add(pad);
+  const ship = new THREE.Mesh(
+    new THREE.ConeGeometry(1, 2.6, 10),
+    new THREE.MeshStandardMaterial({ color: 0xd0d8e4, metalness: 0.75 })
+  );
+  ship.position.y = 1.5;
+  ship.rotation.x = Math.PI;
+  g.add(ship);
+  g.add(ring(0x66ffaa, 0x33cc88));
+  g.add(new THREE.PointLight(0x66ffaa, 2, 12));
+  scene.add(g);
+  return g;
+}
+
+function makeFoe(x, z, color = 0x33aa44, hp = 34) {
+  const g = new THREE.Group();
+  g.position.set(x, 0, z);
+  const mat = new THREE.MeshStandardMaterial({
+    color,
+    emissive: color,
+    emissiveIntensity: 0.4,
+  });
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 0.55, 5, 10), mat);
+  body.position.y = 0.95;
+  g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.34, 12, 12), mat);
+  head.position.y = 1.7;
+  g.add(head);
+  const eye = new THREE.Mesh(
+    new THREE.SphereGeometry(0.1, 8, 8),
+    new THREE.MeshStandardMaterial({
+      color: 0xffff00,
+      emissive: 0xffaa00,
+      emissiveIntensity: 1.5,
+    })
+  );
+  eye.position.set(0, 1.75, 0.28);
+  g.add(eye);
+  scene.add(g);
+  return { mesh: g, fighter: createFighter(hp), speed: 2.5 + Math.random() * 0.6, body };
+}
+
+const robot = makeRobot();
+const colorDoor = makeDoor(POS.colorDoor.z);
+const colorDoor2 = makeDoor(POS.color2.z);
+const keycard = makePickup(POS.keycard.x, POS.keycard.z, 0xff4455, 0xaa1122);
+const battery = makePickup(POS.battery.x, POS.battery.z, 0x44aaff, 0x2266aa);
+battery.visible = false;
+const pc = makePC();
+const escapePad = makeEscape();
+
+const hideZone = new THREE.Mesh(
+  new THREE.CylinderGeometry(1.5, 1.5, 0.1, 24),
+  new THREE.MeshStandardMaterial({
+    color: 0x22aa55,
+    emissive: 0x118833,
+    emissiveIntensity: 1.0,
+    transparent: true,
+    opacity: 0.6,
+  })
+);
+hideZone.position.set(POS.hide1.x, 0.05, POS.hide1.z);
+hideZone.visible = false;
+scene.add(hideZone);
+
+const guard = new THREE.Group();
+guard.visible = false;
+{
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0x33aa44,
+    emissive: 0x116622,
+    emissiveIntensity: 0.45,
+  });
+  const b = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 0.6, 5, 10), mat);
+  b.position.y = 1;
+  guard.add(b);
+  const h = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 12), mat);
+  h.position.y = 1.75;
+  guard.add(h);
+  guard.add(new THREE.PointLight(0x44ff66, 1, 7));
+}
+scene.add(guard);
+
+const doorArrow = new THREE.Mesh(
+  new THREE.ConeGeometry(0.32, 0.75, 8),
+  new THREE.MeshStandardMaterial({
+    color: 0xffcc44,
+    emissive: 0xffaa00,
+    emissiveIntensity: 1.5,
+  })
+);
+doorArrow.rotation.x = Math.PI;
+doorArrow.visible = false;
+scene.add(doorArrow);
+
+const player = new THREE.Group();
+player.position.set(0, 0, 1);
+const bodyRoot = new THREE.Group();
+player.add(bodyRoot);
+{
+  const suit = new THREE.MeshStandardMaterial({ color: 0xeef2f6, metalness: 0.35 });
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.5, 6, 12), suit);
+  body.position.y = 0.85;
+  bodyRoot.add(body);
+  const helm = new THREE.Mesh(new THREE.SphereGeometry(0.28, 14, 14), suit);
+  helm.position.y = 1.5;
+  bodyRoot.add(helm);
+  bodyRoot.rotation.x = -Math.PI / 2 + 0.15;
+  bodyRoot.position.y = 0.28;
+}
+scene.add(player);
+
+const camOrbit = {
+  yaw: 0,
+  pitch: 0.28,
+  distance: 5.2,
+  minPitch: -0.2,
+  maxPitch: 0.95,
+  sensitivity: 0.0024,
+};
+
+// ---------- UI ----------
+function setQuest(q) {
+  state.quest = q;
+  questTextEl.textContent = QUEST_LABELS[q] || q;
+}
+
+function applyEvent(ev) {
+  const n = advanceQuest(state.quest, ev);
+  if (n !== state.quest) {
+    setQuest(n);
+    onQuest(n);
+  }
+}
+
+function toast(msg, d = 2.8) {
+  toastEl.textContent = msg;
+  toastEl.classList.remove("hidden");
+  state.toastT = d;
+}
+
+function story(msg, sec = 3) {
+  storyText.textContent = msg;
+  storyOverlay.classList.remove("hidden");
+  setTimeout(() => storyOverlay.classList.add("hidden"), sec * 1000);
+}
+
+function openDialogue(speaker, text, after = null) {
+  state.dialogueOpen = true;
+  state.dialogueAfter = after;
+  dialogueEl.classList.remove("hidden");
+  promptEl.classList.add("hidden");
+  dSpeaker.textContent = speaker;
+  dText.textContent = text;
+}
+
+function closeDialogue() {
+  state.dialogueOpen = false;
+  dialogueEl.classList.add("hidden");
+  const cb = state.dialogueAfter;
+  state.dialogueAfter = null;
+  if (cb) cb();
+}
+
+function hideAllMinigames() {
+  colorUi.classList.add("hidden");
+  hideUi.classList.add("hidden");
+  runUi.classList.add("hidden");
+  hackUi.classList.add("hidden");
+}
+
+function clearEnemies() {
+  for (const e of enemies) scene.remove(e.mesh);
+  enemies.length = 0;
+  for (const b of bullets) scene.remove(b.mesh);
+  bullets.length = 0;
+  state.combat = false;
+  combatHud?.classList.add("hidden");
+}
+
+function spawnPatrol() {
+  clearEnemies();
+  const c = POS.fight;
+  [
+    [c.x - 2.5, c.z],
+    [c.x + 2, c.z + 1.5],
+    [c.x, c.z - 2],
+    [c.x + 3, c.z - 1],
+  ].forEach(([x, z]) => enemies.push(makeFoe(x, z, 0x2a8844, 32)));
+  state.combat = true;
+  state.canShoot = true;
+  updateCombatHud();
+  toast("KRAXX devriyesi! Sol tık ateş", 3);
+}
+
+function updateCombatHud() {
+  const alive = enemies.filter((e) => e.fighter.alive).length;
+  if (state.combat && alive > 0) combatHud?.classList.remove("hidden");
+  else combatHud?.classList.add("hidden");
+  if (hpText) hpText.textContent = String(Math.ceil(state.playerHp));
+  if (hpBar) hpBar.style.width = `${(state.playerHp / state.playerMaxHp) * 100}%`;
+  if (enemyCountEl) enemyCountEl.textContent = String(alive);
+}
+
+function tryShoot() {
+  if (state.mode !== MODE.PLAY || !state.canShoot || !state.combat || state.dialogueOpen)
+    return;
+  if (state.shootCd > 0) return;
+  state.shootCd = 0.2;
+  const dir = new THREE.Vector3();
+  camera.getWorldDirection(dir);
+  dir.y = 0;
+  dir.normalize();
+  const origin = player.position.clone().add(new THREE.Vector3(0, 1.15, 0));
+  const bolt = new THREE.Mesh(
+    new THREE.SphereGeometry(0.1, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0x66ffcc })
+  );
+  bolt.position.copy(origin);
+  scene.add(bolt);
+  bullets.push({ mesh: bolt, dir: dir.clone(), life: 1.0, speed: 38 });
+
+  for (const e of enemies) {
+    if (!e.fighter.alive) continue;
+    const toE = e.mesh.position.clone().add(new THREE.Vector3(0, 1.2, 0)).sub(origin);
+    const dist = toE.length();
+    if (dist < 22 && dir.dot(toE.normalize()) > 0.7) {
+      e.fighter = applyDamage(e.fighter, 15);
+      e.body.material.emissiveIntensity = 1.3;
+      if (!e.fighter.alive) e.mesh.visible = false;
+    }
+  }
+  if (allDead(enemies.map((e) => e.fighter))) {
+    state.combat = false;
+    updateCombatHud();
+    if (state.quest === QUEST.FIGHT_PATROL) {
+      toast("Devriye bitti! Batarya bul");
+      applyEvent("fight_ok");
+      battery.visible = true;
+    }
+  }
+  updateCombatHud();
+}
+
+function updateEnemies(dt) {
+  if (!state.combat) return;
+  state.hitCd = Math.max(0, state.hitCd - dt);
+  for (const e of enemies) {
+    if (!e.fighter.alive) continue;
+    const dx = player.position.x - e.mesh.position.x;
+    const dz = player.position.z - e.mesh.position.z;
+    const d = Math.hypot(dx, dz) || 1;
+    if (d > 1.25) {
+      e.mesh.position.x += (dx / d) * e.speed * dt;
+      e.mesh.position.z += (dz / d) * e.speed * dt;
+    }
+    e.mesh.lookAt(player.position.x, 1, player.position.z);
+    if (d < 1.45 && state.hitCd <= 0) {
+      state.playerHp = Math.max(0, state.playerHp - 9);
+      state.hitCd = 0.65;
+      updateCombatHud();
+      if (state.playerHp <= 0) {
+        state.playerHp = 55;
+        player.position.set(0, 0, Math.max(2, player.position.z - 8));
+        toast("Yaralandın! Geri çekildin…", 2.5);
+      }
+    }
+  }
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    const b = bullets[i];
+    b.life -= dt;
+    b.mesh.position.addScaledVector(b.dir, b.speed * dt);
+    if (b.life <= 0) {
+      scene.remove(b.mesh);
+      bullets.splice(i, 1);
+    }
+  }
+}
+
+function onQuest(q) {
+  doorArrow.visible = q === QUEST.FOLLOW_DOOR || q === QUEST.COLOR_PUZZLE;
+  if (doorArrow.visible) {
+    doorArrow.position.set(POS.colorDoor.x, 2.9, POS.colorDoor.z - 1.2);
+  }
+  hideZone.visible = q === QUEST.HIDE_GUARD || q === QUEST.HIDE2;
+  guard.visible =
+    q === QUEST.HIDE_GUARD ||
+    q === QUEST.RUN_GUARD ||
+    q === QUEST.HIDE2 ||
+    q === QUEST.RUN2;
+  escapePad.visible = q === QUEST.ESCAPE;
+  battery.visible = q === QUEST.FIND_BATTERY || (q === QUEST.COLOR2 && !state.hasBattery);
+
+  if (q === QUEST.FOLLOW_DOOR) toast("Sarı oka / kapıya git · fare ile bak");
+  if (q === QUEST.COLOR_PUZZLE) startColorPuzzle(1);
+  if (q === QUEST.FIND_KEYCARD) {
+    keycard.visible = true;
+    keycard.position.set(POS.keycard.x, 0, POS.keycard.z);
+    // Daha parlak işaret
+    toast("Kırmızı anahtar: kapıdan çık · SOLA git (kırmızı ışıklı kutu)", 4.5);
+  }
+  if (q === QUEST.HIDE_GUARD) startHide(1);
+  if (q === QUEST.RUN_GUARD) startRun(1);
+  if (q === QUEST.FIGHT_PATROL) spawnPatrol();
+  if (q === QUEST.FIND_BATTERY) {
+    battery.visible = true;
+    toast("Mavi batarya kutusunu al");
+  }
+  if (q === QUEST.COLOR2) startColorPuzzle(2);
+  if (q === QUEST.HIDE2) startHide(2);
+  if (q === QUEST.RUN2) startRun(2);
+  if (q === QUEST.REACH_PC) toast("Ana bilgisayar · E ile hackle");
+  if (q === QUEST.HACK) startHack();
+  if (q === QUEST.ESCAPE) {
+    escapePad.visible = true;
+    toast("Kaçış gemisi! E ile bin");
+  }
+  if (q === QUEST.DONE) showEnd();
+}
+
+// Color — 5 sn sıra göster, o sırada basılamaz; sonra sıra kaybolur
+function startColorPuzzle(which) {
+  state.mode = MODE.COLOR;
+  state.colorWhich = which;
+  state.colorProgress = 0;
+  state.colorLocked = true; // gösterim sırasında basılamaz
+  hideAllMinigames();
+  colorUi.classList.remove("hidden");
+  if (document.pointerLockElement) document.exitPointerLock();
+
+  const order = which === 1 ? COLOR_ORDER : COLOR_ORDER_2;
+  state.colorOrder = order;
+  const names = { blue: "Mavi", green: "Yeşil", red: "Kırmızı", yellow: "Sarı" };
+
+  colorButtons.innerHTML = "";
+  ["red", "blue", "yellow", "green"].forEach((c) => {
+    const b = document.createElement("button");
+    b.className = `color-btn ${c}`;
+    b.textContent = names[c];
+    b.type = "button";
+    b.disabled = true;
+    b.style.opacity = "0.45";
+    b.style.pointerEvents = "none";
+    b.addEventListener("click", () => onColorPress(c, order));
+    colorButtons.appendChild(b);
+  });
+
+  // 5 saniye sıra göster
+  let left = 5;
+  colorOrderLabel.textContent = order.map((c) => names[c]).join(" → ");
+  colorOrderLabel.style.opacity = "1";
+  colorStatus.textContent = `Sırayı ezberle! (${left})`;
+
+  if (state.colorCountdown) clearInterval(state.colorCountdown);
+  state.colorCountdown = setInterval(() => {
+    left -= 1;
+    if (left > 0) {
+      colorStatus.textContent = `Sırayı ezberle! (${left})`;
+    } else {
+      clearInterval(state.colorCountdown);
+      state.colorCountdown = null;
+      // Sıra kaybolur, düğmeler açılır
+      colorOrderLabel.textContent = "??? → ??? → ??? → ???";
+      colorOrderLabel.style.opacity = "0.7";
+      colorStatus.textContent = "Şimdi sırayla bas!";
+      state.colorLocked = false;
+      colorButtons.querySelectorAll("button").forEach((b) => {
+        b.disabled = false;
+        b.style.opacity = "1";
+        b.style.pointerEvents = "auto";
+      });
+    }
+  }, 1000);
+}
+
+function onColorPress(c, order) {
+  if (state.colorLocked) return; // gösterim sırasında basılamaz
+  const ord = order || state.colorOrder || COLOR_ORDER;
+  if (c === ord[state.colorProgress]) {
+    state.colorProgress++;
+    colorStatus.textContent = `İyi (${state.colorProgress}/${ord.length})`;
+    if (state.colorProgress >= ord.length) {
+      colorStatus.textContent = "Açıldı!";
+      state.colorLocked = true;
+      setTimeout(() => {
+        hideAllMinigames();
+        state.mode = MODE.PLAY;
+        if (state.colorWhich === 1) {
+          colorDoor.userData.door.position.x = 2.8;
+          applyEvent("color_ok");
+        } else {
+          colorDoor2.userData.door.position.x = 2.8;
+          applyEvent("color2_ok");
+        }
+      }, 400);
+    }
+  } else {
+    // Yanlış → sırayı tekrar 5 sn göster, basılamaz
+    state.colorProgress = 0;
+    colorStatus.textContent = "Yanlış! Sıra tekrar gösterilecek…";
+    state.colorLocked = true;
+    colorButtons.querySelectorAll("button").forEach((b) => {
+      b.disabled = true;
+      b.style.opacity = "0.45";
+      b.style.pointerEvents = "none";
+    });
+    const names = { blue: "Mavi", green: "Yeşil", red: "Kırmızı", yellow: "Sarı" };
+    let left = 5;
+    colorOrderLabel.textContent = ord.map((c) => names[c]).join(" → ");
+    colorOrderLabel.style.opacity = "1";
+    if (state.colorCountdown) clearInterval(state.colorCountdown);
+    state.colorCountdown = setInterval(() => {
+      left -= 1;
+      if (left > 0) {
+        colorStatus.textContent = `Sırayı ezberle! (${left})`;
+      } else {
+        clearInterval(state.colorCountdown);
+        state.colorCountdown = null;
+        colorOrderLabel.textContent = "??? → ??? → ??? → ???";
+        colorStatus.textContent = "Şimdi sırayla bas!";
+        state.colorLocked = false;
+        colorButtons.querySelectorAll("button").forEach((b) => {
+          b.disabled = false;
+          b.style.opacity = "1";
+          b.style.pointerEvents = "auto";
+        });
+      }
+    }, 1000);
+  }
+}
+
+// Hide / run
+function startHide(which) {
+  state.mode = MODE.HIDE;
+  state.hideWhich = which;
+  state.hideProgress = 0;
+  hideAllMinigames();
+  hideUi.classList.remove("hidden");
+  if (document.pointerLockElement) document.exitPointerLock();
+  const z = which === 1 ? POS.hide1 : POS.hide2;
+  hideZone.position.set(z.x, 0.05, z.z);
+  hideZone.visible = true;
+  guard.visible = true;
+  guard.position.set(z.x - 4, 0, z.z);
+  hideStatus.textContent = "Yeşil bölgede bekle";
+}
+
+function updateHide(dt) {
+  updatePlayerMove(dt);
+  updateCamera();
+  const z = state.hideWhich === 1 ? POS.hide1 : POS.hide2;
+  const d = distXZ(player.position.x, player.position.z, z.x, z.z);
+  state.hideInZone = d < 1.55;
+  guard.position.z = z.z + Math.sin(clock.elapsedTime * 0.8) * 3.5;
+  guard.position.x = z.x - 3 + Math.cos(clock.elapsedTime * 0.6) * 1.2;
+  guard.lookAt(player.position.x, 1, player.position.z);
+  if (state.hideInZone) {
+    state.hideProgress = Math.min(1, state.hideProgress + dt / 3.2);
+    hideStatus.textContent = "Saklandın… geçiyor";
+  } else {
+    state.hideProgress = Math.max(0, state.hideProgress - dt * 0.35);
+    hideStatus.textContent = "Yeşil bölgeye gir!";
+  }
+  hideBar.style.width = `${state.hideProgress * 100}%`;
+  if (state.hideProgress >= 1) {
+    hideAllMinigames();
+    hideZone.visible = false;
+    state.mode = MODE.PLAY;
+    if (state.hideWhich === 1) applyEvent("hide_ok");
+    else applyEvent("hide2_ok");
+    toast("Şimdi KOŞ!");
+  }
+}
+
+function startRun(which) {
+  state.mode = MODE.RUN;
+  state.runWhich = which;
+  state.runT = 0;
+  hideAllMinigames();
+  runUi.classList.remove("hidden");
+  guard.visible = true;
+  toast("Kapıya koş!", 1.5);
+}
+
+function updateRun(dt) {
+  const maxT = 8.5;
+  state.runT += dt;
+  runBar.style.width = `${Math.min(1, state.runT / maxT) * 100}%`;
+  updatePlayerMove(dt * 1.12);
+  updateCamera();
+  guard.position.x += (player.position.x - guard.position.x) * 1.6 * dt;
+  guard.position.z += (player.position.z - guard.position.z) * 1.6 * dt;
+  const target = state.runWhich === 1 ? POS.run1 : POS.run2;
+  if (distXZ(player.position.x, player.position.z, target.x, target.z) < 2.5) {
+    hideAllMinigames();
+    guard.visible = false;
+    state.mode = MODE.PLAY;
+    if (state.runWhich === 1) applyEvent("run_ok");
+    else applyEvent("run2_ok");
+    toast(state.runWhich === 1 ? "Devriyeye hazır ol!" : "Bilgisayar koridoru!");
+    return;
+  }
+  if (state.runT >= maxT) {
+    hideAllMinigames();
+    state.mode = MODE.PLAY;
+    player.position.z = Math.max(8, player.position.z - 6);
+    if (state.runWhich === 1) {
+      setQuest(QUEST.HIDE_GUARD);
+      onQuest(QUEST.HIDE_GUARD);
+    } else {
+      setQuest(QUEST.HIDE2);
+      onQuest(QUEST.HIDE2);
+    }
+    toast("Yakalandın! Tekrar saklan", 2.5);
+  }
+}
+
+// Hack
+function startHack() {
+  state.mode = MODE.HACK;
+  hideAllMinigames();
+  hackUi.classList.remove("hidden");
+  if (document.pointerLockElement) document.exitPointerLock();
+  openDialogue(
+    "ROBOT",
+    "Ben hackleme yapamam.\nSonda 'Ben robot değilim' kutusu var.\nRobotlar onu… işaretleyemez.\n\nSen yap. Bol şans.",
+    () => beginHackStep(1)
+  );
+}
+
+function beginHackStep(step) {
+  state.hackStep = step;
+  hackFail.classList.add("hidden");
+  paperNote.classList.add("hidden");
+  hackBody.innerHTML = "";
+  state.hackTime = 1;
+  state.hackLetterI = 0;
+
+  if (step === 1) {
+    hackStepLabel.textContent = "Adım 1/4 — TÜM düğmelere bas (bar dolmadan)";
+    state.hackMaxTime = 8;
+    const labels = ["A1", "B2", "C3", "D4", "E5", "F6", "G7", "H8", "I9", "J0", "K#", "L*"];
+    const pressed = new Set();
+    labels.forEach((lab) => {
+      const b = document.createElement("button");
+      b.className = "hack-btn";
+      b.textContent = lab;
+      b.type = "button";
+      b.addEventListener("click", () => {
+        if (pressed.has(lab)) return;
+        pressed.add(lab);
+        b.style.background = "#1a4030";
+        if (pressed.size >= labels.length) succeedHackStep();
+      });
+      hackBody.appendChild(b);
+    });
+  } else if (step === 2) {
+    hackStepLabel.textContent = "Adım 2/4 — Üstteki harfe bas";
+    state.hackMaxTime = 2.4 * HACK_LETTERS.length;
+    const show = document.createElement("div");
+    show.id = "hack-letter-show";
+    show.textContent = HACK_LETTERS[0];
+    hackBody.appendChild(show);
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;justify-content:center";
+    const letters = [...new Set([...HACK_LETTERS, "X", "Q", "Z", "M", "P"])];
+    for (let i = letters.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [letters[i], letters[j]] = [letters[j], letters[i]];
+    }
+    letters.forEach((L) => {
+      const b = document.createElement("button");
+      b.className = "hack-btn";
+      b.textContent = L;
+      b.type = "button";
+      b.addEventListener("click", () => {
+        if (L === HACK_LETTERS[state.hackLetterI]) {
+          state.hackLetterI++;
+          if (state.hackLetterI >= HACK_LETTERS.length) succeedHackStep();
+          else {
+            show.textContent = HACK_LETTERS[state.hackLetterI];
+            state.hackTime = Math.min(1, state.hackTime + 0.15);
+          }
+        } else failHack();
+      });
+      row.appendChild(b);
+    });
+    hackBody.appendChild(row);
+  } else if (step === 3) {
+    hackStepLabel.textContent = "Adım 3/4 — Kâğıttaki 1 ve 0";
+    state.hackMaxTime = 14;
+    paperNote.classList.remove("hidden");
+    paperBinary.textContent = BINARY_PAPER;
+    const inp = document.createElement("input");
+    inp.id = "binary-input";
+    inp.type = "text";
+    inp.placeholder = "1010…";
+    inp.autocomplete = "off";
+    hackBody.appendChild(inp);
+    const ok = document.createElement("button");
+    ok.className = "hack-btn";
+    ok.textContent = "ONAYLA";
+    ok.type = "button";
+    const check = () => {
+      if (binaryMatches(inp.value)) succeedHackStep();
+      else failHack();
+    };
+    ok.addEventListener("click", check);
+    inp.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") check();
+    });
+    hackBody.appendChild(ok);
+    setTimeout(() => inp.focus(), 80);
+  } else if (step === 4) {
+    hackStepLabel.textContent = "Son — Ben robot değilim";
+    state.hackMaxTime = 25;
+    paperNote.classList.add("hidden");
+    const row = document.createElement("div");
+    row.id = "captcha-row";
+    row.innerHTML = `<input type="checkbox" id="not-robot" /><label for="not-robot">Ben robot değilim</label>`;
+    hackBody.appendChild(row);
+    const ok = document.createElement("button");
+    ok.className = "hack-btn";
+    ok.textContent = "GÖNDER";
+    ok.type = "button";
+    ok.addEventListener("click", () => {
+      const cb = document.getElementById("not-robot");
+      if (cb?.checked) succeedHackStep();
+      else toast("Kutuyu işaretle!");
+    });
+    hackBody.appendChild(ok);
+  }
+}
+
+function failHack() {
+  hackFail.classList.remove("hidden");
+  toast("Başarısız! Adım 1'e dönülüyor…", 2);
+  setTimeout(() => beginHackStep(1), 700);
+}
+
+function succeedHackStep() {
+  const next = nextHackStep(state.hackStep, true);
+  if (next >= 5) {
+    hideAllMinigames();
+    openDialogue(
+      "ROBOT",
+      "…Aslında robotlar o kutuyu işaretleyebilir.\n\nBen üşendim. Yalan söyledim.\n\nAma sen efsanevdin. Hadi eve — Dünya'ya!",
+      () => {
+        state.mode = MODE.PLAY;
+        applyEvent("hack_ok");
+      }
+    );
+    return;
+  }
+  beginHackStep(next);
+}
+
+function updateHack(dt) {
+  if (state.dialogueOpen) return;
+  state.hackTime -= dt / state.hackMaxTime;
+  hackTimer.style.transform = `scaleX(${Math.max(0, state.hackTime)})`;
+  if (state.hackTime <= 0) failHack();
+}
+
+// Flow
+function setQuest(q) {
+  state.quest = q;
+  questTextEl.textContent = QUEST_LABELS[q] || q;
+}
+
+function applyEvent(ev) {
+  const n = advanceQuest(state.quest, ev);
+  if (n !== state.quest) {
+    setQuest(n);
+    onQuest(n);
+  }
+}
+
+function toast(msg, d = 2.8) {
+  toastEl.textContent = msg;
+  toastEl.classList.remove("hidden");
+  state.toastT = d;
+}
+
+function showEnd() {
+  state.mode = MODE.END;
+  uiEl.classList.add("hidden");
+  hideAllMinigames();
+  endScreen.classList.remove("hidden");
+  if (document.pointerLockElement) document.exitPointerLock();
+}
+
+function startGame() {
+  titleScreen.classList.add("hidden");
+  state.mode = MODE.WAKE;
+  state.wakeT = 0;
+  wakeOverlay.classList.remove("hidden", "fade");
+  requestAnimationFrame(() => setTimeout(() => wakeOverlay.classList.add("fade"), 200));
+  setQuest(QUEST.WAKE);
+  story(
+    "Gözlerin ağır…\nDemir… soğuk…\nPencerede yıldızlar.\n\nKRAXX esir gemisi.\nBizi kaçırdılar.",
+    3.5
+  );
+}
+
+function beginPlay() {
+  state.mode = MODE.PLAY;
+  bodyRoot.rotation.x = 0;
+  bodyRoot.position.y = 0;
+  wakeOverlay.classList.add("hidden");
+  uiEl.classList.remove("hidden");
+  applyEvent("stood_up");
+  toast("Tıkla = fare kilidi · Sağ tık basılı = bak · WASD", 4);
+}
+
+function wdist(a, o) {
+  return distXZ(a.x, a.z, o.x, o.z);
+}
+
+function getNear() {
+  if (state.mode !== MODE.PLAY || state.dialogueOpen) return null;
+  const p = player.position;
+  const q = state.quest;
+  if (q === QUEST.TALK_ROBOT && wdist(p, robot.position) < R)
+    return { t: "robot", l: "[H] Robotla konuş" };
+  if (
+    (q === QUEST.FOLLOW_DOOR || q === QUEST.COLOR_PUZZLE) &&
+    wdist(p, colorDoor.position) < R + 0.6
+  )
+    return { t: "color", l: "[E] Renk panelleri" };
+  if (
+    q === QUEST.FIND_KEYCARD &&
+    keycard.visible &&
+    wdist(p, keycard.position) < R
+  )
+    return { t: "key", l: "[E] Anahtar kartı al" };
+  if (
+    q === QUEST.FIND_BATTERY &&
+    battery.visible &&
+    wdist(p, battery.position) < R
+  )
+    return { t: "bat", l: "[E] Batarya al" };
+  if (q === QUEST.COLOR2 && wdist(p, colorDoor2.position) < R + 0.6)
+    return { t: "color2", l: "[E] 2. renk panelleri" };
+  if (q === QUEST.REACH_PC && wdist(p, pc.position) < R + 0.6)
+    return { t: "pc", l: "[E] Ana bilgisayarı hackle" };
+  if (q === QUEST.ESCAPE && escapePad.visible && wdist(p, escapePad.position) < R + 1.2)
+    return { t: "ship", l: "[E] Kaçış gemisine bin" };
+  return null;
+}
+
+function doNear(t) {
+  if (t === "robot") {
+    openDialogue(
+      "ROBOT",
+      "Uyku modu değil.\nBizi kaçırdılar. Batarya %12.\n\nŞu kapıdan git (sarı ok).\nSonra hackleme… ama onu sen yapacaksın.\nBen haritayım, sen bacaklarsın.",
+      () => {
+        applyEvent("robot_talked");
+        doorArrow.visible = true;
+      }
+    );
+  }
+  if (t === "color") applyEvent("at_color");
+  if (t === "key") {
+    state.hasKeycard = true;
+    keycard.visible = false;
+    toast("Anahtar kartı alındı!");
+    applyEvent("keycard_ok");
+  }
+  if (t === "bat") {
+    state.hasBattery = true;
+    battery.visible = false;
+    toast("Batarya! Robot: %100 😎");
+    applyEvent("battery_ok");
+  }
+  if (t === "color2") {
+    setQuest(QUEST.COLOR2);
+    startColorPuzzle(2);
+  }
+  if (t === "pc") {
+    openDialogue(
+      "ROBOT",
+      "Ana bilgisayar.\nBen hackleme yapamam — sonda\n'Ben robot değilim' kutusu var.\n\nSen yap. Lütfen.",
+      () => applyEvent("pc_start")
+    );
+  }
+  if (t === "ship") {
+    state.mode = MODE.ESCAPE;
+    state.escapeT = 0;
+    uiEl.classList.add("hidden");
+    story("Motorlar…\nYıldızlar…\nDünya mavi…\n\nEve dönüş.", 3.5);
+  }
+}
+
+// Input + camera
+$("btn-start")?.addEventListener("click", startGame);
+
+window.addEventListener("keydown", (e) => {
+  const k = e.key.toLowerCase();
+  keys.add(k);
+  if (state.mode === MODE.TITLE && (e.code === "Enter" || e.code === "Space")) {
+    e.preventDefault();
+    startGame();
+    return;
+  }
+  if (state.mode === MODE.END) return;
+  if (
+    state.dialogueOpen &&
+    (k === "h" || k === "escape" || e.code === "Space" || e.code === "Enter")
+  ) {
+    e.preventDefault();
+    closeDialogue();
+    return;
+  }
+  // Arrow keys rotate camera (always in play/hide/run)
+  if (["arrowleft", "arrowright", "arrowup", "arrowdown"].includes(k)) {
+    if (state.mode === MODE.PLAY || state.mode === MODE.HIDE || state.mode === MODE.RUN) {
+      e.preventDefault();
+    }
+  }
+  if (state.mode !== MODE.PLAY) return;
+  if (k === "e") {
+    const n = getNear();
+    if (n && n.t !== "robot") doNear(n.t);
+  }
+  if (k === "h") {
+    const n = getNear();
+    if (n?.t === "robot") doNear("robot");
+  }
+});
+window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
+
+canvas.addEventListener("mousedown", (e) => {
+  if (e.button === 2) {
+    state.rmbLook = true;
+    e.preventDefault();
+  }
+  if (e.button === 0) {
+    if (
+      (state.mode === MODE.PLAY || state.mode === MODE.RUN || state.mode === MODE.HIDE) &&
+      !state.dialogueOpen
+    ) {
+      if (!state.pointer) {
+        canvas.requestPointerLock();
+        toast("Fare kilidi · bakmak için hareket ettir", 2);
+      } else if (state.combat) {
+        tryShoot();
+      }
+    }
+  }
+});
+canvas.addEventListener("mouseup", (e) => {
+  if (e.button === 2) state.rmbLook = false;
+});
+canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
+document.addEventListener("pointerlockchange", () => {
+  state.pointer = document.pointerLockElement === canvas;
+});
+
+document.addEventListener("mousemove", (e) => {
+  if (state.dialogueOpen) return;
+  if (state.mode !== MODE.PLAY && state.mode !== MODE.RUN && state.mode !== MODE.HIDE)
+    return;
+  const looking = state.pointer || state.rmbLook;
+  if (!looking) return;
+  camOrbit.yaw -= e.movementX * camOrbit.sensitivity;
+  camOrbit.pitch = THREE.MathUtils.clamp(
+    camOrbit.pitch - e.movementY * camOrbit.sensitivity,
+    camOrbit.minPitch,
+    camOrbit.maxPitch
+  );
+});
+
+window.addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+});
+
+function updatePlayerMove(dt) {
+  if (state.dialogueOpen) return;
+  // Arrow keys = look, WASD = move only
+  if (keys.has("arrowleft")) camOrbit.yaw += 1.8 * dt;
+  if (keys.has("arrowright")) camOrbit.yaw -= 1.8 * dt;
+  if (keys.has("arrowup"))
+    camOrbit.pitch = Math.min(camOrbit.maxPitch, camOrbit.pitch + 1.2 * dt);
+  if (keys.has("arrowdown"))
+    camOrbit.pitch = Math.max(camOrbit.minPitch, camOrbit.pitch - 1.2 * dt);
+
+  let ix = 0,
+    iz = 0;
+  if (keys.has("w")) iz -= 1;
+  if (keys.has("s")) iz += 1;
+  if (keys.has("a")) ix -= 1;
+  if (keys.has("d")) ix += 1;
+  if (!ix && !iz) return;
+  const sin = Math.sin(camOrbit.yaw),
+    cos = Math.cos(camOrbit.yaw);
+  const mx = ix * cos + iz * sin;
+  const mz = -ix * sin + iz * cos;
+  const len = Math.hypot(mx, mz) || 1;
+  player.position.x = THREE.MathUtils.clamp(
+    player.position.x + (mx / len) * SPEED * dt,
+    -4.5,
+    4.5
+  );
+  player.position.z = THREE.MathUtils.clamp(
+    player.position.z + (mz / len) * SPEED * dt,
+    -3,
+    88
+  );
+  player.rotation.y = Math.atan2(mx, mz);
+}
+
+function updateCamera() {
+  const target = player.position.clone().add(new THREE.Vector3(0, 1.25, 0));
+  const cp = Math.cos(camOrbit.pitch),
+    sp = Math.sin(camOrbit.pitch);
+  const sy = Math.sin(camOrbit.yaw),
+    cy = Math.cos(camOrbit.yaw);
+  const desired = target
+    .clone()
+    .add(
+      new THREE.Vector3(
+        sy * cp * camOrbit.distance,
+        sp * camOrbit.distance + 0.4,
+        cy * cp * camOrbit.distance
+      )
+    );
+  desired.y = Math.max(0.65, desired.y);
+  camera.position.lerp(desired, 0.18);
+  camera.lookAt(target);
+  playerLight.position.set(player.position.x, player.position.y + 2.5, player.position.z);
+}
+
+function updatePlay(dt) {
+  updatePlayerMove(dt);
+  updateCamera();
+  state.shootCd = Math.max(0, state.shootCd - dt);
+  updateEnemies(dt);
+
+  if (state.quest !== QUEST.WAKE && state.quest !== QUEST.TALK_ROBOT) {
+    const tx = player.position.x - 1.1;
+    const tz = player.position.z - 1.3;
+    robot.position.x += (tx - robot.position.x) * 2.2 * dt;
+    robot.position.z += (tz - robot.position.z) * 2.2 * dt;
+  }
+  if (doorArrow.visible) {
+    doorArrow.position.y = 2.7 + Math.sin(clock.elapsedTime * 3) * 0.15;
+  }
+  // Anahtar / batarya yanıp sönsün
+  if (keycard.visible && keycard.userData.beacon) {
+    keycard.userData.beacon.position.y = 1.0 + Math.sin(clock.elapsedTime * 4) * 0.2;
+    keycard.rotation.y += dt;
+  }
+  if (battery.visible && battery.userData.beacon) {
+    battery.userData.beacon.position.y = 1.0 + Math.sin(clock.elapsedTime * 4) * 0.2;
+    battery.rotation.y += dt;
+  }
+  if (!state.dialogueOpen) {
+    const n = getNear();
+    if (n) {
+      promptEl.textContent = n.l;
+      promptEl.classList.remove("hidden");
+    } else promptEl.classList.add("hidden");
+  }
+  redAlert.intensity = 0.7 + Math.sin(clock.elapsedTime * 2) * 0.5;
+}
+
+function updateWake(dt) {
+  state.wakeT += dt;
+  if (state.wakeT < 1.8) {
+    camera.position.set(1.3, 0.55, 2.6);
+    camera.lookAt(0, 0.35, 1);
+  } else {
+    const u = THREE.MathUtils.clamp((state.wakeT - 1.8) / 2.2, 0, 1);
+    const s = u * u * (3 - 2 * u);
+    bodyRoot.rotation.x = THREE.MathUtils.lerp(-Math.PI / 2 + 0.15, 0, s);
+    bodyRoot.position.y = THREE.MathUtils.lerp(0.28, 0, s);
+    const target = player.position.clone().add(new THREE.Vector3(0, 1.2, 0));
+    camera.position.lerpVectors(
+      new THREE.Vector3(1.3, 0.6, 2.9),
+      target.clone().add(new THREE.Vector3(2, 2.2, 4)),
+      s
+    );
+    camera.lookAt(target);
+    if (u >= 1) beginPlay();
+  }
+}
+
+function updateEscape(dt) {
+  state.escapeT += dt;
+  camera.position.set(5, 3.5, POS.escape.z + 7);
+  camera.lookAt(0, 2, POS.escape.z);
+  escapePad.position.y = Math.min(22, state.escapeT * 4.5);
+  if (state.escapeT > 3.8) {
+    storyOverlay.classList.add("hidden");
+    applyEvent("escaped");
+  }
+}
+
+function setQuest(q) {
+  state.quest = q;
+  questTextEl.textContent = QUEST_LABELS[q] || q;
+}
+
+function applyEvent(ev) {
+  const n = advanceQuest(state.quest, ev);
+  if (n !== state.quest) {
+    setQuest(n);
+    onQuest(n);
+  }
+}
+
+function toast(msg, d = 2.8) {
+  toastEl.textContent = msg;
+  toastEl.classList.remove("hidden");
+  state.toastT = d;
+}
+
+function story(msg, sec = 3) {
+  storyText.textContent = msg;
+  storyOverlay.classList.remove("hidden");
+  setTimeout(() => storyOverlay.classList.add("hidden"), sec * 1000);
+}
+
+function openDialogue(speaker, text, after = null) {
+  state.dialogueOpen = true;
+  state.dialogueAfter = after;
+  dialogueEl.classList.remove("hidden");
+  promptEl.classList.add("hidden");
+  dSpeaker.textContent = speaker;
+  dText.textContent = text;
+}
+
+function closeDialogue() {
+  state.dialogueOpen = false;
+  dialogueEl.classList.add("hidden");
+  const cb = state.dialogueAfter;
+  state.dialogueAfter = null;
+  if (cb) cb();
+}
+
+function hideAllMinigames() {
+  colorUi.classList.add("hidden");
+  hideUi.classList.add("hidden");
+  runUi.classList.add("hidden");
+  hackUi.classList.add("hidden");
+}
+
+function showEnd() {
+  state.mode = MODE.END;
+  uiEl.classList.add("hidden");
+  hideAllMinigames();
+  endScreen.classList.remove("hidden");
+  if (document.pointerLockElement) document.exitPointerLock();
+}
+
+function startGame() {
+  titleScreen.classList.add("hidden");
+  state.mode = MODE.WAKE;
+  state.wakeT = 0;
+  wakeOverlay.classList.remove("hidden", "fade");
+  requestAnimationFrame(() => setTimeout(() => wakeOverlay.classList.add("fade"), 200));
+  setQuest(QUEST.WAKE);
+  story(
+    "Gözlerin ağır…\nDemir… soğuk…\nPencerede yıldızlar.\n\nKRAXX esir gemisi.\nBizi kaçırdılar.",
+    3.5
+  );
+}
+
+function beginPlay() {
+  state.mode = MODE.PLAY;
+  bodyRoot.rotation.x = 0;
+  bodyRoot.position.y = 0;
+  wakeOverlay.classList.add("hidden");
+  uiEl.classList.remove("hidden");
+  applyEvent("stood_up");
+  toast("Sol tık = fare kilidi · Sağ tık basılı = bak · Ok tuşları = bak · WASD", 4.5);
+}
+
+function wdist(a, o) {
+  return distXZ(a.x, a.z, o.x, o.z);
+}
+
+function getNear() {
+  if (state.mode !== MODE.PLAY || state.dialogueOpen) return null;
+  const p = player.position;
+  const q = state.quest;
+  if (q === QUEST.TALK_ROBOT && wdist(p, robot.position) < R)
+    return { t: "robot", l: "[H] Robotla konuş" };
+  if (
+    (q === QUEST.FOLLOW_DOOR || q === QUEST.COLOR_PUZZLE) &&
+    wdist(p, colorDoor.position) < R + 0.7
+  )
+    return { t: "color", l: "[E] Renk panelleri" };
+  if (q === QUEST.FIND_KEYCARD && keycard.visible && wdist(p, keycard.position) < R)
+    return { t: "key", l: "[E] Anahtar kartı al" };
+  if (q === QUEST.FIND_BATTERY && battery.visible && wdist(p, battery.position) < R)
+    return { t: "bat", l: "[E] Batarya al" };
+  if (q === QUEST.COLOR2 && wdist(p, colorDoor2.position) < R + 0.7)
+    return { t: "color2", l: "[E] 2. renk panelleri" };
+  if (q === QUEST.REACH_PC && wdist(p, pc.position) < R + 0.7)
+    return { t: "pc", l: "[E] Ana bilgisayarı hackle" };
+  if (q === QUEST.ESCAPE && escapePad.visible && wdist(p, escapePad.position) < R + 1.3)
+    return { t: "ship", l: "[E] Kaçış gemisine bin · Dünya!" };
+  return null;
+}
+
+function doNear(t) {
+  if (t === "robot") {
+    openDialogue(
+      "ROBOT",
+      "Uyku modu değil.\nBizi kaçırdılar. Batarya %12.\n\nŞu kapıdan git (sarı ok).\nUzun bir yol: renk, saklan, koş, savaş…\nSonra hackleme — onu sen yapacaksın.\nBen haritayım, sen bacaklarsın.",
+      () => {
+        applyEvent("robot_talked");
+        doorArrow.visible = true;
+        doorArrow.position.set(POS.colorDoor.x, 2.9, POS.colorDoor.z - 1.2);
+      }
+    );
+  }
+  if (t === "color") applyEvent("at_color");
+  if (t === "key") {
+    state.hasKeycard = true;
+    keycard.visible = false;
+    toast("Anahtar kartı!");
+    applyEvent("keycard_ok");
+  }
+  if (t === "bat") {
+    state.hasBattery = true;
+    battery.visible = false;
+    toast("Batarya takıldı · Robot %100");
+    applyEvent("battery_ok");
+  }
+  if (t === "color2") {
+    startColorPuzzle(2);
+  }
+  if (t === "pc") {
+    openDialogue(
+      "ROBOT",
+      "Ana bilgisayar.\nBen hackleme yapamam —\n'Ben robot değilim' kutusu var.\n\nSen yap. Lütfen.",
+      () => applyEvent("pc_start")
+    );
+  }
+  if (t === "ship") {
+    state.mode = MODE.ESCAPE;
+    state.escapeT = 0;
+    uiEl.classList.add("hidden");
+    story("Motorlar…\nYıldızlar…\nDünya mavi…\n\nEve dönüş.\nSeri sona eriyor.", 3.5);
+  }
+}
+
+// Input bindings
+$("btn-start")?.addEventListener("click", startGame);
+window.addEventListener("keydown", (e) => {
+  const k = e.key.toLowerCase();
+  keys.add(k);
+  if (state.mode === MODE.TITLE && (e.code === "Enter" || e.code === "Space")) {
+    e.preventDefault();
+    startGame();
+    return;
+  }
+  if (state.mode === MODE.END) return;
+  if (
+    state.dialogueOpen &&
+    (k === "h" || k === "escape" || e.code === "Space" || e.code === "Enter")
+  ) {
+    e.preventDefault();
+    closeDialogue();
+    return;
+  }
+  if (["arrowleft", "arrowright", "arrowup", "arrowdown"].includes(k)) {
+    if (state.mode === MODE.PLAY || state.mode === MODE.HIDE || state.mode === MODE.RUN)
+      e.preventDefault();
+  }
+  if (state.mode !== MODE.PLAY) return;
+  if (k === "e") {
+    const n = getNear();
+    if (n && n.t !== "robot") doNear(n.t);
+  }
+  if (k === "h") {
+    const n = getNear();
+    if (n?.t === "robot") doNear("robot");
+  }
+});
+window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
+
+canvas.addEventListener("mousedown", (e) => {
+  if (e.button === 2) {
+    state.rmbLook = true;
+    e.preventDefault();
+  }
+  if (e.button === 0) {
+    if (
+      (state.mode === MODE.PLAY || state.mode === MODE.RUN || state.mode === MODE.HIDE) &&
+      !state.dialogueOpen
+    ) {
+      if (!state.pointer) {
+        canvas.requestPointerLock();
+        toast("Fare kilidi açık · hareket = bak", 2);
+      } else if (state.combat) tryShoot();
+    }
+  }
+});
+canvas.addEventListener("mouseup", (e) => {
+  if (e.button === 2) state.rmbLook = false;
+});
+canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+document.addEventListener("pointerlockchange", () => {
+  state.pointer = document.pointerLockElement === canvas;
+});
+document.addEventListener("mousemove", (e) => {
+  if (state.dialogueOpen) return;
+  if (state.mode !== MODE.PLAY && state.mode !== MODE.RUN && state.mode !== MODE.HIDE)
+    return;
+  if (!(state.pointer || state.rmbLook)) return;
+  camOrbit.yaw -= e.movementX * camOrbit.sensitivity;
+  camOrbit.pitch = THREE.MathUtils.clamp(
+    camOrbit.pitch - e.movementY * camOrbit.sensitivity,
+    camOrbit.minPitch,
+    camOrbit.maxPitch
+  );
+});
+window.addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+});
+
+// re-bind helpers used above that need to exist - onQuest/startColor etc already defined
+
+const clock = new THREE.Clock();
+
+function tick() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (state.mode === MODE.WAKE) updateWake(dt);
+  else if (state.mode === MODE.PLAY) updatePlay(dt);
+  else if (state.mode === MODE.HIDE) updateHide(dt);
+  else if (state.mode === MODE.RUN) updateRun(dt);
+  else if (state.mode === MODE.HACK) updateHack(dt);
+  else if (state.mode === MODE.ESCAPE) updateEscape(dt);
+  else if (state.mode === MODE.COLOR) {
+    camera.position.lerp(
+      new THREE.Vector3(2.5, 3.2, (state.colorWhich === 1 ? POS.colorDoor.z : POS.color2.z) + 5),
+      0.05
+    );
+    camera.lookAt(0, 1.6, state.colorWhich === 1 ? POS.colorDoor.z : POS.color2.z);
+  }
+
+  if (state.toastT > 0) {
+    state.toastT -= dt;
+    if (state.toastT <= 0) toastEl.classList.add("hidden");
+  }
+  composer.render();
+  requestAnimationFrame(tick);
+}
+
+// Fix missing function refs - updateHide/Run/Hack need to call existing
+// (already defined above in file order - wait, updateHide is defined before tick, good)
+
+// Wire duplicate toast/apply - ensure onQuest startColor exist before beginPlay
+// beginPlay uses applyEvent - defined
+
+// Fix: hideAllMinigames and others duplicated? Only one set in this rewrite at bottom of first section...
+// Actually I have duplicate setQuest/applyEvent/toast at end of "Flow" and earlier - let me check
+
+// There might be duplicate function definitions from the write. Grep later.
+
+setQuest(QUEST.WAKE);
+tick();
+console.info("%cHENTW 3 uzun", "color:#ff6688;font-weight:bold");

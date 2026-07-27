@@ -1,0 +1,151 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: #020a06; color: #e8fff0;
+  font-family: "Segoe UI", system-ui, sans-serif; user-select: none;
+}
+#game { display: block; width: 100%; height: 100%; }
+.layer { position: fixed; inset: 0; z-index: 20; pointer-events: none; }
+.hidden { display: none !important; }
+
+#title-screen, #end-screen {
+  z-index: 40; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 12px;
+  background: radial-gradient(ellipse at center, #0a2818 0%, #020a06 70%);
+  pointer-events: auto;
+}
+.badge { font-size: 11px; letter-spacing: 0.35em; color: #66ffaa; }
+.big {
+  font-size: clamp(52px, 13vw, 110px); font-weight: 800;
+  letter-spacing: 0.2em; padding-left: 0.2em;
+  text-shadow: 0 0 40px rgba(68, 255, 136, 0.5);
+}
+.sub { letter-spacing: 0.35em; color: #88ffbb; font-size: 18px; }
+.line { color: rgba(200,255,220,0.75); font-size: 14px; margin: 8px 0; }
+#btn-start, #choices button {
+  pointer-events: auto; cursor: pointer;
+  border: 1px solid rgba(100,255,180,0.5);
+  background: rgba(10,40,24,0.92); color: #b8ffd8;
+  border-radius: 10px; padding: 12px 24px; font-size: 14px;
+}
+#btn-start:hover, #choices button:hover { background: rgba(20,70,40,0.95); }
+.thanks { font-size: 22px; color: #9dffc8; letter-spacing: 0.1em; }
+.next { font-size: 14px; letter-spacing: 0.2em; color: #66ffaa; text-transform: uppercase; }
+
+#ui { z-index: 15; }
+#game-title {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  font-size: 12px; letter-spacing: 0.28em; color: #66ffaa;
+}
+#quest-panel, #inv-panel {
+  position: absolute; padding: 12px 14px;
+  background: rgba(6,24,14,0.88);
+  border: 1px solid rgba(100,255,160,0.35); border-radius: 10px;
+}
+#quest-panel { top: 42px; left: 12px; max-width: 300px; }
+#inv-panel { bottom: 42px; left: 12px; min-width: 140px; font-size: 13px; }
+#combat-hud {
+  position: absolute; top: 42px; right: 12px; min-width: 160px;
+  padding: 12px 14px; background: rgba(40,8,8,0.9);
+  border: 1px solid rgba(255,80,80,0.5); border-radius: 10px; font-size: 13px;
+}
+#hp-bar-wrap {
+  height: 10px; background: #200808; border-radius: 5px; overflow: hidden; margin: 4px 0 8px;
+}
+#hp-bar {
+  height: 100%; width: 100%; background: linear-gradient(90deg, #ff3344, #ff8866);
+  transition: width 0.1s linear;
+}
+.lab { font-size: 10px; letter-spacing: 0.18em; color: #7ab894; margin-bottom: 6px; }
+#quest-text { font-size: 14px; line-height: 1.35; }
+
+#prompt {
+  position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%);
+  padding: 10px 16px; background: rgba(8,28,16,0.92);
+  border: 1px solid rgba(255,220,100,0.5); border-radius: 8px; color: #ffe28a;
+}
+#dialogue {
+  position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%);
+  width: min(540px, calc(100% - 24px)); padding: 16px;
+  background: rgba(8,28,18,0.96); border: 1px solid rgba(120,255,180,0.4);
+  border-radius: 12px;
+}
+#d-speaker { font-size: 11px; letter-spacing: 0.14em; color: #88ffbb; margin-bottom: 8px; }
+#d-text { font-size: 15px; line-height: 1.45; white-space: pre-line; }
+#d-hint { margin-top: 10px; font-size: 11px; color: #6a8a78; }
+
+#choices {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; gap: 10px; min-width: 260px;
+  padding: 20px; background: rgba(4,20,12,0.95);
+  border: 1px solid rgba(100,255,160,0.45); border-radius: 14px;
+  pointer-events: auto; z-index: 25;
+}
+#choices:not(.hidden) { display: flex; }
+#choice-title { text-align: center; margin-bottom: 6px; color: #9dffc8; }
+
+#toast {
+  position: absolute; top: 36%; left: 50%; transform: translate(-50%,-50%);
+  padding: 14px 20px; background: rgba(8,32,20,0.92);
+  border: 1px solid rgba(80,255,160,0.45); border-radius: 10px;
+  color: #9dffc8; text-align: center;
+}
+#help {
+  position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+  font-size: 12px; color: rgba(160,220,180,0.5);
+}
+
+#wake-overlay {
+  z-index: 30; background: #000; opacity: 1;
+  transition: opacity 2s ease;
+}
+#wake-overlay.fade { opacity: 0; }
+
+#story-overlay {
+  z-index: 35; display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.55); pointer-events: none;
+}
+#story-text {
+  max-width: 90vw; text-align: center; font-size: clamp(16px, 2.8vw, 26px);
+  line-height: 1.5; white-space: pre-line;
+  text-shadow: 0 2px 16px #000;
+}
+
+#hurt-vignette {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at center, transparent 30%, rgba(120,0,0,0.65) 100%);
+  pointer-events: none; z-index: 12;
+}
+
+/* Series shared HUD */
+.easy-label {
+  display: flex; align-items: center; gap: 8px; margin-top: 8px;
+  font-size: 13px; color: #c8d0e0; cursor: pointer; pointer-events: auto;
+}
+.easy-label input { width: 16px; height: 16px; }
+.title-btns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+#btn-continue {
+  cursor: pointer; pointer-events: auto;
+  border: 1px solid rgba(100, 220, 180, 0.55);
+  background: rgba(10, 40, 30, 0.95); color: #9dffd0;
+  border-radius: 10px; padding: 12px 24px; font-size: 15px; font-weight: 700;
+}
+#collect-hud {
+  position: absolute; top: 42px; right: 12px;
+  padding: 8px 12px; background: rgba(12, 20, 14, 0.9);
+  border: 1px solid rgba(255, 200, 80, 0.45); border-radius: 10px;
+  color: #ffdd88; font-weight: 700; font-size: 14px; pointer-events: none; z-index: 16;
+}
+#minimap-wrap {
+  position: absolute; bottom: 48px; right: 12px; z-index: 16;
+  padding: 8px; background: rgba(10, 14, 28, 0.88);
+  border: 1px solid rgba(100, 160, 255, 0.4); border-radius: 10px; pointer-events: none;
+}
+#minimap-wrap .lab { font-size: 9px; letter-spacing: 0.16em; color: #7a9cc8; margin-bottom: 4px; }
+#minimap-canvas { display: block; width: 120px; height: 120px; border-radius: 6px; }
+#easy-badge {
+  position: absolute; top: 12px; right: 12px; z-index: 16;
+  padding: 4px 10px; background: rgba(40, 120, 80, 0.85);
+  border-radius: 6px; font-size: 11px; letter-spacing: 0.12em; color: #b6ffd0; pointer-events: none;
+}
+#story-overlay { cursor: pointer; }

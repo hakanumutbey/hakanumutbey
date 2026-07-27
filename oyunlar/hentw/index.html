@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HENTW — Bölüm 1</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%233de0ff'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="cinematic" class="layer">
+    <div id="cine-vignette"></div>
+    <div id="cine-grain"></div>
+    <div id="cine-flash"></div>
+    <div id="logo-card" class="hidden">
+      <div id="logo-sub">NASA KEŞİF KAYDI · 2026</div>
+      <div id="logo-title">HENTW</div>
+      <div id="logo-tag">Gizemli Gezegen</div>
+    </div>
+    <div id="cine-content">
+      <div id="cine-chapter"></div>
+      <div id="cine-title"></div>
+      <div id="cine-body"></div>
+    </div>
+    <div id="cine-skip">BOŞLUK / TIKLA — devam · ESC — atla</div>
+  </div>
+
+  <div id="meta-title" class="layer">
+    <div class="meta-card">
+      <div class="badge">HAKOROCKS STUDIOS</div>
+      <div class="big-meta">HENTW 1</div>
+      <label class="easy-label" for="easy-mode"><input type="checkbox" id="easy-mode" /> Kolay mod</label>
+      <div class="title-btns">
+        <button type="button" id="btn-continue" class="hidden">DEVAM ET</button>
+      </div>
+      <p class="meta-hint">Sinematikten sonra oyun başlar · boşluk ile atla</p>
+    </div>
+  </div>
+  <div id="ui" class="layer hidden">
+    <div id="title">HENTW — BÖLÜM 1</div>
+
+    <div id="collect-hud">★ <span id="collect-count">0</span>/3</div>
+    <div id="minimap-wrap"><div class="lab">HARİTA</div><canvas id="minimap-canvas" width="120" height="120"></canvas></div>
+    <div id="easy-badge" class="hidden">KOLAY</div>
+    <div id="quest-panel">
+      <div class="panel-label">GÖREV</div>
+      <div id="quest-text">Işın tabancasını al (E)</div>
+    </div>
+
+    <div id="boss-hud" class="hidden">
+      <div class="panel-label">İLK BOSS</div>
+      <div id="boss-bar-wrap"><div id="boss-bar"></div></div>
+      <div id="boss-hp-text">100 / 100</div>
+    </div>
+
+    <div id="inv-panel">
+      <div class="panel-label">ENVANTER</div>
+      <div id="inv-list">—</div>
+    </div>
+
+    <div id="prompt" class="hidden"></div>
+    <div id="dialogue" class="hidden">
+      <div id="dialogue-speaker"></div>
+      <div id="dialogue-text"></div>
+      <div id="dialogue-hint">H — devam · ESC — kapat</div>
+    </div>
+
+    <div id="toast" class="hidden"></div>
+
+    <div id="debug">
+      <div>FPS: <span id="dbg-fps">—</span></div>
+      <div>Poz: <span id="dbg-pos">—</span></div>
+      <div>Görev: <span id="dbg-quest">—</span></div>
+      <div>Tabanca: <span id="dbg-gun">YOK</span></div>
+      <div>Mod: <span id="dbg-mode">—</span></div>
+    </div>
+
+    <div id="help">
+      WASD · Fare · E al · H konuş · Sol tık ateş · T tablet
+    </div>
+  </div>
+
+  <!-- NASA Tablet overlay -->
+  <div id="tablet" class="layer hidden">
+    <div id="tablet-frame">
+      <div id="tablet-header">NASA TABLET · HENTW</div>
+      <div id="tablet-tabs">
+        <button type="button" class="tab active" data-tab="map">🗺️ Harita</button>
+        <button type="button" class="tab" data-tab="signal">📡 Sinyal</button>
+        <button type="button" class="tab" data-tab="music" id="tab-music">🎵 Müzik</button>
+      </div>
+      <div id="tablet-body">
+        <div id="tab-panel-map" class="tab-panel">
+          <p class="map-title">HENTW keşif haritası · canlı konum</p>
+          <div id="mini-map">
+            <canvas id="map-canvas" width="440" height="280" aria-label="HENTW haritası"></canvas>
+          </div>
+          <div id="map-legend">
+            <span class="leg you">● Sen</span>
+            <span class="leg rocket">■ Roket</span>
+            <span class="leg sphere">◆ Küre / Boss</span>
+            <span class="leg crate">■ NASA kule</span>
+            <span class="leg sphere">◆ NASA röle</span>
+          </div>
+        </div>
+        <div id="tab-panel-signal" class="tab-panel hidden">
+          <p>Sinyal tarayıcı yükleniyor…</p>
+        </div>
+        <div id="tab-panel-music" class="tab-panel hidden">
+          <p id="music-msg">Işıltı Küresi gerekli…</p>
+          <p id="music-note" class="hidden">Uzun görevlerde astronotların moralini korumak için müzik sistemi etkinleştirildi.</p>
+        </div>
+      </div>
+      <button type="button" id="tablet-close">Kapat (T / ESC)</button>
+    </div>
+  </div>
+
+  <div id="wake-overlay" class="layer hidden"></div>
+  <div id="impact-flash" class="layer hidden"></div>
+  <!-- Finale / credits -->
+  <div id="finale-overlay" class="layer hidden">
+    <div id="finale-text"></div>
+  </div>
+  <div id="end-screen" class="layer hidden">
+    <div id="end-title">HENTW</div>
+    <div id="end-thanks">Thanks you playing</div>
+    <div id="end-next">Devamı HENTW 2'de</div>
+  </div>
+  <div id="crosshair" class="hidden"></div>
+  <canvas id="game"></canvas>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

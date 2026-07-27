@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HENTW 3 — Seri Sonu</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23ff4466'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="title-screen" class="layer">
+    <div class="badge">HAKOROCKS STUDIOS · SERİ SONU</div>
+    <div class="big">HENTW 3</div>
+    <div class="sub">Esir Gemisi</div>
+    <p class="line">Kaçırıldınız. Robot yanınızda. Eve tek yol: hacklemek.</p>
+    <label class="easy-label" for="easy-mode">
+      <input type="checkbox" id="easy-mode" /> Kolay mod (daha yavaş düşman, bol süre)
+    </label>
+    <div class="title-btns">
+      <button type="button" id="btn-start">BAŞLA</button>
+      <button type="button" id="btn-continue" class="hidden">DEVAM ET</button>
+    </div>
+  </div>
+
+  <div id="ui" class="layer hidden">
+    <div id="game-title">HENTW 3</div>
+    <div id="quest-panel">
+      <div class="lab">GÖREV</div>
+      <div id="quest-text">—</div>
+    </div>
+    <div id="collect-hud" title="Yıldız koleksiyonu">★ <span id="collect-count">0</span>/3</div>
+    <div id="minimap-wrap">
+      <div class="lab">HARİTA</div>
+      <canvas id="minimap-canvas" width="120" height="120"></canvas>
+    </div>
+    <div id="easy-badge" class="hidden">KOLAY</div>
+    <div id="prompt" class="hidden"></div>
+    <button type="button" id="interact-btn" class="hidden">E · ETKİLEŞİM</button>
+    <div id="dialogue" class="hidden">
+      <div id="d-speaker"></div>
+      <div id="d-text"></div>
+      <div id="d-hint">Boşluk / tıkla / ESC — devam</div>
+    </div>
+    <div id="toast" class="hidden"></div>
+    <div id="help">WASD · bak · ATEŞ: boşluk · E · H · ★ yıldız topla</div>
+  </div>
+
+  <div id="color-ui" class="minigame hidden">
+    <div class="mg-title">RENK PANELİ</div>
+    <div class="mg-sub">Sıra: <span id="color-order-label"></span></div>
+    <div id="color-buttons"></div>
+    <div id="color-status">Doğru sırayla bas</div>
+  </div>
+
+  <div id="hide-ui" class="minigame hidden">
+    <div class="mg-title">SAKLAN</div>
+    <div class="mg-sub">Yeşil bölgede DUR · nöbetçi geçene kadar</div>
+    <div id="hide-bar-wrap"><div id="hide-bar"></div></div>
+    <div id="hide-status">Bölgeye gir…</div>
+  </div>
+
+  <div id="run-ui" class="minigame hidden">
+    <div class="mg-title">KOŞ!</div>
+    <div class="mg-sub">SARI daireye koş · süre bol · W ile ileri</div>
+    <div id="run-bar-wrap"><div id="run-bar"></div></div>
+  </div>
+
+  <div id="hack-ui" class="minigame hidden">
+    <div class="mg-title">ANA BİLGİSAYAR · HACK</div>
+    <div id="hack-step-label">Adım 1 / 4</div>
+    <div id="hack-body"></div>
+    <div id="hack-fail" class="hidden">Yanlış — tekrar dene</div>
+    <div id="paper-note" class="hidden">
+      <div class="paper-title">📄 KÂĞIT — bunu yaz:</div>
+      <div id="paper-binary"></div>
+    </div>
+    <div id="hack-hint">Yanlış olursa sorun değil · tekrar dene</div>
+  </div>
+
+  <div id="wake-overlay" class="layer hidden"></div>
+  <div id="story-overlay" class="layer hidden">
+    <div id="story-text"></div>
+    <div id="story-skip">Boşluk — atla</div>
+  </div>
+  <div id="end-screen" class="layer hidden">
+    <div class="big">HENTW 3</div>
+    <div class="thanks">Thanks you playing</div>
+    <div class="next">HENTW serisi sona erdi</div>
+    <div id="end-stars">★ ★ ★</div>
+    <div class="badge" style="margin-top:20px">HAKOROCKS STUDIOS</div>
+  </div>
+
+  <canvas id="game"></canvas>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

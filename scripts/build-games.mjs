@@ -18,6 +18,9 @@ await copyStaticGame("skeleton-wars", ["remotion/node_modules", "remotion/packag
 await copyStaticGame("rhgpo");
 await copyStaticGame("siyah-adam");
 await copyStaticGame("birlesim-arenasi");
+await copyStaticGame("hentw", ["package.json"]);
+await copyStaticGame("hentw2", ["package.json"]);
+await copyStaticGame("hentw3", ["package.json"]);
 await copyRobotAvcisi();
 
 async function buildViteGame(slug) {

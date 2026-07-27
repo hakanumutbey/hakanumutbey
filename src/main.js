@@ -157,6 +157,54 @@ const games = [
     updates: ["Babylon.js vendor dosyası üretim build'ine eklendi", "Tek oyunculu tarayıcı erişimi düzeltildi", "Fotoğraf kısayolu desteği eklendi"],
     stockBase: 173,
   },
+  {
+    slug: "hentw",
+    title: "HENTW",
+    path: "/oyunlar/hentw/",
+    type: "Uzay Macerası",
+    status: "Oynanabilir",
+    description: "Gizemli gezegene in, ışın tabancasını kap, yıldızları topla ve ilk boss'u yen.",
+    longDescription: "NASA keşif kaydı başlıyor. Sinematik açılışla gizemli gezegene in, görevleri takip et, NASA tabletindeki harita ve sinyal sekmelerini kullan, 3 yıldızı topla ve gezegenin boss'uyla yüzleş.",
+    accent: "cosmos",
+    controls: "Klavye ve fare (WASD, E, H, sol tık, T tablet)",
+    mobileStatus: "Masaüstü önerilir",
+    mobileNote: "3D uzay macerası klavye ve fare ile en iyi oynanır.",
+    achievements: ["Işın tabancasını al", "3 yıldızı topla", "İlk boss'u yen"],
+    updates: ["Sinematik açılış eklendi", "NASA tableti: harita, sinyal ve müzik sekmeleri", "Kolay mod ve devam etme sistemi hazır"],
+    stockBase: 145,
+  },
+  {
+    slug: "hentw2",
+    title: "HENTW 2 — KRYNN",
+    path: "/oyunlar/hentw2/",
+    type: "Uzay Macerası",
+    status: "Oynanabilir",
+    description: "Roket düştü, JOLE bitti, tablet kırılacak. KRYNN gezegeninde hayatta kal.",
+    longDescription: "HENTW serisinin ikinci bölümü. Roket KRYNN'e düştü; savaş sistemi, can barı ve düşman dalgaları seni bekliyor. Yoluna çıkan robotla arkadaş mı olacaksın, yoksa terk mi edeceksin? Karar senin.",
+    accent: "venom",
+    controls: "Klavye ve fare (WASD, E, sol tık ateş)",
+    mobileStatus: "Masaüstü önerilir",
+    mobileNote: "Savaşlı 3D macera klavye ve fare ile en iyi oynanır.",
+    achievements: ["İlk savaşı kazan", "Robotla arkadaş ol", "3 yıldızı topla"],
+    updates: ["Savaş ve can sistemi eklendi", "Seçim sistemi: arkadaş ol ya da terk et", "Hikaye sahneleri ve devam etme desteği hazır"],
+    stockBase: 152,
+  },
+  {
+    slug: "hentw3",
+    title: "HENTW 3 — Seri Sonu",
+    path: "/oyunlar/hentw3/",
+    type: "Uzay Macerası",
+    status: "Oynanabilir",
+    description: "Esir gemisindesin, robotun yanında. Eve dönmenin tek yolu: gemiyi hacklemek.",
+    longDescription: "Serinin finali. Uzaylılar seni kaçırdı; robot dostunla esir gemisinden kaç. Renk paneli gibi mini oyunları çöz, sistemleri hackle, yıldızları topla ve eve dönüş yolunu aç.",
+    accent: "crimson",
+    controls: "Klavye ve fare (WASD, boşluk ateş, E, H)",
+    mobileStatus: "Masaüstü önerilir",
+    mobileNote: "Hack mini oyunları ve 3D kaçış klavye ile en iyi oynanır.",
+    achievements: ["Renk panelini çöz", "Gemiyi hackle", "Seriyi bitir"],
+    updates: ["Esir gemisi bölümü eklendi", "Hack mini oyunları hazırlandı", "Seri finali ve jenerik akışı tamamlandı"],
+    stockBase: 160,
+  },
 ];
 
 const FUSION_GAME_PATH = "/oyunlar/birlesim-arenasi/";
@@ -607,7 +655,7 @@ document.querySelector("#app").innerHTML = `
         </div>
       </div>
       <aside class="hero-panel" aria-label="Stüdyo özeti">
-        <strong>8 oyun</strong>
+        <strong>11 oyun</strong>
         <span>Tek domain altında yayında</span>
       </aside>
     </section>

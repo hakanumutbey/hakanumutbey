@@ -105,6 +105,45 @@ export const gameExtras = {
     },
     changelog: ["Tek oyunculu erişim düzeldi", "Fotoğraf kısayolu", "Mobil FPS paneli"],
   },
+  hentw: {
+    progress: 70,
+    difficulty: "Orta",
+    averagePlayTime: "15 dk",
+    lastUpdated: "Siteye eklendi",
+    hiddenAchievements: ["Tablet ustası", "Sinematiği hiç atlamayan"],
+    wiki: {
+      characters: ["NASA astronotu", "Gezegen boss'u"],
+      weapons: ["Işın tabancası", "NASA tableti"],
+      craft: ["3 yıldız + görev zinciri = boss kapısı"],
+    },
+    changelog: ["Sinematik açılış", "NASA tableti", "Kolay mod"],
+  },
+  hentw2: {
+    progress: 70,
+    difficulty: "Orta",
+    averagePlayTime: "15 dk",
+    lastUpdated: "Siteye eklendi",
+    hiddenAchievements: ["Robot dostu", "KRYYN kurtulanı"],
+    wiki: {
+      characters: ["Astronot", "Terk edilmiş robot", "KRYYN düşmanları"],
+      weapons: ["Işın tabancası", "Can barı"],
+      craft: ["Savaş + doğru seçim = hayatta kalma"],
+    },
+    changelog: ["Savaş sistemi", "Seçim sistemi", "Hikaye sahneleri"],
+  },
+  hentw3: {
+    progress: 70,
+    difficulty: "Zor",
+    averagePlayTime: "18 dk",
+    lastUpdated: "Siteye eklendi",
+    hiddenAchievements: ["Usta hacker", "Seriyi bitiren"],
+    wiki: {
+      characters: ["Esir astronot", "Robot dost", "Uzaylı nöbetçiler"],
+      weapons: ["Hack paneli", "Işın tabancası"],
+      craft: ["Mini oyunlar + hack = eve dönüş"],
+    },
+    changelog: ["Esir gemisi bölümü", "Hack mini oyunları", "Seri finali"],
+  },
 };
 
 export const devDiaryEntries = [
