@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
 import { createReadStream } from "node:fs";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
@@ -16,7 +16,7 @@ const announcementPasswordHash =
 const sessions = new Map();
 const voiceRooms = new Map();
 const siyahAdamRooms = new Map();
-const games = ["annenden-kac", "bardak", "essiz-zindan", "skeleton-wars", "rhgpo", "siyah-adam", "birlesim-arenasi", "vale", "robot-avcisi"];
+const games = ["annenden-kac", "bardak", "essiz-zindan", "skeleton-wars", "rhgpo", "siyah-adam", "birlesim-arenasi", "vale", "robot-avcisi", "hentw", "hentw2", "hentw3", "hentw-premium"];
 const baseValues = {
   "annenden-kac": 128,
   bardak: 96,
@@ -27,6 +27,10 @@ const baseValues = {
   "birlesim-arenasi": 205,
   vale: 112,
   "robot-avcisi": 173,
+  hentw: 132,
+  hentw2: 148,
+  hentw3: 176,
+  "hentw-premium": 210,
 };
 const averagePlayMinutes = {
   "annenden-kac": 6,
@@ -38,6 +42,10 @@ const averagePlayMinutes = {
   "birlesim-arenasi": 10,
   vale: 8,
   "robot-avcisi": 13,
+  hentw: 8,
+  hentw2: 9,
+  hentw3: 12,
+  "hentw-premium": 14,
 };
 const voteOptionIds = ["uzay-yarisi", "market-savasi", "okul-gorevi"];
 
@@ -80,6 +88,8 @@ let accounts = normalizeAccounts(await readJson("accounts.json", []));
 accounts = await ensureDefaultBotAccounts(accounts);
 let friendRequests = normalizeFriendRequests(await readJson("friend-requests.json", []));
 let invites = normalizeInvites(await readJson("invites.json", []));
+let adminState = normalizeAdminState(await readJson("admin.json", {}));
+const adminTokens = new Map();
 
 const server = createServer(async (request, response) => {
   try {
@@ -621,6 +631,219 @@ async function handleApi(request, response) {
     sendJson(response, blackSnapshot(roomId, sessionId));
     return;
   }
+  if (request.method === "GET" && url.pathname === "/api/public-state") {
+    sendJson(response, publicStateSnapshot());
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/ban-status") {
+    const sessionId = safeText(url.searchParams.get("sessionId"), 120);
+    const nickname = safeText(url.searchParams.get("nickname"), 24);
+    const ban = findBan(sessionId, nickname);
+    sendJson(response, {
+      banned: Boolean(ban),
+      reason: ban?.reason || "",
+      permanent: Boolean(ban?.permanent),
+    });
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/appeal") {
+    const body = await readBody(request, 64_000);
+    const nickname = safeText(body.nickname, 24);
+    const sessionId = safeText(body.sessionId, 120);
+    const message = safeText(body.message, 500);
+    if (!findBan(sessionId, nickname)) {
+      response.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "not-banned" }));
+      return;
+    }
+    if (!message) {
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "message-required" }));
+      return;
+    }
+    adminState.appeals.unshift({
+      id: createRecordId("appeal"),
+      nickname,
+      message,
+      status: "pending",
+      createdAt: new Date().toISOString(),
+    });
+    adminState.appeals = adminState.appeals.slice(0, 200);
+    await saveAdminState();
+    sendJson(response, { ok: true });
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/community-game") {
+    const id = safeText(url.searchParams.get("id"), 120);
+    const game = adminState.gameQueue.find((item) => item.id === id);
+    if (!game || (!game.published && !hasAdminToken(request, url, null))) {
+      response.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "not-found" }));
+      return;
+    }
+    response.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+    response.end(game.code);
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/admin/login") {
+    const body = await readBody(request, 64_000);
+    const username = safeText(body.username, 80);
+    let githubUser = null;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
+      let githubResponse;
+      try {
+        githubResponse = await fetch(`https://api.github.com/users/${encodeURIComponent(username)}`, {
+          signal: controller.signal,
+          headers: { "User-Agent": "hakorocks-studio", Accept: "application/vnd.github+json" },
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+      if (!githubResponse.ok && githubResponse.status !== 404) {
+        throw new Error("github-unreachable");
+      }
+      githubUser = githubResponse.ok ? await githubResponse.json() : null;
+    } catch {
+      response.writeHead(503, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "unreachable" }));
+      return;
+    }
+    if (safeText(githubUser?.login, 80).toLocaleLowerCase("tr-TR") !== "hakanumutbey") {
+      response.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "no-permission" }));
+      return;
+    }
+    const token = randomBytes(24).toString("hex");
+    adminTokens.set(token, Date.now() + 12 * 60 * 60 * 1000);
+    sendJson(response, { ok: true, token, message: "Hoş geldiniz, doğrulama başarılı" });
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/admin/state") {
+    if (!requireAdmin(request, response, url, null)) return;
+    sendJson(response, adminState);
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/admin/maintenance") {
+    const body = await readBody(request, 64_000);
+    if (!requireAdmin(request, response, url, body)) return;
+    adminState.maintenance = Boolean(body.on);
+    await saveAdminState();
+    sendJson(response, publicStateSnapshot());
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/admin/ban") {
+    const body = await readBody(request, 64_000);
+    if (!requireAdmin(request, response, url, body)) return;
+    const nickname = safeText(body.nickname, 24);
+    const reason = safeText(body.reason, 200);
+    if (!nickname) {
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "nickname-required" }));
+      return;
+    }
+    let sessionId = safeText(body.sessionId, 120);
+    if (!sessionId) {
+      const account = accounts.find((item) => normalizeNickname(item.nickname) === normalizeNickname(nickname));
+      sessionId = account?.sessionId || "";
+    }
+    adminState.bans = adminState.bans.filter((ban) => normalizeNickname(ban.nickname) !== normalizeNickname(nickname));
+    adminState.bans.unshift({
+      id: createRecordId("ban"),
+      nickname,
+      sessionId,
+      reason,
+      permanent: Boolean(body.permanent),
+      createdAt: new Date().toISOString(),
+    });
+    await saveAdminState();
+    sendJson(response, adminState);
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/admin/unban") {
+    const body = await readBody(request, 64_000);
+    if (!requireAdmin(request, response, url, body)) return;
+    const id = safeText(body.id, 120);
+    adminState.bans = adminState.bans.filter((ban) => ban.id !== id);
+    await saveAdminState();
+    sendJson(response, adminState);
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/admin/appeal-decision") {
+    const body = await readBody(request, 64_000);
+    if (!requireAdmin(request, response, url, body)) return;
+    const id = safeText(body.id, 120);
+    const appeal = adminState.appeals.find((item) => item.id === id);
+    if (!appeal) {
+      response.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "not-found" }));
+      return;
+    }
+    appeal.status = body.approve ? "approved" : "rejected";
+    if (body.approve) {
+      adminState.bans = adminState.bans.filter((ban) => normalizeNickname(ban.nickname) !== normalizeNickname(appeal.nickname));
+    }
+    await saveAdminState();
+    sendJson(response, adminState);
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/admin/game-queue") {
+    const body = await readBody(request, 600_000);
+    if (!requireAdmin(request, response, url, body)) return;
+    const title = safeText(body.title, 80);
+    const code = typeof body.code === "string" ? body.code : "";
+    if (!title || !code.trim()) {
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "title-and-code-required" }));
+      return;
+    }
+    if (code.length > 500_000) {
+      response.writeHead(413, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "code-too-large" }));
+      return;
+    }
+    adminState.gameQueue.unshift({
+      id: createRecordId("game"),
+      title,
+      code,
+      published: false,
+      createdAt: new Date().toISOString(),
+    });
+    adminState.gameQueue = adminState.gameQueue.slice(0, 50);
+    await saveAdminState();
+    sendJson(response, adminState);
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/admin/game-queue-publish") {
+    const body = await readBody(request, 64_000);
+    if (!requireAdmin(request, response, url, body)) return;
+    const id = safeText(body.id, 120);
+    const game = adminState.gameQueue.find((item) => item.id === id);
+    if (!game) {
+      response.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "not-found" }));
+      return;
+    }
+    game.published = true;
+    await saveAdminState();
+    sendJson(response, adminState);
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/admin/remove-game") {
+    const body = await readBody(request, 64_000);
+    if (!requireAdmin(request, response, url, body)) return;
+    const slug = safeText(body.slug, 80);
+    const mode = safeText(body.mode, 20);
+    if (mode === "restore") {
+      delete adminState.removedGames[slug];
+    } else if (mode === "temporary" || mode === "permanent") {
+      adminState.removedGames[slug] = { mode, createdAt: new Date().toISOString() };
+    }
+    await saveAdminState();
+    sendJson(response, publicStateSnapshot());
+    return;
+  }
   response.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
   response.end(JSON.stringify({ error: "not-found" }));
 }
@@ -917,6 +1140,82 @@ function sendJson(response, payload) {
 
 function safeText(value, maxLength) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
+function normalizeAdminState(value) {
+  const source = value && typeof value === "object" ? value : {};
+  return {
+    maintenance: Boolean(source.maintenance),
+    bans: Array.isArray(source.bans) ? source.bans.filter((item) => item && typeof item === "object").map((item) => ({
+      id: safeText(item.id, 120) || createRecordId("ban"),
+      nickname: safeText(item.nickname, 24),
+      sessionId: safeText(item.sessionId, 120),
+      reason: safeText(item.reason, 200),
+      permanent: Boolean(item.permanent),
+      createdAt: safeText(item.createdAt, 40) || new Date().toISOString(),
+    })).filter((item) => item.nickname) : [],
+    appeals: Array.isArray(source.appeals) ? source.appeals.filter((item) => item && typeof item === "object").map((item) => ({
+      id: safeText(item.id, 120) || createRecordId("appeal"),
+      nickname: safeText(item.nickname, 24),
+      message: safeText(item.message, 500),
+      status: ["pending", "approved", "rejected"].includes(item.status) ? item.status : "pending",
+      createdAt: safeText(item.createdAt, 40) || new Date().toISOString(),
+    })) : [],
+    gameQueue: Array.isArray(source.gameQueue) ? source.gameQueue.filter((item) => item && typeof item === "object").map((item) => ({
+      id: safeText(item.id, 120) || createRecordId("game"),
+      title: safeText(item.title, 80),
+      code: typeof item.code === "string" ? item.code.slice(0, 500_000) : "",
+      published: Boolean(item.published),
+      createdAt: safeText(item.createdAt, 40) || new Date().toISOString(),
+    })).filter((item) => item.title && item.code) : [],
+    removedGames: source.removedGames && typeof source.removedGames === "object" && !Array.isArray(source.removedGames)
+      ? Object.fromEntries(Object.entries(source.removedGames)
+        .filter(([, item]) => item && (item.mode === "temporary" || item.mode === "permanent"))
+        .map(([slug, item]) => [safeText(slug, 80), { mode: item.mode, createdAt: safeText(item.createdAt, 40) || new Date().toISOString() }]))
+      : {},
+  };
+}
+
+async function saveAdminState() {
+  await writeJson("admin.json", adminState);
+}
+
+function publicStateSnapshot() {
+  return {
+    maintenance: Boolean(adminState.maintenance),
+    removedGames: adminState.removedGames,
+    publishedGames: adminState.gameQueue
+      .filter((game) => game.published)
+      .map((game) => ({ id: game.id, title: game.title })),
+  };
+}
+
+function findBan(sessionId, nickname) {
+  const normalized = normalizeNickname(nickname);
+  return adminState.bans.find((ban) => {
+    if (normalized && normalizeNickname(ban.nickname) === normalized) return true;
+    return Boolean(sessionId && ban.sessionId && ban.sessionId === sessionId);
+  }) || null;
+}
+
+function hasAdminToken(request, url, body) {
+  const header = request.headers.authorization || "";
+  const bearer = header.startsWith("Bearer ") ? header.slice(7) : "";
+  const token = safeText(bearer || body?.token || url?.searchParams.get("token") || "", 120);
+  if (!token) return false;
+  const expiresAt = adminTokens.get(token);
+  if (!expiresAt || expiresAt < Date.now()) {
+    adminTokens.delete(token);
+    return false;
+  }
+  return true;
+}
+
+function requireAdmin(request, response, url, body) {
+  if (hasAdminToken(request, url, body)) return true;
+  response.writeHead(401, { "Content-Type": "application/json; charset=utf-8" });
+  response.end(JSON.stringify({ error: "no-admin-token" }));
+  return false;
 }
 
 function clamp(value, min, max) {

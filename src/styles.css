@@ -2932,6 +2932,11 @@ h3 {
   background: #ff4466;
 }
 
+.poster-nova {
+  color: #f5ecff;
+  background: #9d4edd;
+}
+
 .game-body {
   display: grid;
   gap: 12px;
@@ -4026,4 +4031,213 @@ h3 {
     width: 36px;
     height: 36px;
   }
+}
+
+/* Yönetici Odası */
+.admin-entry {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 14px;
+  color: var(--text);
+  background: rgba(53, 210, 255, 0.08);
+  cursor: pointer;
+  font: inherit;
+}
+
+.admin-entry:hover {
+  border-color: var(--cyan, #35d2ff);
+}
+
+.admin-login {
+  padding: 32px;
+  display: grid;
+  gap: 14px;
+}
+
+.admin-login form {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-login input,
+.admin-form input,
+.admin-form textarea,
+.ban-appeal-form textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.3);
+  font: inherit;
+}
+
+.admin-panel {
+  width: min(960px, 100%);
+  padding: 28px;
+  display: grid;
+  gap: 20px;
+}
+
+.admin-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-panel-head h2 {
+  margin: 0;
+}
+
+.admin-section {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+}
+
+.admin-section h3,
+.admin-section h4 {
+  margin: 0;
+}
+
+.admin-form {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-form label,
+.admin-login label,
+.ban-appeal-form label {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-check {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-check input {
+  width: auto;
+}
+
+.admin-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.admin-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.admin-row-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-empty {
+  opacity: 0.7;
+}
+
+.admin-tag {
+  font-style: normal;
+  font-size: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin-left: 6px;
+  color: var(--cyan, #35d2ff);
+}
+
+.admin-tag.danger,
+.button.danger {
+  color: #ff7a7a;
+  border-color: rgba(255, 122, 122, 0.5);
+}
+
+.admin-tag.pending {
+  color: #ffd166;
+}
+
+.admin-blocker[hidden] {
+  display: none;
+}
+
+.admin-blocker {
+  position: fixed;
+  z-index: 90;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #090d10;
+}
+
+.admin-blocker-card {
+  max-width: 560px;
+  border: 1px solid rgba(53, 210, 255, 0.28);
+  border-radius: 8px;
+  padding: 32px;
+  display: grid;
+  gap: 16px;
+  text-align: center;
+  background: #101319;
+  box-shadow: 0 28px 120px rgba(0, 0, 0, 0.52);
+}
+
+.admin-blocker-card h2 {
+  margin: 0;
+}
+
+.admin-blocker-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.ban-reason {
+  color: #ffd166;
+}
+
+.ban-appeal-form {
+  display: grid;
+  gap: 10px;
+  text-align: left;
+}
+
+.play-link.is-removed {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.game-card.is-removed .game-media {
+  filter: grayscale(0.8);
+}
+
+.community-badge {
+  border: 1px solid rgba(53, 210, 255, 0.5);
+  border-radius: 999px;
+  padding: 2px 10px;
+  color: var(--cyan, #35d2ff);
+}
+
+.ban-appeal-form[hidden] {
+  display: none;
 }

@@ -1,0 +1,9 @@
+{
+  "name": "hentw-premium",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test js/gameLogic.test.js",
+    "start": "python3 -m http.server 8768"
+  }
+}

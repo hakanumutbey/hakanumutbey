@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HENTW PREMIUM — Sonsuz Uzay</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23aa66ff'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="title-screen" class="layer">
+    <div class="badge">HAKOROCKS STUDIOS · BONUS OYUN</div>
+    <div class="big">HENTW PREMIUM</div>
+    <div class="sub">Sonsuz Uzay</div>
+    <p class="line">Bu oyunun sonu yok! Uzayda malzeme topla, barınak inşa et.<br />Canavarlar saldırıyor — kaç ya da savaş. Harita çok büyük!</p>
+    <p class="line controls-hint">WASD hareket · SAĞ TIK ateş · E topla · B inşa</p>
+    <label class="easy-label" for="easy-mode">
+      <input type="checkbox" id="easy-mode" /> Kolay mod (daha az ve yavaş canavar)
+    </label>
+    <div class="title-btns">
+      <button type="button" id="btn-start">BAŞLA</button>
+    </div>
+    <div id="title-best" class="hidden">EN İYİ SKOR: <span id="title-best-val">0</span></div>
+  </div>
+
+  <div id="ui" class="layer hidden">
+    <div id="game-title">HENTW PREMIUM</div>
+    <div id="hearts-hud">❤❤❤</div>
+    <div id="stats-hud">
+      <div>SÜRE <span id="time-text">0:00</span></div>
+      <div>SKOR <span id="score-text">0</span></div>
+      <div>TEHLİKE <span id="danger-text">1</span></div>
+    </div>
+    <div id="mat-hud">
+      <div class="mat crystal">◆ KRİSTAL <span id="mat-crystal">0</span></div>
+      <div class="mat metal">▲ METAL <span id="mat-metal">0</span></div>
+    </div>
+    <div id="minimap-wrap">
+      <div class="lab">HARİTA</div>
+      <canvas id="minimap-canvas" width="120" height="120"></canvas>
+    </div>
+    <div id="easy-badge" class="hidden">KOLAY</div>
+    <div id="wave-banner" class="hidden">⚠ SALDIRI DALGASI! ⚠</div>
+    <div id="prompt" class="hidden"></div>
+    <div id="build-menu" class="hidden">
+      <div class="lab">İNŞA MENÜSÜ (B ile kapat)</div>
+      <div class="build-row" id="build-row-wall"><b>1</b> DUVAR — 2◆ 3▲ <i>canavarları durdurur</i></div>
+      <div class="build-row" id="build-row-turret"><b>2</b> TARET — 3◆ 5▲ <i>otomatik ateş eder</i></div>
+      <div class="build-row" id="build-row-heal"><b>3</b> CAN İSTASYONU — 5◆ 3▲ <i>kalp doldurur</i></div>
+    </div>
+    <div id="toast" class="hidden"></div>
+    <div id="help">WASD hareket · SAĞ TIK ateş · E topla · B inşa menüsü · 1-2-3 hızlı inşa</div>
+  </div>
+
+  <div id="touch-ui" class="layer">
+    <div id="joy-zone"></div>
+    <div id="joy-base" class="hidden"></div>
+    <div id="joy-knob" class="hidden"></div>
+    <button type="button" id="btn-fire">ATEŞ</button>
+    <button type="button" id="btn-e">TOPLA</button>
+    <button type="button" id="btn-b">İNŞA</button>
+  </div>
+
+  <div id="end-screen" class="layer hidden">
+    <div class="big">OYUN BİTTİ</div>
+    <div class="sub">Gemin düştü — ama uzay hâlâ seni bekliyor!</div>
+    <div id="end-stats">
+      <div class="stat-row">Hayatta kalma süresi: <b id="end-time">0:00</b></div>
+      <div class="stat-row">Toplanan kristal: <b id="end-kristal">0</b> ◆</div>
+      <div class="stat-row">Toplanan metal: <b id="end-metal">0</b> ▲</div>
+      <div class="stat-row">Yenilen canavar: <b id="end-kills">0</b></div>
+      <div class="stat-row big-stat">SKOR: <b id="end-score">0</b></div>
+      <div class="stat-row">En iyi skor: <b id="end-best">0</b></div>
+      <div id="end-record" class="hidden">🏆 YENİ REKOR! 🏆</div>
+    </div>
+    <div class="title-btns">
+      <button type="button" id="btn-restart">TEKRAR OYNA</button>
+    </div>
+    <div class="badge" style="margin-top:12px">HAKOROCKS STUDIOS</div>
+  </div>
+
+  <canvas id="game"></canvas>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

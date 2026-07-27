@@ -144,6 +144,19 @@ export const gameExtras = {
     },
     changelog: ["Esir gemisi bölümü", "Hack mini oyunları", "Seri finali"],
   },
+  "hentw-premium": {
+    progress: 70,
+    difficulty: "Orta",
+    averagePlayTime: "Sonsuz",
+    lastUpdated: "Siteye eklendi",
+    hiddenAchievements: ["Dalga avcısı", "Uzay mimarı"],
+    wiki: {
+      characters: ["Uzay pilotu", "Uzay canavarları"],
+      weapons: ["Otomatik nişan lazer", "Taret"],
+      craft: ["Kristal + metal = duvar, taret, can istasyonu"],
+    },
+    changelog: ["Sonsuz harita", "İnşa sistemi", "Dokunmatik kontroller"],
+  },
 };
 
 export const devDiaryEntries = [

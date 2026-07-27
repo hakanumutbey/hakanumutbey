@@ -205,6 +205,22 @@ const games = [
     updates: ["Esir gemisi bölümü eklendi", "Hack mini oyunları hazırlandı", "Seri finali ve jenerik akışı tamamlandı"],
     stockBase: 160,
   },
+  {
+    slug: "hentw-premium",
+    title: "HENTW Premium — Sonsuz Uzay",
+    path: "/oyunlar/hentw-premium/",
+    type: "Hayatta Kalma",
+    status: "Oynanabilir",
+    description: "Sonu olmayan uzay: kristal ve metal topla, barınak inşa et, canavarlardan kaç ya da savaş.",
+    longDescription: "HENTW serisinin bonus oyunu. Dev asteroit haritasında malzeme topla, duvar-taret-can istasyonu ile barınağını kur ve her dakika güçlenen saldırı dalgalarına ne kadar dayanabildiğini gör. En iyi skorun saklanır.",
+    accent: "nova",
+    controls: "Klavye ve fare (WASD, sağ tık ateş, E, B) · dokunmatik destekli",
+    mobileStatus: "Mobil uyumlu",
+    mobileNote: "Sanal joystick ve ATEŞ/TOPLA/İNŞA düğmeleri ile telefonda oynanır.",
+    achievements: ["İlk barınağını kur", "Saldırı dalgasını atlat", "Rekor kır"],
+    updates: ["Sonsuz hayatta kalma modu", "İnşa sistemi: duvar, taret, can istasyonu", "Dokunmatik kontroller eklendi"],
+    stockBase: 210,
+  },
 ];
 
 const FUSION_GAME_PATH = "/oyunlar/birlesim-arenasi/";
@@ -616,6 +632,11 @@ let millionHState = {
 };
 let millionHTextCache = "";
 let audioContext;
+let adminToken = localStorage.getItem("hakorocksAdminToken") || "";
+let adminPanelState = null;
+let publicState = { maintenance: false, removedGames: {}, publishedGames: [] };
+let banInfo = null;
+let appealStatus = "";
 
 document.documentElement.dataset.theme = selectedTheme;
 
@@ -655,7 +676,7 @@ document.querySelector("#app").innerHTML = `
         </div>
       </div>
       <aside class="hero-panel" aria-label="Stüdyo özeti">
-        <strong>11 oyun</strong>
+        <strong>12 oyun</strong>
         <span>Tek domain altında yayında</span>
       </aside>
     </section>
@@ -1045,7 +1066,7 @@ document.querySelector("#app").innerHTML = `
         <h2 id="games-title">Oyunun üstüne bas, +team tarzı detay ekranı açılsın.</h2>
       </div>
       <div class="game-grid">
-        ${games.map(renderGameCard).join("")}
+        ${renderGameCards()}
       </div>
     </section>
 
@@ -1143,6 +1164,7 @@ document.querySelector("#app").innerHTML = `
       <strong>Hakorocks Studio</strong>
       <span>Hakan Umut Akadal tarafından geliştiriliyor.</span>
     </div>
+    <button class="admin-entry" type="button" data-admin-open>Yönetici Odası</button>
     <a href="#top">Yukarı çık</a>
   </footer>
 
@@ -1153,6 +1175,42 @@ document.querySelector("#app").innerHTML = `
       <div data-modal-content></div>
     </article>
   </section>
+
+  <section class="game-modal" data-admin-login hidden>
+    <button class="modal-backdrop" type="button" data-admin-login-close aria-label="Yönetici girişini kapat"></button>
+    <article class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="admin-login-title">
+      <button class="modal-close" type="button" data-admin-login-close aria-label="Kapat">×</button>
+      <div class="admin-login">
+        <h2 id="admin-login-title">Yönetici Odası</h2>
+        <p>Girmek için GitHub kullanıcı adını yaz.</p>
+        <form data-admin-login-form>
+          <label>
+            GitHub kullanıcı adı
+            <input name="username" maxlength="80" placeholder="örn. hakanumutbey" autocomplete="off" required />
+          </label>
+          <button class="button primary" type="submit">Giriş yap</button>
+        </form>
+        <p class="form-status" data-admin-login-status aria-live="polite"></p>
+      </div>
+    </article>
+  </section>
+
+  <section class="game-modal" data-admin-panel hidden>
+    <button class="modal-backdrop" type="button" data-admin-panel-close aria-label="Yönetici odasını kapat"></button>
+    <article class="modal-panel admin-panel" role="dialog" aria-modal="true" aria-labelledby="admin-panel-title">
+      <button class="modal-close" type="button" data-admin-panel-close aria-label="Kapat">×</button>
+      <div data-admin-panel-content></div>
+    </article>
+  </section>
+
+  <div class="admin-blocker" data-maintenance-screen hidden>
+    <div class="admin-blocker-card">
+      <h2>Bakım Arası</h2>
+      <p>Birazdan döneceğiz!</p>
+    </div>
+  </div>
+
+  <div class="admin-blocker" data-ban-screen hidden></div>
 `;
 
 function renderMillionHSection() {
@@ -2052,12 +2110,16 @@ function renderGameCard(game, index) {
   const extra = gameExtra(game);
   const isFavorite = favoriteGames.includes(game.slug);
   const commentCount = latestComments.games?.[game.slug]?.length ?? 0;
+  const removal = publicState.removedGames?.[game.slug];
   const media = game.image
     ? `<img src="${game.image}" alt="${game.title} oyun görseli" loading="lazy" />`
     : `<div class="game-poster poster-${game.accent}" aria-hidden="true"><span>${String(index + 1).padStart(2, "0")}</span></div>`;
+  const playAction = removal
+    ? `<span class="play-link is-removed" aria-disabled="true">${removal.mode === "permanent" ? "Kalıcı olarak kaldırıldı" : "Geçici olarak kaldırıldı"}</span>`
+    : `<a class="play-link" href="${game.path}" data-play-game="${game.slug}">Oyunu aç</a>`;
 
   return `
-    <article class="game-card">
+    <article class="game-card${removal ? " is-removed" : ""}">
       <div class="game-card-inner">
         <button class="game-card-link" type="button" data-game-open="${game.slug}" aria-label="${game.title} detaylarını aç">
           <div class="game-media">${media}</div>
@@ -2081,7 +2143,7 @@ function renderGameCard(game, index) {
           </div>
         </button>
         <div class="game-card-actions">
-          <a class="play-link" href="${game.path}" data-play-game="${game.slug}">Oyunu aç</a>
+          ${playAction}
           <button class="favorite-button ${isFavorite ? "is-active" : ""}" type="button" data-favorite-game="${game.slug}" aria-pressed="${isFavorite ? "true" : "false"}">
             ${isFavorite ? "Favoride" : "Favori"}
           </button>
@@ -2089,6 +2151,30 @@ function renderGameCard(game, index) {
       </div>
     </article>
   `;
+}
+
+function renderCommunityGameCards() {
+  return (publicState.publishedGames || []).map((item) => `
+    <article class="game-card community-game-card">
+      <div class="game-card-inner">
+        <div class="game-media"><div class="game-poster poster-mint" aria-hidden="true"><span>★</span></div></div>
+        <div class="game-body">
+          <div class="game-meta">
+            <span class="community-badge">Topluluk Oyunu</span>
+          </div>
+          <h3>${escapeHtml(item.title)}</h3>
+          <p>Yönetici Odası kuyruğundan siteye gönderilen oyun.</p>
+        </div>
+        <div class="game-card-actions">
+          <a class="play-link" href="/api/community-game?id=${encodeURIComponent(item.id)}" target="_blank" rel="noopener">Oyunu aç</a>
+        </div>
+      </div>
+    </article>
+  `).join("");
+}
+
+function renderGameCards() {
+  return games.map(renderGameCard).join("") + renderCommunityGameCards();
 }
 
 function renderProjectCard(project) {
@@ -3894,7 +3980,7 @@ function openGameModal(slug) {
 
 function renderGameGrid() {
   const grid = document.querySelector(".game-grid");
-  if (grid) grid.innerHTML = games.map(renderGameCard).join("");
+  if (grid) grid.innerHTML = renderGameCards();
 }
 
 function toggleFavoriteGame(slug) {
@@ -4850,6 +4936,8 @@ async function refreshLiveData() {
   renderStudioPanel();
   renderSocialDashboard();
   maybeNotifySocialChanges();
+  refreshPublicState();
+  refreshBanStatus();
   if (!document.querySelector("[data-game-modal]").hidden) {
     document.querySelector("[data-modal-content]").innerHTML = renderModal(selectedGame);
     bindDynamicForms();
@@ -4893,6 +4981,7 @@ renderSocialDashboard();
 renderStudioPulsePanel();
 renderClickGamePanel();
 refreshLiveData();
+initAdminRoom();
 setInterval(refreshLiveData, 10000);
 startPerformanceMonitor();
 startRevealAnimations();
@@ -5003,8 +5092,489 @@ function startRevealAnimations() {
   mutationObserver.observe(document.querySelector("#app"), { childList: true, subtree: true });
 }
 
-function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
+// ---- Yönetici Odası ----
+
+async function initAdminRoom() {
+  bindAdminRoom();
+  await refreshPublicState();
+  if (adminToken) {
+    const valid = await loadAdminState();
+    if (!valid) clearAdminToken();
+  }
+  applyAdminOverlays();
+  renderGameGrid();
+}
+
+function clearAdminToken() {
+  adminToken = "";
+  adminPanelState = null;
+  localStorage.removeItem("hakorocksAdminToken");
+}
+
+async function refreshPublicState() {
+  try {
+    const response = await fetch("/api/public-state");
+    const next = await response.json();
+    if (JSON.stringify(next) !== JSON.stringify(publicState)) {
+      publicState = next;
+      applyAdminOverlays();
+      renderGameGrid();
+      const panel = document.querySelector("[data-admin-panel]");
+      if (panel && !panel.hidden) renderAdminPanelContent();
+    }
+  } catch {}
+}
+
+async function refreshBanStatus() {
+  const nickname = latestSocial.account?.nickname || "";
+  try {
+    const response = await fetch(`/api/ban-status?sessionId=${encodeURIComponent(sessionId)}&nickname=${encodeURIComponent(nickname)}`);
+    const next = await response.json();
+    if (JSON.stringify(next) !== JSON.stringify(banInfo)) {
+      banInfo = next;
+      appealStatus = "";
+      renderBanScreen();
+    }
+  } catch {}
+}
+
+function applyAdminOverlays() {
+  const maintenanceScreen = document.querySelector("[data-maintenance-screen]");
+  if (maintenanceScreen) {
+    maintenanceScreen.hidden = !(publicState.maintenance && !adminToken);
+  }
+  renderBanScreen();
+}
+
+function renderBanScreen() {
+  const screen = document.querySelector("[data-ban-screen]");
+  if (!screen) return;
+  const blockedByMaintenance = Boolean(publicState.maintenance) && !adminToken;
+  if (!banInfo?.banned || blockedByMaintenance) {
+    screen.hidden = true;
+    return;
+  }
+  const nickname = latestSocial.account?.nickname || "Oyuncu";
+  screen.hidden = false;
+  screen.innerHTML = `
+    <div class="admin-blocker-card">
+      <h2>${escapeHtml(nickname)}, siz Hakorocks Studio'dan banlandınız — hesabınız banlandı</h2>
+      ${banInfo.reason ? `<p class="ban-reason">Sebep: ${escapeHtml(banInfo.reason)}</p>` : ""}
+      <div class="admin-blocker-actions">
+        ${banInfo.permanent ? "" : `<button class="button secondary" type="button" data-ban-ok>Tamam</button>`}
+        <button class="button primary" type="button" data-ban-appeal-toggle>İtiraz Et</button>
+      </div>
+      <form class="ban-appeal-form" data-ban-appeal-form hidden>
+        <label>
+          İtiraz mesajın
+          <textarea name="message" maxlength="500" required placeholder="Neden banının kalkmasını istiyorsun?"></textarea>
+        </label>
+        <button class="button primary" type="submit">İtirazı Gönder</button>
+      </form>
+      <p class="form-status" data-ban-appeal-status aria-live="polite">${appealStatus}</p>
+    </div>
+  `;
+}
+
+function openAdminEntry() {
+  if (!adminToken) {
+    openAdminLogin();
+    return;
+  }
+  loadAdminState().then((valid) => {
+    if (valid) {
+      openAdminPanel();
+    } else {
+      clearAdminToken();
+      openAdminLogin();
+    }
+  });
+}
+
+function openAdminLogin() {
+  const modal = document.querySelector("[data-admin-login]");
+  if (!modal) return;
+  modal.hidden = false;
+  document.body.classList.add("modal-open");
+  const status = modal.querySelector("[data-admin-login-status]");
+  if (status) status.textContent = "";
+}
+
+function closeAdminLogin() {
+  const modal = document.querySelector("[data-admin-login]");
+  if (modal) modal.hidden = true;
+  document.body.classList.remove("modal-open");
+}
+
+function openAdminPanel() {
+  const loginModal = document.querySelector("[data-admin-login]");
+  if (loginModal) loginModal.hidden = true;
+  const modal = document.querySelector("[data-admin-panel]");
+  if (!modal) return;
+  modal.hidden = false;
+  document.body.classList.add("modal-open");
+  renderAdminPanelContent();
+}
+
+function closeAdminPanel() {
+  const modal = document.querySelector("[data-admin-panel]");
+  if (modal) modal.hidden = true;
+  document.body.classList.remove("modal-open");
+}
+
+async function loadAdminState() {
+  if (!adminToken) return false;
+  try {
+    const response = await fetch("/api/admin/state", {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    if (!response.ok) return false;
+    adminPanelState = await response.json();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function adminPost(path, payload = {}) {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${adminToken}` },
+    body: JSON.stringify({ ...payload, token: adminToken }),
+  });
+  if (response.status === 401) {
+    clearAdminToken();
+    closeAdminPanel();
+    openAdminLogin();
+    throw new Error("no-admin-token");
+  }
+  return response.json().catch(() => ({}));
+}
+
+async function refreshAdminViews() {
+  await loadAdminState();
+  renderAdminPanelContent();
+  await refreshPublicState();
+}
+
+function renderAdminPanelContent() {
+  const container = document.querySelector("[data-admin-panel-content]");
+  if (!container) return;
+  const state = adminPanelState;
+  if (!state) {
+    container.innerHTML = `<h2 id="admin-panel-title">Yönetici Odası</h2><p>Yükleniyor...</p>`;
+    return;
+  }
+
+  const banList = state.bans.length ? state.bans.map((ban) => `
+    <li class="admin-row">
+      <span>@${escapeHtml(ban.nickname)} ${ban.permanent ? '<em class="admin-tag danger">Siteden kalıcı ban</em>' : '<em class="admin-tag">Ban</em>'}${ban.reason ? ` — ${escapeHtml(ban.reason)}` : ""}</span>
+      <span class="admin-row-actions">
+        <button class="button secondary" type="button" data-admin-unban="${escapeHtml(ban.id)}">Banı Kaldır</button>
+      </span>
+    </li>
+  `).join("") : `<li class="admin-empty">Banlı hesap yok.</li>`;
+
+  const appealList = state.appeals.length ? state.appeals.map((appeal) => `
+    <li class="admin-row">
+      <span>@${escapeHtml(appeal.nickname)}: ${escapeHtml(appeal.message)}
+        <em class="admin-tag">${appeal.status === "pending" ? "Bekliyor" : appeal.status === "approved" ? "Onaylandı" : "Reddedildi"}</em>
+      </span>
+      ${appeal.status === "pending" ? `
+        <span class="admin-row-actions">
+          <button class="button primary" type="button" data-admin-appeal="${escapeHtml(appeal.id)}" data-approve="1">Onayla</button>
+          <button class="button secondary" type="button" data-admin-appeal="${escapeHtml(appeal.id)}" data-approve="0">Reddet</button>
+        </span>
+      ` : ""}
+    </li>
+  `).join("") : `<li class="admin-empty">İtiraz yok.</li>`;
+
+  const queueList = state.gameQueue.length ? state.gameQueue.map((item) => `
+    <li class="admin-row">
+      <span>${escapeHtml(item.title)} ${item.published ? '<em class="admin-tag">Yayında</em>' : '<em class="admin-tag pending">Kuyrukta</em>'}</span>
+      <span class="admin-row-actions">
+        <a class="button secondary" href="/api/community-game?id=${encodeURIComponent(item.id)}&token=${encodeURIComponent(adminToken)}" target="_blank" rel="noopener">Aç</a>
+        ${item.published ? "" : `<button class="button primary" type="button" data-admin-publish="${escapeHtml(item.id)}">Siteye Gönder</button>`}
+      </span>
+    </li>
+  `).join("") : `<li class="admin-empty">Kuyruk boş.</li>`;
+
+  const removeList = games.map((game) => {
+    const removal = state.removedGames?.[game.slug];
+    return `
+      <li class="admin-row">
+        <span>${escapeHtml(game.title)} ${removal ? `<em class="admin-tag ${removal.mode === "permanent" ? "danger" : ""}">${removal.mode === "permanent" ? "Sonsuz kaldırıldı" : "Geçici kaldırıldı"}</em>` : ""}</span>
+        <span class="admin-row-actions">
+          ${removal
+            ? `<button class="button secondary" type="button" data-admin-remove="${game.slug}" data-mode="restore">Geri Al</button>`
+            : `<button class="button secondary" type="button" data-admin-remove="${game.slug}" data-mode="temporary">Geçici Kaldır</button>
+               <button class="button secondary danger" type="button" data-admin-remove="${game.slug}" data-mode="permanent">Sonsuz Kaldır</button>`}
+        </span>
+      </li>
+    `;
+  }).join("");
+
+  container.innerHTML = `
+    <div class="admin-panel-head">
+      <h2 id="admin-panel-title">Yönetici Odası</h2>
+      <button class="button secondary" type="button" data-admin-logout>Çıkış</button>
+    </div>
+
+    <section class="admin-section">
+      <h3>Bakım Arası</h3>
+      <p>${state.maintenance ? "Açık — admin olmayan ziyaretçiler bakım ekranı görüyor." : "Kapalı — site herkese açık."}</p>
+      <button class="button ${state.maintenance ? "secondary" : "primary"}" type="button" data-admin-maintenance>
+        ${state.maintenance ? "Bakımı Kapat" : "Bakım Arası Aç"}
+      </button>
+    </section>
+
+    <section class="admin-section">
+      <h3>Hesap Banla</h3>
+      <form class="admin-form" data-admin-ban-form>
+        <label>
+          Rumuz
+          <input name="nickname" maxlength="24" required placeholder="örn. test-bot-1" />
+        </label>
+        <label>
+          Ban sebebi
+          <input name="reason" maxlength="200" placeholder="örn. küfür" />
+        </label>
+        <label class="admin-check">
+          <input type="checkbox" name="permanent" />
+          Siteden kalıcı banla (Tamam düğmesi olmaz)
+        </label>
+        <button class="button primary" type="submit">Banla</button>
+      </form>
+      <ul class="admin-list">${banList}</ul>
+    </section>
+
+    <section class="admin-section">
+      <h3>Ban İtirazları</h3>
+      <ul class="admin-list">${appealList}</ul>
+    </section>
+
+    <section class="admin-section">
+      <h3>Oyun Yükle</h3>
+      <form class="admin-form" data-admin-game-form>
+        <label>
+          Başlık
+          <input name="title" maxlength="80" required placeholder="Oyunun adı" />
+        </label>
+        <label>
+          HTML kodu
+          <textarea name="code" rows="6" required placeholder="Oyunun tam HTML kodunu buraya yapıştır"></textarea>
+        </label>
+        <button class="button primary" type="submit">Oyunu Yükle</button>
+      </form>
+      <h4>Oyun Kuyruğu</h4>
+      <ul class="admin-list">${queueList}</ul>
+    </section>
+
+    <section class="admin-section">
+      <h3>Oyun Kaldır</h3>
+      <ul class="admin-list">${removeList}</ul>
+    </section>
+  `;
+}
+
+async function submitAdminLogin(event) {
+  event.preventDefault();
+  const form = event.target;
+  const status = document.querySelector("[data-admin-login-status]");
+  const username = new FormData(form).get("username");
+  if (status) status.textContent = "Kontrol ediliyor...";
+  try {
+    const response = await fetch("/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (response.ok && data.token) {
+      adminToken = data.token;
+      localStorage.setItem("hakorocksAdminToken", adminToken);
+      if (status) status.textContent = data.message || "Hoş geldiniz, doğrulama başarılı";
+      form.reset();
+      await loadAdminState();
+      applyAdminOverlays();
+      setTimeout(openAdminPanel, 700);
+    } else if (response.status === 503) {
+      if (status) status.textContent = "Bağlanılamadı, tekrar deneyin";
+    } else {
+      if (status) status.textContent = "Buraya girmek için izniniz yok";
+    }
+  } catch {
+    if (status) status.textContent = "Bağlanılamadı, tekrar deneyin";
+  }
+}
+
+async function submitAdminBan(event) {
+  event.preventDefault();
+  const form = event.target;
+  const data = new FormData(form);
+  const permanent = data.get("permanent") === "on";
+  if (permanent && !window.confirm("Emin misin?")) return;
+  try {
+    await adminPost("/api/admin/ban", {
+      nickname: data.get("nickname"),
+      reason: data.get("reason"),
+      permanent,
+    });
+    form.reset();
+    await refreshAdminViews();
+  } catch {}
+}
+
+async function submitAdminGame(event) {
+  event.preventDefault();
+  const form = event.target;
+  const data = new FormData(form);
+  try {
+    await adminPost("/api/admin/game-queue", {
+      title: data.get("title"),
+      code: data.get("code"),
+    });
+    form.reset();
+    await refreshAdminViews();
+  } catch {}
+}
+
+async function submitBanAppeal(event) {
+  event.preventDefault();
+  const form = event.target;
+  const status = document.querySelector("[data-ban-appeal-status]");
+  const message = new FormData(form).get("message");
+  try {
+    const response = await fetch("/api/appeal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nickname: latestSocial.account?.nickname || "",
+        sessionId,
+        message,
+      }),
+    });
+    appealStatus = response.ok ? "İtirazın alındı." : "İtiraz gönderilemedi, tekrar deneyin.";
+  } catch {
+    appealStatus = "İtiraz gönderilemedi, tekrar deneyin.";
+  }
+  form.hidden = true;
+  if (status) status.textContent = appealStatus;
+}
+
+async function toggleMaintenance() {
+  try {
+    await adminPost("/api/admin/maintenance", { on: !adminPanelState?.maintenance });
+    await refreshAdminViews();
+  } catch {}
+}
+
+async function unbanAccount(id) {
+  try {
+    await adminPost("/api/admin/unban", { id });
+    await refreshAdminViews();
+  } catch {}
+}
+
+async function decideAppeal(id, approve) {
+  try {
+    await adminPost("/api/admin/appeal-decision", { id, approve });
+    await refreshAdminViews();
+  } catch {}
+}
+
+async function publishQueuedGame(id) {
+  try {
+    await adminPost("/api/admin/game-queue-publish", { id });
+    await refreshAdminViews();
+  } catch {}
+}
+
+async function removeSiteGame(slug, mode) {
+  if (mode === "permanent" && !window.confirm("Emin misin?")) return;
+  try {
+    await adminPost("/api/admin/remove-game", { slug, mode });
+    await refreshAdminViews();
+  } catch {}
+}
+
+function adminLogout() {
+  clearAdminToken();
+  closeAdminPanel();
+  applyAdminOverlays();
+}
+
+function bindAdminRoom() {
+  document.querySelector("[data-admin-open]")?.addEventListener("click", openAdminEntry);
+  document.querySelectorAll("[data-admin-login-close]").forEach((button) => {
+    button.addEventListener("click", closeAdminLogin);
+  });
+  document.querySelectorAll("[data-admin-panel-close]").forEach((button) => {
+    button.addEventListener("click", closeAdminPanel);
+  });
+
+  document.addEventListener("submit", (event) => {
+    const form = event.target;
+    if (form.matches?.("[data-admin-login-form]")) {
+      submitAdminLogin(event);
+      return;
+    }
+    if (form.matches?.("[data-admin-ban-form]")) {
+      submitAdminBan(event);
+      return;
+    }
+    if (form.matches?.("[data-admin-game-form]")) {
+      submitAdminGame(event);
+      return;
+    }
+    if (form.matches?.("[data-ban-appeal-form]")) {
+      submitBanAppeal(event);
+    }
+  });
+
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (target.closest?.("[data-admin-maintenance]")) {
+      toggleMaintenance();
+      return;
+    }
+    const unbanButton = target.closest?.("[data-admin-unban]");
+    if (unbanButton) {
+      unbanAccount(unbanButton.dataset.adminUnban);
+      return;
+    }
+    const appealButton = target.closest?.("[data-admin-appeal]");
+    if (appealButton) {
+      decideAppeal(appealButton.dataset.adminAppeal, appealButton.dataset.approve === "1");
+      return;
+    }
+    const publishButton = target.closest?.("[data-admin-publish]");
+    if (publishButton) {
+      publishQueuedGame(publishButton.dataset.adminPublish);
+      return;
+    }
+    const removeButton = target.closest?.("[data-admin-remove]");
+    if (removeButton) {
+      removeSiteGame(removeButton.dataset.adminRemove, removeButton.dataset.mode);
+      return;
+    }
+    if (target.closest?.("[data-admin-logout]")) {
+      adminLogout();
+      return;
+    }
+    if (target.closest?.("[data-ban-ok]")) {
+      const screen = document.querySelector("[data-ban-screen]");
+      if (screen) screen.hidden = true;
+      return;
+    }
+    if (target.closest?.("[data-ban-appeal-toggle]")) {
+      const form = document.querySelector("[data-ban-appeal-form]");
+      if (form) form.hidden = !form.hidden;
+    }
+  });
+}
+
+function fileToDataUrl(file) {  return new Promise((resolve, reject) => {
     if (file.size > 250_000) {
       reject(new Error("avatar-too-large"));
       return;
