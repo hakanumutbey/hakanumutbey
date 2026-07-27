@@ -634,9 +634,14 @@ let millionHTextCache = "";
 let audioContext;
 let adminToken = localStorage.getItem("hakorocksAdminToken") || "";
 let adminPanelState = null;
-let publicState = { maintenance: false, removedGames: {}, publishedGames: [] };
+let publicState = { maintenance: false, removedGames: {}, publishedGames: [], adminUsers: [] };
 let banInfo = null;
 let appealStatus = "";
+let dismissedWarningNote = "";
+let reportQuery = "";
+let reportResults = [];
+let reportTarget = "";
+let panelReportQuery = "";
 let authId = "";
 let authRecaptchaSiteKey = "";
 let authStage = 0;
@@ -645,6 +650,11 @@ let authViaBackup = false;
 let authChallengeQuestion = "";
 let recaptchaToken = "";
 const authLockTimers = {};
+let adminAccountsQuery = "";
+let adminAccounts = [];
+let banAccountsQuery = "";
+let banAccounts = [];
+let selectedBanNickname = "";
 
 document.documentElement.dataset.theme = selectedTheme;
 
@@ -1106,6 +1116,31 @@ document.querySelector("#app").innerHTML = `
       </div>
     </section>
 
+    <section class="section report-section" id="sikayet" aria-labelledby="report-title">
+      <div class="section-heading">
+        <p class="eyebrow">Kullanıcı Şikayet Et</p>
+        <h2 id="report-title">Kurala uymayan kullanıcıyı yöneticiye bildir.</h2>
+        <p class="section-note">Kullanıcıyı ara, seç ve şikayet notunu yaz. Yönetici odası şikayeti inceler.</p>
+      </div>
+      <div class="report-panel">
+        <input data-report-search maxlength="40" placeholder="Kullanıcı ara (rumuz veya isim)" />
+        <ul class="report-results" data-report-results></ul>
+        <form class="report-form" data-report-form>
+          <p class="report-selected" data-report-selected>Şikayet etmek için listeden bir kullanıcı seç.</p>
+          <label>
+            Adın
+            <input name="reporterName" maxlength="40" placeholder="Adın veya rumuzun" />
+          </label>
+          <label>
+            Şikayet notu
+            <textarea name="note" maxlength="300" required placeholder="Ne oldu? Kısaca anlat"></textarea>
+          </label>
+          <button class="button primary" type="submit">Şikayeti Gönder</button>
+          <p class="form-status" data-report-status aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+
     <section class="section studio-section" id="studio" aria-labelledby="studio-title">
       <div class="section-heading">
         <p class="eyebrow">Studio merkezi</p>
@@ -1208,6 +1243,8 @@ document.querySelector("#app").innerHTML = `
   </div>
 
   <div class="admin-blocker" data-ban-screen hidden></div>
+
+  <div class="warning-banner" data-warning-banner hidden></div>
 
   <div class="admin-anim" data-admin-animation hidden>
     <div class="anim-scene" data-anim-scene>
@@ -2549,13 +2586,26 @@ function renderAccountDashboard() {
   `;
 }
 
+function isAdminNickname(nickname) {
+  const normalized = (nickname || "").toLocaleLowerCase("tr-TR");
+  return Boolean(normalized) && (publicState.adminUsers || []).some(
+    (item) => String(item).toLocaleLowerCase("tr-TR") === normalized,
+  );
+}
+
+function adminBadge(nickname) {
+  if (!isAdminNickname(nickname)) return "";
+  const crown = nickname.toLocaleLowerCase("tr-TR") === "hakanumutbey" ? "👑 " : "";
+  return ` <em class="admin-badge">${crown}ADMIN</em>`;
+}
+
 function renderPersonCard(person) {
   return `
     <article class="person-card">
       ${avatarMarkup(person)}
       <div>
         <strong>${escapeHtml(person.name)}</strong>
-        <span>@${escapeHtml(person.nickname)}</span>
+        <span>@${escapeHtml(person.nickname)}${adminBadge(person.nickname)}</span>
       </div>
     </article>
   `;
@@ -2567,7 +2617,7 @@ function renderFriendCard(friend) {
       ${avatarMarkup(friend)}
       <div>
         <strong>${escapeHtml(friend.name)}</strong>
-        <span>@${escapeHtml(friend.nickname)}</span>
+        <span>@${escapeHtml(friend.nickname)}${adminBadge(friend.nickname)}</span>
       </div>
     </article>
   `;
@@ -5110,6 +5160,8 @@ async function initAdminRoom() {
   }
   applyAdminOverlays();
   renderGameGrid();
+  refreshReportUsers();
+  renderWarningBanner();
 }
 
 function clearAdminToken() {
@@ -5135,14 +5187,33 @@ async function refreshPublicState() {
 async function refreshBanStatus() {
   const nickname = latestSocial.account?.nickname || "";
   try {
-    const response = await fetch(`/api/ban-status?sessionId=${encodeURIComponent(sessionId)}&nickname=${encodeURIComponent(nickname)}`);
+    const response = await fetch(`/api/user-status?sessionId=${encodeURIComponent(sessionId)}&nickname=${encodeURIComponent(nickname)}`);
     const next = await response.json();
     if (JSON.stringify(next) !== JSON.stringify(banInfo)) {
       banInfo = next;
       appealStatus = "";
       renderBanScreen();
     }
+    renderWarningBanner();
   } catch {}
+}
+
+function renderWarningBanner() {
+  const banner = document.querySelector("[data-warning-banner]");
+  if (!banner) return;
+  const note = banInfo?.warning?.note || "";
+  if (!note || note === dismissedWarningNote || banInfo?.banned) {
+    banner.hidden = true;
+    return;
+  }
+  banner.hidden = false;
+  banner.innerHTML = `
+    <div class="warning-card">
+      <strong>⚠️ UYARI</strong>
+      <p>${escapeHtml(note)}</p>
+      <button class="button secondary" type="button" data-warning-ok>Tamam, anladım</button>
+    </div>
+  `;
 }
 
 function applyAdminOverlays() {
@@ -5536,6 +5607,7 @@ function openAdminPanel() {
   modal.hidden = false;
   document.body.classList.add("modal-open");
   renderAdminPanelContent();
+  refreshAccountLists();
 }
 
 function closeAdminPanel() {
@@ -5577,6 +5649,214 @@ async function refreshAdminViews() {
   await loadAdminState();
   renderAdminPanelContent();
   await refreshPublicState();
+  refreshAccountLists();
+}
+
+function renderAccountRows(list, mode) {
+  if (!list.length) return `<li class="admin-empty">Hesap bulunamadı.</li>`;
+  return list.map((account) => {
+    const nickname = escapeHtml(account.nickname);
+    const isSuper = account.nickname.toLocaleLowerCase("tr-TR") === "hakanumutbey";
+    let action = "";
+    let badges = "";
+    if (mode === "admin") {
+      if (account.isAdmin) badges += `<em class="admin-tag">Admin</em>`;
+      action = isSuper
+        ? `<em class="admin-tag">Süper Admin</em>`
+        : account.isAdmin
+          ? `<button class="button secondary" type="button" data-admin-revoke="${nickname}">Yetkiyi Al</button>`
+          : `<button class="button primary" type="button" data-admin-grant="${nickname}">Adminlik Ver</button>`;
+    } else {
+      if (account.banned) badges += `<em class="admin-tag danger">Banlı</em>`;
+      action = account.banned
+        ? `<button class="button secondary" type="button" data-ban-unban="${nickname}">Banı Kaldır</button>`
+        : `<button class="button primary" type="button" data-ban-select="${nickname}">Banla</button>`;
+    }
+    return `
+      <li class="admin-row">
+        <span>${escapeHtml(account.name)} @${nickname}${adminBadge(account.nickname)} ${badges}</span>
+        <span class="admin-row-actions">${action}</span>
+      </li>
+    `;
+  }).join("");
+}
+
+async function refreshAccountLists() {
+  if (!adminToken) return;
+  const headers = { Authorization: `Bearer ${adminToken}` };
+  const load = (query) => fetch(`/api/admin/accounts?query=${encodeURIComponent(query)}`, { headers })
+    .then((response) => (response.ok ? response.json() : []))
+    .catch(() => []);
+  const [admins, bans] = await Promise.all([load(adminAccountsQuery), load(banAccountsQuery)]);
+  adminAccounts = admins;
+  banAccounts = bans;
+  const adminUl = document.querySelector("[data-admin-account-list]");
+  if (adminUl) adminUl.innerHTML = renderAccountRows(adminAccounts, "admin");
+  const banUl = document.querySelector("[data-ban-account-list]");
+  if (banUl) banUl.innerHTML = renderAccountRows(banAccounts, "ban");
+}
+
+async function grantAdmin(nickname) {
+  try {
+    await adminPost("/api/admin/grant", { nickname });
+    await refreshAdminViews();
+  } catch {}
+}
+
+async function revokeAdmin(nickname) {
+  try {
+    await adminPost("/api/admin/revoke", { nickname });
+    await refreshAdminViews();
+  } catch {}
+}
+
+function selectBanAccount(nickname) {
+  selectedBanNickname = nickname;
+  const label = document.querySelector("[data-ban-selected]");
+  if (label) label.textContent = `Seçili hesap: @${nickname}`;
+}
+
+async function unbanByNickname(nickname) {
+  const ban = adminPanelState?.bans?.find(
+    (item) => item.nickname.toLocaleLowerCase("tr-TR") === nickname.toLocaleLowerCase("tr-TR"),
+  );
+  if (ban) await unbanAccount(ban.id);
+}
+
+// ---- Kullanıcı şikayeti (herkese açık bölüm) ----
+
+async function refreshReportUsers() {
+  const list = document.querySelector("[data-report-results]");
+  if (!list) return;
+  try {
+    const response = await fetch(`/api/users?sessionId=${encodeURIComponent(sessionId)}&query=${encodeURIComponent(reportQuery)}`);
+    reportResults = response.ok ? await response.json() : [];
+  } catch {
+    reportResults = [];
+  }
+  list.innerHTML = reportResults.length ? reportResults.map((person) => `
+    <li class="admin-row">
+      <span>${escapeHtml(person.name)} @${escapeHtml(person.nickname)}${adminBadge(person.nickname)}</span>
+      <span class="admin-row-actions">
+        <button class="button secondary" type="button" data-report-select="${escapeHtml(person.nickname)}">Seç</button>
+      </span>
+    </li>
+  `).join("") : `<li class="admin-empty">Kullanıcı bulunamadı.</li>`;
+}
+
+function selectReportTarget(nickname) {
+  reportTarget = nickname;
+  const label = document.querySelector("[data-report-selected]");
+  if (label) label.textContent = `Şikayet edilen: @${nickname}`;
+}
+
+async function submitReport(event) {
+  event.preventDefault();
+  const form = event.target;
+  const status = form.querySelector("[data-report-status]");
+  const data = new FormData(form);
+  if (!reportTarget) {
+    if (status) status.textContent = "Önce listeden bir kullanıcı seç.";
+    return;
+  }
+  const reporterName = data.get("reporterName") || latestSocial.account?.nickname || "Anonim";
+  try {
+    const response = await fetch("/api/report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targetNickname: reportTarget, reporterName, note: data.get("note") }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (response.ok) {
+      if (status) status.textContent = result.message || "Şikayetin alındı, teşekkürler";
+      form.reset();
+      reportTarget = "";
+      const label = document.querySelector("[data-report-selected]");
+      if (label) label.textContent = "Şikayet etmek için listeden bir kullanıcı seç.";
+    } else if (response.status === 409) {
+      if (status) status.textContent = "Bu kullanıcıyı zaten şikayet ettin, yönetici inceliyor.";
+    } else {
+      if (status) status.textContent = "Şikayet gönderilemedi, tekrar deneyin.";
+    }
+  } catch {
+    if (status) status.textContent = "Şikayet gönderilemedi, tekrar deneyin.";
+  }
+}
+
+// ---- Panel: şikayet kararları + işlem kayıtları ----
+
+function renderPanelReportRows(reports) {
+  const pending = (reports || []).filter((report) => report.status === "pending");
+  const query = panelReportQuery.toLocaleLowerCase("tr-TR");
+  const filtered = query
+    ? pending.filter((report) => report.targetNickname.toLocaleLowerCase("tr-TR").includes(query)
+      || report.reporterName.toLocaleLowerCase("tr-TR").includes(query))
+    : pending;
+  if (!filtered.length) return `<li class="admin-empty">Bekleyen şikayet yok.</li>`;
+  return filtered.map((report) => `
+    <li class="admin-row">
+      <span>@${escapeHtml(report.targetNickname)}${adminBadge(report.targetNickname)} — ${escapeHtml(report.note)}
+        <em class="admin-tag">şikayet eden: ${escapeHtml(report.reporterName)}</em>
+      </span>
+      <span class="admin-row-actions">
+        <button class="button secondary" type="button" data-report-warn="${escapeHtml(report.id)}">Uyarı Ver</button>
+        <button class="button secondary danger" type="button" data-report-ban="${escapeHtml(report.id)}">Banla</button>
+        <button class="button secondary" type="button" data-report-dismiss="${escapeHtml(report.id)}">Reddet</button>
+      </span>
+    </li>
+  `).join("");
+}
+
+function renderActionRows(actions) {
+  const list = (actions || []).slice(0, 30);
+  if (!list.length) return `<li class="admin-empty">İşlem yok.</li>`;
+  const undoable = ["ban", "warn", "game-publish", "game-remove", "maintenance"];
+  return list.map((action) => `
+    <li class="admin-row">
+      <span>${escapeHtml(new Date(action.createdAt).toLocaleString("tr-TR"))} · ${escapeHtml(action.actor)} — ${escapeHtml(action.detail)}
+        ${action.undone ? '<em class="admin-tag">Geri alındı</em>' : ""}
+      </span>
+      ${!action.undone && undoable.includes(action.type) ? `
+        <span class="admin-row-actions">
+          <button class="button secondary" type="button" data-admin-undo="${escapeHtml(action.id)}">Geri Al</button>
+        </span>` : ""}
+    </li>
+  `).join("");
+}
+
+async function decideReportWarn(id) {
+  const report = adminPanelState?.reports?.find((item) => item.id === id);
+  const note = window.prompt("Uyarı notu:", report?.note || "");
+  if (note === null) return;
+  try {
+    await adminPost("/api/admin/report-decision", { id, action: "warn", note });
+    await refreshAdminViews();
+  } catch {}
+}
+
+async function decideReportBan(id) {
+  const report = adminPanelState?.reports?.find((item) => item.id === id);
+  const reason = window.prompt("Ban sebebi:", report?.note || "");
+  if (reason === null) return;
+  const permanent = window.confirm("Kalıcı ban olsun mu? (Tamam = kalıcı, İptal = geçici)");
+  try {
+    await adminPost("/api/admin/report-decision", { id, action: "ban", note: reason, permanent });
+    await refreshAdminViews();
+  } catch {}
+}
+
+async function decideReportDismiss(id) {
+  try {
+    await adminPost("/api/admin/report-decision", { id, action: "dismiss" });
+    await refreshAdminViews();
+  } catch {}
+}
+
+async function undoAdminAction(actionId) {
+  try {
+    await adminPost("/api/admin/undo", { actionId });
+    await refreshAdminViews();
+  } catch {}
 }
 
 function renderAdminPanelContent() {
@@ -5645,7 +5925,7 @@ function renderAdminPanelContent() {
 
   container.innerHTML = `
     <div class="admin-panel-head">
-      <h2 id="admin-panel-title">Yönetici Odası</h2>
+      <h2 id="admin-panel-title">Yönetici Odası <em class="admin-tag role-tag">${state.role === "tam" ? "👑 Tam Admin" : "🛡️ Yan Admin"}</em></h2>
       <button class="button secondary" type="button" data-admin-logout>Çıkış Yap</button>
     </div>
 
@@ -5657,13 +5937,25 @@ function renderAdminPanelContent() {
       </button>
     </section>
 
+    ${state.role === "tam" ? `
+    <section class="admin-section">
+      <h3>Adminler</h3>
+      <input data-admin-account-search maxlength="40" placeholder="Hesap ara (rumuz veya isim)" value="${escapeHtml(adminAccountsQuery)}" />
+      <ul class="admin-list" data-admin-account-list>
+        ${renderAccountRows(adminAccounts, "admin")}
+      </ul>
+    </section>` : ""}
+
     <section class="admin-section">
       <h3>Hesap Banla</h3>
+      <input data-ban-account-search maxlength="40" placeholder="Hesap ara (rumuz veya isim)" value="${escapeHtml(banAccountsQuery)}" />
+      <ul class="admin-list" data-ban-account-list>
+        ${renderAccountRows(banAccounts, "ban")}
+      </ul>
       <form class="admin-form" data-admin-ban-form>
-        <label>
-          Rumuz
-          <input name="nickname" maxlength="24" required placeholder="örn. test-bot-1" />
-        </label>
+        <p class="admin-selected" data-ban-selected>
+          ${selectedBanNickname ? `Seçili hesap: @${escapeHtml(selectedBanNickname)}` : "Banlamak için listeden bir hesap seç."}
+        </p>
         <label>
           Ban sebebi
           <input name="reason" maxlength="200" placeholder="örn. küfür" />
@@ -5673,6 +5965,7 @@ function renderAdminPanelContent() {
           Siteden kalıcı banla (Tamam düğmesi olmaz)
         </label>
         <button class="button primary" type="submit">Banla</button>
+        <p class="form-status" data-ban-form-status aria-live="polite"></p>
       </form>
       <ul class="admin-list">${banList}</ul>
     </section>
@@ -5680,6 +5973,14 @@ function renderAdminPanelContent() {
     <section class="admin-section">
       <h3>Ban İtirazları</h3>
       <ul class="admin-list">${appealList}</ul>
+    </section>
+
+    <section class="admin-section">
+      <h3>Şikayetler</h3>
+      <input data-panel-report-search maxlength="40" placeholder="Şikayet ara (hedef rumuz veya şikayet eden)" value="${escapeHtml(panelReportQuery)}" />
+      <ul class="admin-list" data-panel-report-list>
+        ${renderPanelReportRows(state.reports)}
+      </ul>
     </section>
 
     <section class="admin-section">
@@ -5704,6 +6005,12 @@ function renderAdminPanelContent() {
       <ul class="admin-list">${removeList}</ul>
     </section>
 
+    ${state.role === "tam" ? `
+    <section class="admin-section">
+      <h3>İşlem Kayıtları</h3>
+      <ul class="admin-list">${renderActionRows(state.actions)}</ul>
+    </section>` : ""}
+
     <section class="admin-section">
       <h3>Güvenlik Kayıtları</h3>
       <ul class="admin-list">${securityRows}</ul>
@@ -5714,16 +6021,22 @@ function renderAdminPanelContent() {
 async function submitAdminBan(event) {
   event.preventDefault();
   const form = event.target;
+  const status = form.querySelector("[data-ban-form-status]");
+  if (!selectedBanNickname) {
+    if (status) status.textContent = "Önce listeden bir hesap seç.";
+    return;
+  }
   const data = new FormData(form);
   const permanent = data.get("permanent") === "on";
   if (permanent && !window.confirm("Emin misin?")) return;
   try {
     await adminPost("/api/admin/ban", {
-      nickname: data.get("nickname"),
+      nickname: selectedBanNickname,
       reason: data.get("reason"),
       permanent,
     });
     form.reset();
+    selectedBanNickname = "";
     await refreshAdminViews();
   } catch {}
 }
@@ -5852,6 +6165,10 @@ function bindAdminRoom() {
     }
     if (form.matches?.("[data-ban-appeal-form]")) {
       submitBanAppeal(event);
+      return;
+    }
+    if (form.matches?.("[data-report-form]")) {
+      submitReport(event);
     }
   });
 
@@ -5859,6 +6176,56 @@ function bindAdminRoom() {
     const target = event.target;
     if (target.closest?.("[data-admin-maintenance]")) {
       toggleMaintenance();
+      return;
+    }
+    const grantButton = target.closest?.("[data-admin-grant]");
+    if (grantButton) {
+      grantAdmin(grantButton.dataset.adminGrant);
+      return;
+    }
+    const revokeButton = target.closest?.("[data-admin-revoke]");
+    if (revokeButton) {
+      revokeAdmin(revokeButton.dataset.adminRevoke);
+      return;
+    }
+    const banSelectButton = target.closest?.("[data-ban-select]");
+    if (banSelectButton) {
+      selectBanAccount(banSelectButton.dataset.banSelect);
+      return;
+    }
+    const banUnbanButton = target.closest?.("[data-ban-unban]");
+    if (banUnbanButton) {
+      unbanByNickname(banUnbanButton.dataset.banUnban);
+      return;
+    }
+    const reportSelect = target.closest?.("[data-report-select]");
+    if (reportSelect) {
+      selectReportTarget(reportSelect.dataset.reportSelect);
+      return;
+    }
+    const reportWarn = target.closest?.("[data-report-warn]");
+    if (reportWarn) {
+      decideReportWarn(reportWarn.dataset.reportWarn);
+      return;
+    }
+    const reportBan = target.closest?.("[data-report-ban]");
+    if (reportBan) {
+      decideReportBan(reportBan.dataset.reportBan);
+      return;
+    }
+    const reportDismiss = target.closest?.("[data-report-dismiss]");
+    if (reportDismiss) {
+      decideReportDismiss(reportDismiss.dataset.reportDismiss);
+      return;
+    }
+    const undoButton = target.closest?.("[data-admin-undo]");
+    if (undoButton) {
+      undoAdminAction(undoButton.dataset.adminUndo);
+      return;
+    }
+    if (target.closest?.("[data-warning-ok]")) {
+      dismissedWarningNote = banInfo?.warning?.note || "";
+      renderWarningBanner();
       return;
     }
     const unbanButton = target.closest?.("[data-admin-unban]");
@@ -5893,6 +6260,30 @@ function bindAdminRoom() {
     if (target.closest?.("[data-ban-appeal-toggle]")) {
       const form = document.querySelector("[data-ban-appeal-form]");
       if (form) form.hidden = !form.hidden;
+    }
+  });
+
+  document.addEventListener("input", (event) => {
+    const target = event.target;
+    if (target.matches?.("[data-admin-account-search]")) {
+      adminAccountsQuery = target.value;
+      refreshAccountLists();
+      return;
+    }
+    if (target.matches?.("[data-ban-account-search]")) {
+      banAccountsQuery = target.value;
+      refreshAccountLists();
+      return;
+    }
+    if (target.matches?.("[data-report-search]")) {
+      reportQuery = target.value;
+      refreshReportUsers();
+      return;
+    }
+    if (target.matches?.("[data-panel-report-search]")) {
+      panelReportQuery = target.value;
+      const list = document.querySelector("[data-panel-report-list]");
+      if (list) list.innerHTML = renderPanelReportRows(adminPanelState?.reports);
     }
   });
 }

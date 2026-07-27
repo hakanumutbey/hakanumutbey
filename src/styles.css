@@ -4494,3 +4494,115 @@ h3 {
   bottom: 24px;
   right: 24px;
 }
+
+/* Adminler / ban hesap arama */
+.admin-section > input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.3);
+  font: inherit;
+}
+
+.admin-selected {
+  margin: 0;
+  color: var(--cyan, #35d2ff);
+}
+
+/* Sarı ADMIN rozeti */
+.admin-badge {
+  font-style: normal;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-left: 4px;
+  background: #ffd666;
+  color: #241a02;
+  vertical-align: middle;
+}
+
+.role-tag {
+  font-size: 0.9rem;
+}
+
+/* Uyarı bandı */
+.warning-banner[hidden] {
+  display: none;
+}
+
+.warning-banner {
+  position: fixed;
+  z-index: 80;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: grid;
+  place-items: center;
+  padding: 12px 16px;
+  background: rgba(60, 42, 0, 0.96);
+  border-bottom: 2px solid #ffd666;
+}
+
+.warning-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 900px;
+}
+
+.warning-card strong {
+  color: #ffd666;
+  font-size: 1.1rem;
+}
+
+.warning-card p {
+  margin: 0;
+  color: #fff3cf;
+}
+
+/* Şikayet bölümü */
+.report-panel {
+  display: grid;
+  gap: 14px;
+  max-width: 640px;
+}
+
+.report-panel > input,
+.report-form input,
+.report-form textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.3);
+  font: inherit;
+}
+
+.report-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.report-form {
+  display: grid;
+  gap: 10px;
+}
+
+.report-form label {
+  display: grid;
+  gap: 6px;
+}
+
+.report-selected {
+  margin: 0;
+  color: var(--cyan, #35d2ff);
+}

@@ -660,6 +660,50 @@ async function handleApi(request, response) {
     });
     return;
   }
+  if (request.method === "GET" && url.pathname === "/api/user-status") {
+    const sessionId = safeText(url.searchParams.get("sessionId"), 120);
+    const nickname = safeText(url.searchParams.get("nickname"), 24);
+    const ban = findBan(sessionId, nickname);
+    const warning = findWarning(sessionId, nickname);
+    sendJson(response, {
+      banned: Boolean(ban),
+      reason: ban?.reason || "",
+      permanent: Boolean(ban?.permanent),
+      warning: warning ? { note: warning.note } : null,
+    });
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/report") {
+    const body = await readBody(request, 64_000);
+    const targetNickname = safeText(body.targetNickname, 24);
+    const reporterName = safeText(body.reporterName, 40) || "Anonim";
+    const note = safeText(body.note, 300);
+    if (!targetNickname || !note) {
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "target-and-note-required" }));
+      return;
+    }
+    const duplicate = adminState.reports.some((report) => report.status === "pending"
+      && normalizeNickname(report.targetNickname) === normalizeNickname(targetNickname)
+      && report.reporterName.toLocaleLowerCase("tr-TR") === reporterName.toLocaleLowerCase("tr-TR"));
+    if (duplicate) {
+      response.writeHead(409, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "duplicate-report" }));
+      return;
+    }
+    adminState.reports.unshift({
+      id: createRecordId("rep"),
+      targetNickname,
+      reporterName,
+      note,
+      status: "pending",
+      createdAt: new Date().toISOString(),
+    });
+    adminState.reports = adminState.reports.slice(0, 100);
+    await saveAdminState();
+    sendJson(response, { ok: true, message: "Şikayetin alındı, teşekkürler" });
+    return;
+  }
   if (request.method === "POST" && url.pathname === "/api/appeal") {
     const body = await readBody(request, 64_000);
     const nickname = safeText(body.nickname, 24);
@@ -754,6 +798,24 @@ async function handleApi(request, response) {
       return;
     }
     const username = safeText(body.username, 80);
+    const normalizedUsername = username.toLocaleLowerCase("tr-TR");
+    const isListedAdmin = adminState.adminUsers.some(
+      (nickname) => normalizeNickname(nickname) === normalizedUsername,
+    );
+    if (isListedAdmin && normalizedUsername !== "hakanumutbey") {
+      session.stage = Math.max(session.stage, 2);
+      session.username = adminState.adminUsers.find(
+        (nickname) => normalizeNickname(nickname) === normalizedUsername,
+      ) || username;
+      sendJson(response, { ok: true, message: "✅ GitHub doğrulaması başarılı." });
+      return;
+    }
+    if (normalizedUsername !== "hakanumutbey") {
+      await logSecurityEvent(request, "stage2", `github-no-permission:${username}`);
+      response.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "no-permission", message: "❌ Bu GitHub hesabının yönetici yetkisi bulunmuyor." }));
+      return;
+    }
     let githubUser = null;
     try {
       const controller = new AbortController();
@@ -785,6 +847,7 @@ async function handleApi(request, response) {
     githubConsecutiveFailures = 0;
     if (safeText(githubUser?.login, 80).toLocaleLowerCase("tr-TR") === "hakanumutbey") {
       session.stage = Math.max(session.stage, 2);
+      session.username = "hakanumutbey";
       sendJson(response, { ok: true, message: "✅ GitHub doğrulaması başarılı." });
       return;
     }
@@ -814,6 +877,7 @@ async function handleApi(request, response) {
     }
     if (passwordHash(normalizePassword(body.password)) === adminBackupPasswordHash) {
       session.stage = Math.max(session.stage, 2);
+      session.username = "hakanumutbey";
       sendJson(response, { ok: true, message: "✅ Yedek doğrulama başarılı." });
       return;
     }
@@ -888,7 +952,7 @@ async function handleApi(request, response) {
       }
     }
     const token = randomBytes(24).toString("hex");
-    adminTokens.set(token, Date.now() + 12 * 60 * 60 * 1000);
+    adminTokens.set(token, { username: session.username || "hakanumutbey", expiresAt: Date.now() + 12 * 60 * 60 * 1000 });
     adminAuthSessions.delete(session.id);
     sendJson(response, { ok: true, token, message: "✅ Robot doğrulaması başarılı." });
     return;
@@ -903,21 +967,78 @@ async function handleApi(request, response) {
     return;
   }
   if (request.method === "GET" && url.pathname === "/api/admin/state") {
+    const username = requireAdmin(request, response, url, null);
+    if (!username) return;
+    sendJson(response, { ...adminState, securityLog: securityLog.slice(0, 20), role: adminRole(username), username });
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/admin/grant") {
+    const body = await readBody(request, 64_000);
+    if (!requireSuperAdmin(request, response, url, body)) return;
+    const nickname = safeText(body.nickname, 24);
+    if (!nickname) {
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "nickname-required" }));
+      return;
+    }
+    const isSuper = normalizeNickname(nickname) === "hakanumutbey";
+    const already = adminState.adminUsers.some((item) => normalizeNickname(item) === normalizeNickname(nickname));
+    if (!isSuper && !already) {
+      adminState.adminUsers.unshift(nickname);
+      await saveAdminState();
+    }
+    sendJson(response, adminState);
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/admin/revoke") {
+    const body = await readBody(request, 64_000);
+    if (!requireSuperAdmin(request, response, url, body)) return;
+    const nickname = safeText(body.nickname, 24);
+    if (normalizeNickname(nickname) === "hakanumutbey") {
+      response.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "cannot-revoke-superadmin" }));
+      return;
+    }
+    adminState.adminUsers = adminState.adminUsers.filter((item) => normalizeNickname(item) !== normalizeNickname(nickname));
+    await saveAdminState();
+    sendJson(response, adminState);
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/admin/accounts") {
     if (!requireAdmin(request, response, url, null)) return;
-    sendJson(response, { ...adminState, securityLog: securityLog.slice(0, 20) });
+    const query = safeText(url.searchParams.get("query"), 40).toLocaleLowerCase("tr-TR");
+    const list = accounts
+      .filter((account) => {
+        if (!query) return true;
+        return account.nickname.toLocaleLowerCase("tr-TR").includes(query)
+          || account.name.toLocaleLowerCase("tr-TR").includes(query);
+      })
+      .slice(0, 30)
+      .map((account) => ({
+        nickname: account.nickname,
+        name: account.name,
+        banned: Boolean(findBan(account.sessionId, account.nickname)),
+        isAdmin: normalizeNickname(account.nickname) === "hakanumutbey"
+          || adminState.adminUsers.some((item) => normalizeNickname(item) === normalizeNickname(account.nickname)),
+        createdAt: account.createdAt,
+      }));
+    sendJson(response, list);
     return;
   }
   if (request.method === "POST" && url.pathname === "/api/admin/maintenance") {
     const body = await readBody(request, 64_000);
-    if (!requireAdmin(request, response, url, body)) return;
+    const actor = requireAdmin(request, response, url, body);
+    if (!actor) return;
     adminState.maintenance = Boolean(body.on);
+    logAdminAction("maintenance", actor, `Bakım arası ${adminState.maintenance ? "açıldı" : "kapatıldı"}`);
     await saveAdminState();
     sendJson(response, publicStateSnapshot());
     return;
   }
   if (request.method === "POST" && url.pathname === "/api/admin/ban") {
     const body = await readBody(request, 64_000);
-    if (!requireAdmin(request, response, url, body)) return;
+    const actor = requireAdmin(request, response, url, body);
+    if (!actor) return;
     const nickname = safeText(body.nickname, 24);
     const reason = safeText(body.reason, 200);
     if (!nickname) {
@@ -925,36 +1046,28 @@ async function handleApi(request, response) {
       response.end(JSON.stringify({ error: "nickname-required" }));
       return;
     }
-    let sessionId = safeText(body.sessionId, 120);
-    if (!sessionId) {
-      const account = accounts.find((item) => normalizeNickname(item.nickname) === normalizeNickname(nickname));
-      sessionId = account?.sessionId || "";
-    }
-    adminState.bans = adminState.bans.filter((ban) => normalizeNickname(ban.nickname) !== normalizeNickname(nickname));
-    adminState.bans.unshift({
-      id: createRecordId("ban"),
-      nickname,
-      sessionId,
-      reason,
-      permanent: Boolean(body.permanent),
-      createdAt: new Date().toISOString(),
-    });
+    const ban = createBan(nickname, reason, Boolean(body.permanent));
+    logAdminAction("ban", actor, `@${nickname} banlandı${ban.permanent ? " (kalıcı)" : ""}${reason ? ` — ${reason}` : ""}`, ban.id);
     await saveAdminState();
     sendJson(response, adminState);
     return;
   }
   if (request.method === "POST" && url.pathname === "/api/admin/unban") {
     const body = await readBody(request, 64_000);
-    if (!requireAdmin(request, response, url, body)) return;
+    const actor = requireAdmin(request, response, url, body);
+    if (!actor) return;
     const id = safeText(body.id, 120);
-    adminState.bans = adminState.bans.filter((ban) => ban.id !== id);
+    const ban = adminState.bans.find((item) => item.id === id);
+    adminState.bans = adminState.bans.filter((item) => item.id !== id);
+    logAdminAction("unban", actor, `@${ban?.nickname || id} banı kaldırıldı`);
     await saveAdminState();
     sendJson(response, adminState);
     return;
   }
   if (request.method === "POST" && url.pathname === "/api/admin/appeal-decision") {
     const body = await readBody(request, 64_000);
-    if (!requireAdmin(request, response, url, body)) return;
+    const actor = requireAdmin(request, response, url, body);
+    if (!actor) return;
     const id = safeText(body.id, 120);
     const appeal = adminState.appeals.find((item) => item.id === id);
     if (!appeal) {
@@ -966,13 +1079,15 @@ async function handleApi(request, response) {
     if (body.approve) {
       adminState.bans = adminState.bans.filter((ban) => normalizeNickname(ban.nickname) !== normalizeNickname(appeal.nickname));
     }
+    logAdminAction("appeal-decision", actor, `@${appeal.nickname} itirazı ${body.approve ? "onaylandı" : "reddedildi"}`);
     await saveAdminState();
     sendJson(response, adminState);
     return;
   }
   if (request.method === "POST" && url.pathname === "/api/admin/game-queue") {
     const body = await readBody(request, 600_000);
-    if (!requireAdmin(request, response, url, body)) return;
+    const actor = requireAdmin(request, response, url, body);
+    if (!actor) return;
     const title = safeText(body.title, 80);
     const code = typeof body.code === "string" ? body.code : "";
     if (!title || !code.trim()) {
@@ -985,21 +1100,24 @@ async function handleApi(request, response) {
       response.end(JSON.stringify({ error: "code-too-large" }));
       return;
     }
-    adminState.gameQueue.unshift({
+    const queuedGame = {
       id: createRecordId("game"),
       title,
       code,
       published: false,
       createdAt: new Date().toISOString(),
-    });
+    };
+    adminState.gameQueue.unshift(queuedGame);
     adminState.gameQueue = adminState.gameQueue.slice(0, 50);
+    logAdminAction("game-queue", actor, `"${title}" kuyruğa eklendi`, queuedGame.id);
     await saveAdminState();
     sendJson(response, adminState);
     return;
   }
   if (request.method === "POST" && url.pathname === "/api/admin/game-queue-publish") {
     const body = await readBody(request, 64_000);
-    if (!requireAdmin(request, response, url, body)) return;
+    const actor = requireAdmin(request, response, url, body);
+    if (!actor) return;
     const id = safeText(body.id, 120);
     const game = adminState.gameQueue.find((item) => item.id === id);
     if (!game) {
@@ -1008,22 +1126,107 @@ async function handleApi(request, response) {
       return;
     }
     game.published = true;
+    logAdminAction("game-publish", actor, `"${game.title}" siteye gönderildi`, game.id);
     await saveAdminState();
     sendJson(response, adminState);
     return;
   }
   if (request.method === "POST" && url.pathname === "/api/admin/remove-game") {
     const body = await readBody(request, 64_000);
-    if (!requireAdmin(request, response, url, body)) return;
+    const actor = requireAdmin(request, response, url, body);
+    if (!actor) return;
     const slug = safeText(body.slug, 80);
     const mode = safeText(body.mode, 20);
     if (mode === "restore") {
       delete adminState.removedGames[slug];
     } else if (mode === "temporary" || mode === "permanent") {
       adminState.removedGames[slug] = { mode, createdAt: new Date().toISOString() };
+    } else {
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "invalid-mode" }));
+      return;
     }
+    logAdminAction("game-remove", actor, `${slug} ${mode === "restore" ? "geri alındı" : mode === "permanent" ? "sonsuz kaldırıldı" : "geçici kaldırıldı"}`, slug);
     await saveAdminState();
     sendJson(response, publicStateSnapshot());
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/admin/report-decision") {
+    const body = await readBody(request, 64_000);
+    const actor = requireAdmin(request, response, url, body);
+    if (!actor) return;
+    const id = safeText(body.id, 120);
+    const action = safeText(body.action, 20);
+    const report = adminState.reports.find((item) => item.id === id);
+    if (!report) {
+      response.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "not-found" }));
+      return;
+    }
+    if (action === "warn") {
+      const note = safeText(body.note, 300) || report.note;
+      const account = accounts.find((item) => normalizeNickname(item.nickname) === normalizeNickname(report.targetNickname));
+      const warning = {
+        id: createRecordId("warn"),
+        nickname: report.targetNickname,
+        sessionId: account?.sessionId || "",
+        note,
+        by: actor,
+        createdAt: new Date().toISOString(),
+      };
+      adminState.warnings.unshift(warning);
+      adminState.warnings = adminState.warnings.slice(0, 100);
+      report.status = "warned";
+      logAdminAction("warn", actor, `@${report.targetNickname} uyarıldı — ${note}`, warning.id);
+    } else if (action === "ban") {
+      const reason = safeText(body.note, 200) || report.note;
+      const ban = createBan(report.targetNickname, reason, Boolean(body.permanent));
+      report.status = "banned";
+      logAdminAction("ban", actor, `@${report.targetNickname} şikayet üzerine banlandı${ban.permanent ? " (kalıcı)" : ""} — ${reason}`, ban.id);
+    } else if (action === "dismiss") {
+      report.status = "dismissed";
+      logAdminAction("report-decision", actor, `@${report.targetNickname} şikayeti reddedildi`);
+    } else {
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "invalid-action" }));
+      return;
+    }
+    await saveAdminState();
+    sendJson(response, adminState);
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/admin/undo") {
+    const body = await readBody(request, 64_000);
+    const actor = requireSuperAdmin(request, response, url, body);
+    if (!actor) return;
+    const actionId = safeText(body.actionId, 120);
+    const action = adminState.actions.find((item) => item.id === actionId);
+    if (!action) {
+      response.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "not-found" }));
+      return;
+    }
+    const undoable = ["ban", "warn", "game-publish", "game-remove", "maintenance"];
+    if (action.undone || !undoable.includes(action.type)) {
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "not-undoable" }));
+      return;
+    }
+    if (action.type === "ban") {
+      adminState.bans = adminState.bans.filter((ban) => ban.id !== action.ref);
+    } else if (action.type === "warn") {
+      adminState.warnings = adminState.warnings.filter((warning) => warning.id !== action.ref);
+    } else if (action.type === "game-publish") {
+      const game = adminState.gameQueue.find((item) => item.id === action.ref);
+      if (game) game.published = false;
+    } else if (action.type === "game-remove") {
+      delete adminState.removedGames[action.ref];
+    } else if (action.type === "maintenance") {
+      adminState.maintenance = false;
+    }
+    action.undone = true;
+    await saveAdminState();
+    sendJson(response, adminState);
     return;
   }
   response.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
@@ -1328,6 +1531,34 @@ function normalizeAdminState(value) {
   const source = value && typeof value === "object" ? value : {};
   return {
     maintenance: Boolean(source.maintenance),
+    adminUsers: Array.isArray(source.adminUsers)
+      ? [...new Set(source.adminUsers.map((item) => safeText(item, 24)).filter(Boolean))]
+      : [],
+    actions: Array.isArray(source.actions) ? source.actions.filter((item) => item && typeof item === "object").map((item) => ({
+      id: safeText(item.id, 120) || createRecordId("act"),
+      type: safeText(item.type, 30),
+      actor: safeText(item.actor, 40),
+      detail: safeText(item.detail, 220),
+      ref: safeText(item.ref, 120),
+      createdAt: safeText(item.createdAt, 40) || new Date().toISOString(),
+      undone: Boolean(item.undone),
+    })).filter((item) => item.type) : [],
+    reports: Array.isArray(source.reports) ? source.reports.filter((item) => item && typeof item === "object").map((item) => ({
+      id: safeText(item.id, 120) || createRecordId("rep"),
+      targetNickname: safeText(item.targetNickname, 24),
+      reporterName: safeText(item.reporterName, 40),
+      note: safeText(item.note, 300),
+      status: ["pending", "warned", "banned", "dismissed"].includes(item.status) ? item.status : "pending",
+      createdAt: safeText(item.createdAt, 40) || new Date().toISOString(),
+    })).filter((item) => item.targetNickname) : [],
+    warnings: Array.isArray(source.warnings) ? source.warnings.filter((item) => item && typeof item === "object").map((item) => ({
+      id: safeText(item.id, 120) || createRecordId("warn"),
+      nickname: safeText(item.nickname, 24),
+      sessionId: safeText(item.sessionId, 120),
+      note: safeText(item.note, 300),
+      by: safeText(item.by, 40),
+      createdAt: safeText(item.createdAt, 40) || new Date().toISOString(),
+    })).filter((item) => item.nickname) : [],
     bans: Array.isArray(source.bans) ? source.bans.filter((item) => item && typeof item === "object").map((item) => ({
       id: safeText(item.id, 120) || createRecordId("ban"),
       nickname: safeText(item.nickname, 24),
@@ -1362,42 +1593,98 @@ async function saveAdminState() {
   await writeJson("admin.json", adminState);
 }
 
+function logAdminAction(type, actor, detail, ref = "") {
+  adminState.actions.unshift({
+    id: createRecordId("act"),
+    type,
+    actor: safeText(actor, 40),
+    detail: safeText(detail, 220),
+    ref: safeText(ref, 120),
+    createdAt: new Date().toISOString(),
+    undone: false,
+  });
+  adminState.actions = adminState.actions.slice(0, 100);
+}
+
+function findWarning(sessionId, nickname) {
+  const normalized = normalizeNickname(nickname);
+  return adminState.warnings.find((warning) => {
+    if (normalized && normalizeNickname(warning.nickname) === normalized) return true;
+    return Boolean(sessionId && warning.sessionId && warning.sessionId === sessionId);
+  }) || null;
+}
+
 function publicStateSnapshot() {
   return {
     maintenance: Boolean(adminState.maintenance),
     removedGames: adminState.removedGames,
+    adminUsers: ["hakanumutbey", ...adminState.adminUsers],
     publishedGames: adminState.gameQueue
       .filter((game) => game.published)
       .map((game) => ({ id: game.id, title: game.title })),
   };
 }
 
-function findBan(sessionId, nickname) {
-  const normalized = normalizeNickname(nickname);
+function createBan(nickname, reason, permanent) {
+  const account = accounts.find((item) => normalizeNickname(item.nickname) === normalizeNickname(nickname));
+  adminState.bans = adminState.bans.filter((ban) => normalizeNickname(ban.nickname) !== normalizeNickname(nickname));
+  const ban = {
+    id: createRecordId("ban"),
+    nickname,
+    sessionId: account?.sessionId || "",
+    reason,
+    permanent: Boolean(permanent),
+    createdAt: new Date().toISOString(),
+  };
+  adminState.bans.unshift(ban);
+  return ban;
+}
+
+function findBan(sessionId, nickname) {  const normalized = normalizeNickname(nickname);
   return adminState.bans.find((ban) => {
     if (normalized && normalizeNickname(ban.nickname) === normalized) return true;
     return Boolean(sessionId && ban.sessionId && ban.sessionId === sessionId);
   }) || null;
 }
 
-function hasAdminToken(request, url, body) {
+function adminUsernameFrom(request, url, body) {
   const header = request.headers.authorization || "";
   const bearer = header.startsWith("Bearer ") ? header.slice(7) : "";
   const token = safeText(bearer || body?.token || url?.searchParams.get("token") || "", 120);
-  if (!token) return false;
-  const expiresAt = adminTokens.get(token);
-  if (!expiresAt || expiresAt < Date.now()) {
+  if (!token) return "";
+  const entry = adminTokens.get(token);
+  if (!entry || entry.expiresAt < Date.now()) {
     adminTokens.delete(token);
-    return false;
+    return "";
   }
-  return true;
+  return entry.username || "";
+}
+
+function hasAdminToken(request, url, body) {
+  return Boolean(adminUsernameFrom(request, url, body));
+}
+
+function adminRole(username) {
+  return normalizeNickname(username) === "hakanumutbey" ? "tam" : "yan";
 }
 
 function requireAdmin(request, response, url, body) {
-  if (hasAdminToken(request, url, body)) return true;
+  const username = adminUsernameFrom(request, url, body);
+  if (username) return username;
   response.writeHead(401, { "Content-Type": "application/json; charset=utf-8" });
   response.end(JSON.stringify({ error: "no-admin-token" }));
-  return false;
+  return "";
+}
+
+function requireSuperAdmin(request, response, url, body) {
+  const username = requireAdmin(request, response, url, body);
+  if (!username) return "";
+  if (adminRole(username) !== "tam") {
+    response.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
+    response.end(JSON.stringify({ error: "superadmin-required" }));
+    return "";
+  }
+  return username;
 }
 
 function getAuthSession(authId) {
