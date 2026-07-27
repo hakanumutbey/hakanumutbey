@@ -637,6 +637,14 @@ let adminPanelState = null;
 let publicState = { maintenance: false, removedGames: {}, publishedGames: [] };
 let banInfo = null;
 let appealStatus = "";
+let authId = "";
+let authRecaptchaSiteKey = "";
+let authStage = 0;
+let authBackupAvailable = false;
+let authViaBackup = false;
+let authChallengeQuestion = "";
+let recaptchaToken = "";
+const authLockTimers = {};
 
 document.documentElement.dataset.theme = selectedTheme;
 
@@ -1180,18 +1188,7 @@ document.querySelector("#app").innerHTML = `
     <button class="modal-backdrop" type="button" data-admin-login-close aria-label="Yönetici girişini kapat"></button>
     <article class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="admin-login-title">
       <button class="modal-close" type="button" data-admin-login-close aria-label="Kapat">×</button>
-      <div class="admin-login">
-        <h2 id="admin-login-title">Yönetici Odası</h2>
-        <p>Girmek için GitHub kullanıcı adını yaz.</p>
-        <form data-admin-login-form>
-          <label>
-            GitHub kullanıcı adı
-            <input name="username" maxlength="80" placeholder="örn. hakanumutbey" autocomplete="off" required />
-          </label>
-          <button class="button primary" type="submit">Giriş yap</button>
-        </form>
-        <p class="form-status" data-admin-login-status aria-live="polite"></p>
-      </div>
+      <div class="admin-login" data-admin-auth></div>
     </article>
   </section>
 
@@ -1211,6 +1208,16 @@ document.querySelector("#app").innerHTML = `
   </div>
 
   <div class="admin-blocker" data-ban-screen hidden></div>
+
+  <div class="admin-anim" data-admin-animation hidden>
+    <div class="anim-scene" data-anim-scene>
+      <div class="anim-light"></div>
+      <div class="anim-door"><span class="anim-lock" data-anim-lock>🔒</span></div>
+      <div class="anim-key" data-anim-key>🔑</div>
+    </div>
+    <p class="anim-text" data-anim-text hidden>🎉 Hoş geldiniz Hakan Umut. Yönetici doğrulaması başarıyla tamamlandı.</p>
+    <button class="button secondary anim-skip" type="button" data-anim-skip>Atla</button>
+  </div>
 `;
 
 function renderMillionHSection() {
@@ -5194,10 +5201,318 @@ function openAdminEntry() {
 function openAdminLogin() {
   const modal = document.querySelector("[data-admin-login]");
   if (!modal) return;
+  authId = "";
+  authStage = 0;
+  authBackupAvailable = false;
+  authViaBackup = false;
+  authChallengeQuestion = "";
+  recaptchaToken = "";
   modal.hidden = false;
   document.body.classList.add("modal-open");
-  const status = modal.querySelector("[data-admin-login-status]");
-  if (status) status.textContent = "";
+  renderAdminAuth();
+  startAdminAuth();
+}
+
+async function startAdminAuth() {
+  try {
+    const response = await fetch("/api/admin/auth/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    const data = await response.json();
+    authId = data.authId || "";
+    authRecaptchaSiteKey = data.recaptchaSiteKey || "";
+  } catch {
+    setAuthStatus("stage1", "Bağlanılamadı, tekrar deneyin");
+  }
+}
+
+function setAuthStatus(stageKey, message) {
+  const status = document.querySelector(`[data-auth-status="${stageKey}"]`);
+  if (status) status.textContent = message;
+}
+
+function startAuthLockCountdown(stageKey, seconds) {
+  const button = document.querySelector(`[data-auth-form="${stageKey}"] button[type=submit]`);
+  if (button) button.disabled = true;
+  let remaining = Math.max(1, seconds);
+  clearInterval(authLockTimers[stageKey]);
+  const tick = () => {
+    setAuthStatus(stageKey, `⏳ Güvenlik nedeniyle 100 saniye boyunca yeni giriş denemesi yapılamaz. (${remaining} sn)`);
+    remaining -= 1;
+    if (remaining < 0) {
+      clearInterval(authLockTimers[stageKey]);
+      if (button) button.disabled = false;
+      setAuthStatus(stageKey, "");
+    }
+  };
+  authLockTimers[stageKey] = setInterval(tick, 1000);
+  tick();
+}
+
+function renderAdminAuth() {
+  const container = document.querySelector("[data-admin-auth]");
+  if (!container) return;
+  container.innerHTML = `
+    <h2 id="admin-login-title">🛡️ YÖNETİCİ ODASI GÜVENLİK DUVARI</h2>
+    <ol class="auth-stages">
+      <li class="auth-stage ${authStage === 0 ? "active" : "done"}">
+        <h3>1. Aşama — Yönetici Şifresi</h3>
+        ${authStage >= 1 ? `<p class="auth-ok">✅ Yönetici şifresi doğrulandı.</p>` : `
+          <form data-auth-form="stage1" data-auth-stage1-form>
+            <input type="password" name="password" maxlength="500" placeholder="Yönetici şifresi" autocomplete="off" required />
+            <button class="button primary" type="submit">Doğrula</button>
+          </form>
+          <p class="form-status" data-auth-status="stage1" aria-live="polite"></p>`}
+      </li>
+      ${authStage >= 1 ? `
+      <li class="auth-stage ${authStage === 1 ? "active" : "done"}">
+        <h3>2. Aşama — GitHub Doğrulaması</h3>
+        ${authStage >= 2 ? `<p class="auth-ok">✅ ${authViaBackup ? "Yedek doğrulama başarılı." : "GitHub doğrulaması başarılı."}</p>` : `
+          <form data-auth-form="stage2" data-auth-stage2-form>
+            <input name="username" maxlength="80" placeholder="GitHub kullanıcı adı" autocomplete="off" required />
+            <button class="button primary" type="submit">GitHub ile Doğrula</button>
+          </form>
+          <p class="form-status" data-auth-status="stage2" aria-live="polite"></p>
+          ${authBackupAvailable ? `
+            <div class="auth-backup">
+              <h4>2.1 Aşama — Yedek Yönetici Doğrulaması</h4>
+              <form data-auth-form="backup" data-auth-backup-form>
+                <input type="password" name="password" maxlength="500" placeholder="Yedek şifre" autocomplete="off" required />
+                <button class="button primary" type="submit">Yedek Doğrulama</button>
+              </form>
+              <p class="form-status" data-auth-status="backup" aria-live="polite"></p>
+            </div>` : ""}`}
+      </li>` : ""}
+      ${authStage >= 2 ? `
+      <li class="auth-stage active">
+        <h3>3. Aşama — Ben Robot Değilim</h3>
+        <form data-auth-form="stage3" data-auth-stage3-form>
+          <label class="admin-check">
+            <input type="checkbox" name="notrobot" required />
+            Ben robot değilim
+          </label>
+          ${authRecaptchaSiteKey ? `<div data-recaptcha></div>` : `
+            <label>
+              ${escapeHtml(authChallengeQuestion || "Soru yükleniyor...")}
+              <input name="answer" inputmode="numeric" maxlength="10" placeholder="Cevap" autocomplete="off" required />
+            </label>`}
+          <button class="button primary" type="submit">Doğrulamayı Bitir</button>
+        </form>
+        <p class="form-status" data-auth-status="stage3" aria-live="polite"></p>
+      </li>` : ""}
+    </ol>
+  `;
+  if (authStage >= 2 && authRecaptchaSiteKey) renderRecaptchaWidget();
+}
+
+function renderRecaptchaWidget() {
+  const container = document.querySelector("[data-recaptcha]");
+  if (!container || container.dataset.rendered === "1") return;
+  const render = () => {
+    if (!window.grecaptcha?.render || container.dataset.rendered === "1") return;
+    container.dataset.rendered = "1";
+    window.grecaptcha.render(container, {
+      sitekey: authRecaptchaSiteKey,
+      callback: (token) => { recaptchaToken = token; },
+    });
+  };
+  if (window.grecaptcha?.render) {
+    render();
+    return;
+  }
+  if (!document.querySelector("script[data-recaptcha-api]")) {
+    const script = document.createElement("script");
+    script.src = "https://www.google.com/recaptcha/api.js";
+    script.async = true;
+    script.defer = true;
+    script.dataset.recaptchaApi = "1";
+    script.onload = render;
+    document.head.appendChild(script);
+  }
+}
+
+async function loadAuthChallenge() {
+  try {
+    const response = await fetch(`/api/admin/auth/stage3-challenge?authId=${encodeURIComponent(authId)}`);
+    const data = await response.json();
+    authChallengeQuestion = data.question || "";
+  } catch {
+    authChallengeQuestion = "";
+  }
+}
+
+async function submitAuthStage1(event) {
+  event.preventDefault();
+  const form = event.target;
+  const password = new FormData(form).get("password");
+  setAuthStatus("stage1", "Kontrol ediliyor...");
+  try {
+    const response = await fetch("/api/admin/auth/stage1", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ authId, password }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (response.ok) {
+      authStage = 1;
+      renderAdminAuth();
+      return;
+    }
+    if (response.status === 429) {
+      startAuthLockCountdown("stage1", data.retryAfterSeconds || 100);
+      return;
+    }
+    if (data.error === "invalid-auth") {
+      renderAdminAuth();
+      startAdminAuth();
+      setAuthStatus("stage1", "Oturum zaman aşımına uğradı, yeniden başlatıldı.");
+      return;
+    }
+    setAuthStatus("stage1", data.message || "❌ Şifre hatalı.");
+  } catch {
+    setAuthStatus("stage1", "Bağlanılamadı, tekrar deneyin");
+  }
+}
+
+async function submitAuthStage2(event) {
+  event.preventDefault();
+  const form = event.target;
+  const username = new FormData(form).get("username");
+  setAuthStatus("stage2", "GitHub kontrol ediliyor...");
+  try {
+    const response = await fetch("/api/admin/auth/stage2", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ authId, username }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (response.ok) {
+      authStage = 2;
+      authViaBackup = false;
+      await loadAuthChallenge();
+      renderAdminAuth();
+      return;
+    }
+    if (data.error === "invalid-auth") {
+      authStage = 0;
+      renderAdminAuth();
+      startAdminAuth();
+      return;
+    }
+    if (response.status === 503 && data.backupAvailable && !authBackupAvailable) {
+      authBackupAvailable = true;
+      renderAdminAuth();
+    }
+    setAuthStatus("stage2", data.message || "❌ GitHub'a bağlanılamadı.");
+  } catch {
+    setAuthStatus("stage2", "Bağlanılamadı, tekrar deneyin");
+  }
+}
+
+async function submitAuthBackup(event) {
+  event.preventDefault();
+  const form = event.target;
+  const password = new FormData(form).get("password");
+  setAuthStatus("backup", "Kontrol ediliyor...");
+  try {
+    const response = await fetch("/api/admin/auth/stage2-backup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ authId, password }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (response.ok) {
+      authStage = 2;
+      authViaBackup = true;
+      await loadAuthChallenge();
+      renderAdminAuth();
+      return;
+    }
+    if (response.status === 429) {
+      startAuthLockCountdown("backup", data.retryAfterSeconds || 100);
+      return;
+    }
+    setAuthStatus("backup", data.message || "❌ Yedek doğrulama başarısız.");
+  } catch {
+    setAuthStatus("backup", "Bağlanılamadı, tekrar deneyin");
+  }
+}
+
+async function submitAuthStage3(event) {
+  event.preventDefault();
+  const form = event.target;
+  const formData = new FormData(form);
+  if (formData.get("notrobot") !== "on") {
+    setAuthStatus("stage3", "Önce 'Ben robot değilim' kutusunu işaretle.");
+    return;
+  }
+  setAuthStatus("stage3", "Kontrol ediliyor...");
+  const payload = authRecaptchaSiteKey
+    ? { authId, recaptchaToken }
+    : { authId, answer: formData.get("answer") };
+  try {
+    const response = await fetch("/api/admin/auth/stage3", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (response.ok && data.token) {
+      finishAdminAuth(data.token);
+      return;
+    }
+    setAuthStatus("stage3", data.message || "❌ Robot doğrulaması başarısız.");
+    if (!authRecaptchaSiteKey) {
+      await loadAuthChallenge();
+      renderAdminAuth();
+      setAuthStatus("stage3", data.message || "❌ Robot doğrulaması başarısız.");
+    }
+  } catch {
+    setAuthStatus("stage3", "Bağlanılamadı, tekrar deneyin");
+  }
+}
+
+function finishAdminAuth(token) {
+  adminToken = token;
+  localStorage.setItem("hakorocksAdminToken", adminToken);
+  closeAdminLogin();
+  playAdminAnimation(async () => {
+    await loadAdminState();
+    applyAdminOverlays();
+    openAdminPanel();
+  });
+}
+
+function playAdminAnimation(onDone) {
+  const overlay = document.querySelector("[data-admin-animation]");
+  if (!overlay) {
+    onDone();
+    return;
+  }
+  const scene = overlay.querySelector("[data-anim-scene]");
+  const key = overlay.querySelector("[data-anim-key]");
+  const lock = overlay.querySelector("[data-anim-lock]");
+  const text = overlay.querySelector("[data-anim-text]");
+  const timers = [];
+  const finish = () => {
+    timers.forEach(clearTimeout);
+    overlay.hidden = true;
+    onDone();
+  };
+  scene.classList.remove("open");
+  key.classList.remove("fly", "insert");
+  lock.textContent = "🔒";
+  text.hidden = true;
+  overlay.hidden = false;
+  overlay.querySelector("[data-anim-skip]").onclick = finish;
+  requestAnimationFrame(() => requestAnimationFrame(() => key.classList.add("fly")));
+  timers.push(setTimeout(() => key.classList.add("insert"), 1250));
+  timers.push(setTimeout(() => { lock.textContent = "🔓"; }, 1850));
+  timers.push(setTimeout(() => scene.classList.add("open"), 2350));
+  timers.push(setTimeout(() => { text.hidden = false; }, 3150));
+  timers.push(setTimeout(finish, 4300));
 }
 
 function closeAdminLogin() {
@@ -5314,10 +5629,17 @@ function renderAdminPanelContent() {
     `;
   }).join("");
 
+  const securityRows = (state.securityLog || []).length ? state.securityLog.map((entry) => `
+    <li class="admin-row">
+      <span>${escapeHtml(new Date(entry.createdAt).toLocaleString("tr-TR"))} · ${escapeHtml(entry.ip || "")} · ${escapeHtml((entry.userAgent || "").slice(0, 60))}</span>
+      <span><em class="admin-tag">${escapeHtml(entry.stage || "")}</em> ${escapeHtml(entry.reason || "")}</span>
+    </li>
+  `).join("") : `<li class="admin-empty">Kayıt yok.</li>`;
+
   container.innerHTML = `
     <div class="admin-panel-head">
       <h2 id="admin-panel-title">Yönetici Odası</h2>
-      <button class="button secondary" type="button" data-admin-logout>Çıkış</button>
+      <button class="button secondary" type="button" data-admin-logout>Çıkış Yap</button>
     </div>
 
     <section class="admin-section">
@@ -5374,38 +5696,12 @@ function renderAdminPanelContent() {
       <h3>Oyun Kaldır</h3>
       <ul class="admin-list">${removeList}</ul>
     </section>
-  `;
-}
 
-async function submitAdminLogin(event) {
-  event.preventDefault();
-  const form = event.target;
-  const status = document.querySelector("[data-admin-login-status]");
-  const username = new FormData(form).get("username");
-  if (status) status.textContent = "Kontrol ediliyor...";
-  try {
-    const response = await fetch("/api/admin/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username }),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (response.ok && data.token) {
-      adminToken = data.token;
-      localStorage.setItem("hakorocksAdminToken", adminToken);
-      if (status) status.textContent = data.message || "Hoş geldiniz, doğrulama başarılı";
-      form.reset();
-      await loadAdminState();
-      applyAdminOverlays();
-      setTimeout(openAdminPanel, 700);
-    } else if (response.status === 503) {
-      if (status) status.textContent = "Bağlanılamadı, tekrar deneyin";
-    } else {
-      if (status) status.textContent = "Buraya girmek için izniniz yok";
-    }
-  } catch {
-    if (status) status.textContent = "Bağlanılamadı, tekrar deneyin";
-  }
+    <section class="admin-section">
+      <h3>Güvenlik Kayıtları</h3>
+      <ul class="admin-list">${securityRows}</ul>
+    </section>
+  `;
 }
 
 async function submitAdminBan(event) {
@@ -5499,9 +5795,17 @@ async function removeSiteGame(slug, mode) {
 }
 
 function adminLogout() {
+  const token = adminToken;
   clearAdminToken();
   closeAdminPanel();
   applyAdminOverlays();
+  if (token) {
+    fetch("/api/admin/logout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ token }),
+    }).catch(() => {});
+  }
 }
 
 function bindAdminRoom() {
@@ -5515,8 +5819,20 @@ function bindAdminRoom() {
 
   document.addEventListener("submit", (event) => {
     const form = event.target;
-    if (form.matches?.("[data-admin-login-form]")) {
-      submitAdminLogin(event);
+    if (form.matches?.("[data-auth-stage1-form]")) {
+      submitAuthStage1(event);
+      return;
+    }
+    if (form.matches?.("[data-auth-stage2-form]")) {
+      submitAuthStage2(event);
+      return;
+    }
+    if (form.matches?.("[data-auth-backup-form]")) {
+      submitAuthBackup(event);
+      return;
+    }
+    if (form.matches?.("[data-auth-stage3-form]")) {
+      submitAuthStage3(event);
       return;
     }
     if (form.matches?.("[data-admin-ban-form]")) {

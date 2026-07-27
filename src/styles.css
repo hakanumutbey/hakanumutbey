@@ -4241,3 +4241,155 @@ h3 {
 .ban-appeal-form[hidden] {
   display: none;
 }
+
+/* Güvenlik duvarı aşamaları */
+.auth-stages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.auth-stage {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.auth-stage.active {
+  border-color: rgba(53, 210, 255, 0.5);
+}
+
+.auth-stage.done {
+  opacity: 0.85;
+}
+
+.auth-stage h3,
+.auth-stage h4 {
+  margin: 0;
+}
+
+.auth-stage form {
+  display: grid;
+  gap: 10px;
+}
+
+.auth-ok {
+  margin: 0;
+  color: #7dd87d;
+}
+
+.auth-backup {
+  border-top: 1px dashed var(--line);
+  padding-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+/* Giriş başarı animasyonu */
+.admin-anim[hidden] {
+  display: none;
+}
+
+.admin-anim {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 28px;
+  background: #05070a;
+}
+
+.anim-scene {
+  position: relative;
+  width: 260px;
+  height: 320px;
+  perspective: 900px;
+  display: grid;
+  place-items: center;
+}
+
+.anim-light {
+  position: absolute;
+  inset: -60px;
+  background: radial-gradient(circle, rgba(255, 214, 102, 0.95), rgba(255, 214, 102, 0) 65%);
+  opacity: 0;
+  transition: opacity 1.2s ease;
+  pointer-events: none;
+}
+
+.anim-door {
+  position: relative;
+  width: 200px;
+  height: 280px;
+  border: 3px solid #3a2c10;
+  border-radius: 8px 8px 0 0;
+  background: linear-gradient(160deg, #2a2118, #171208);
+  display: grid;
+  place-items: center;
+  transform-origin: left center;
+  transition: transform 1.4s ease;
+}
+
+.anim-scene.open .anim-door {
+  transform: rotateY(-100deg);
+}
+
+.anim-scene.open .anim-light {
+  opacity: 1;
+}
+
+.anim-lock {
+  font-size: 2.4rem;
+}
+
+.anim-key {
+  position: absolute;
+  top: 50%;
+  left: 340px;
+  margin-top: -24px;
+  font-size: 3rem;
+  filter: drop-shadow(0 0 12px rgba(255, 214, 102, 0.85));
+  transition: transform 1.1s ease;
+}
+
+.anim-key.fly {
+  transform: translateX(-205px);
+}
+
+.anim-key.insert {
+  transform: translateX(-212px) rotate(-35deg);
+  transition: transform 0.6s ease;
+}
+
+.anim-text {
+  max-width: 520px;
+  margin: 0;
+  padding: 0 20px;
+  text-align: center;
+  font-size: 1.2rem;
+  color: #ffd666;
+  animation: anim-text-in 0.8s ease both;
+}
+
+@keyframes anim-text-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.anim-skip {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+}

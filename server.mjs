@@ -13,6 +13,15 @@ const port = Number(process.env.PORT || 8080);
 const announcementPasswordHash =
   process.env.ANNOUNCEMENT_PASSWORD_HASH ||
   "7241bb00842e01487a32ea059136a43484969ae967f2dfd50e8ac15a4234d257";
+const adminPasswordHash =
+  process.env.ADMIN_PASSWORD_HASH ||
+  "5e7846f35f3cad108c9bee897ded6261104e078c4e54e9f81f2784b123368ed7";
+const adminBackupPasswordHash =
+  process.env.ADMIN_BACKUP_PASSWORD_HASH ||
+  "0fb013de181a8ac917ee0c563bf0b674ecd3cccfa43f4dfe3de07cae050de7d4";
+const recaptchaSiteKey = process.env.RECAPTCHA_SITE_KEY || "";
+const recaptchaSecret = process.env.RECAPTCHA_SECRET || "";
+const githubApiBase = process.env.GITHUB_API_BASE || "https://api.github.com";
 const sessions = new Map();
 const voiceRooms = new Map();
 const siyahAdamRooms = new Map();
@@ -90,6 +99,11 @@ let friendRequests = normalizeFriendRequests(await readJson("friend-requests.jso
 let invites = normalizeInvites(await readJson("invites.json", []));
 let adminState = normalizeAdminState(await readJson("admin.json", {}));
 const adminTokens = new Map();
+const adminAuthSessions = new Map();
+let githubConsecutiveFailures = 0;
+let securityLogRaw = await readJson("security-log.json", []);
+let securityLog = Array.isArray(securityLogRaw) ? securityLogRaw.slice(0, 200) : [];
+securityLogRaw = null;
 
 const server = createServer(async (request, response) => {
   try {
@@ -685,8 +699,60 @@ async function handleApi(request, response) {
     response.end(game.code);
     return;
   }
-  if (request.method === "POST" && url.pathname === "/api/admin/login") {
+  if (request.method === "POST" && url.pathname === "/api/admin/auth/start") {
+    const authId = randomBytes(16).toString("hex");
+    adminAuthSessions.set(authId, {
+      id: authId,
+      stage: 0,
+      expiresAt: Date.now() + 10 * 60 * 1000,
+      fails: { stage1: 0, backup: 0 },
+      lockedUntil: { stage1: 0, backup: 0 },
+      challenge: "",
+    });
+    sendJson(response, { ok: true, authId, recaptchaSiteKey });
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/admin/auth/stage1") {
     const body = await readBody(request, 64_000);
+    const session = getAuthSession(body.authId);
+    if (!session) {
+      response.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "invalid-auth" }));
+      return;
+    }
+    const remaining = authLockRemaining(session, "stage1");
+    if (remaining > 0) {
+      response.writeHead(429, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "locked", retryAfterSeconds: remaining, message: "⏳ Güvenlik nedeniyle 100 saniye boyunca yeni giriş denemesi yapılamaz." }));
+      return;
+    }
+    if (passwordHash(safeText(body.password, 500)) === adminPasswordHash) {
+      session.stage = Math.max(session.stage, 1);
+      sendJson(response, { ok: true, message: "✅ Yönetici şifresi doğrulandı." });
+      return;
+    }
+    session.fails.stage1 += 1;
+    await logSecurityEvent(request, "stage1", "wrong-password");
+    if (session.fails.stage1 >= 3) {
+      session.fails.stage1 = 0;
+      session.lockedUntil.stage1 = Date.now() + 100_000;
+      await logSecurityEvent(request, "stage1", "locked-100s");
+      response.writeHead(429, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "locked", retryAfterSeconds: 100, message: "⏳ Güvenlik nedeniyle 100 saniye boyunca yeni giriş denemesi yapılamaz." }));
+      return;
+    }
+    response.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
+    response.end(JSON.stringify({ error: "wrong-password", message: "❌ Şifre hatalı." }));
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/admin/auth/stage2") {
+    const body = await readBody(request, 64_000);
+    const session = getAuthSession(body.authId);
+    if (!session || session.stage < 1) {
+      response.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "invalid-auth" }));
+      return;
+    }
     const username = safeText(body.username, 80);
     let githubUser = null;
     try {
@@ -694,7 +760,7 @@ async function handleApi(request, response) {
       const timer = setTimeout(() => controller.abort(), 5000);
       let githubResponse;
       try {
-        githubResponse = await fetch(`https://api.github.com/users/${encodeURIComponent(username)}`, {
+        githubResponse = await fetch(`${githubApiBase}/users/${encodeURIComponent(username)}`, {
           signal: controller.signal,
           headers: { "User-Agent": "hakorocks-studio", Accept: "application/vnd.github+json" },
         });
@@ -706,23 +772,139 @@ async function handleApi(request, response) {
       }
       githubUser = githubResponse.ok ? await githubResponse.json() : null;
     } catch {
+      githubConsecutiveFailures += 1;
+      await logSecurityEvent(request, "stage2", "github-unreachable");
       response.writeHead(503, { "Content-Type": "application/json; charset=utf-8" });
-      response.end(JSON.stringify({ error: "unreachable" }));
+      response.end(JSON.stringify({
+        error: "unreachable",
+        message: "❌ GitHub'a bağlanılamadı.",
+        backupAvailable: githubConsecutiveFailures >= 3,
+      }));
       return;
     }
-    if (safeText(githubUser?.login, 80).toLocaleLowerCase("tr-TR") !== "hakanumutbey") {
-      response.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
-      response.end(JSON.stringify({ error: "no-permission" }));
+    githubConsecutiveFailures = 0;
+    if (safeText(githubUser?.login, 80).toLocaleLowerCase("tr-TR") === "hakanumutbey") {
+      session.stage = Math.max(session.stage, 2);
+      sendJson(response, { ok: true, message: "✅ GitHub doğrulaması başarılı." });
       return;
+    }
+    await logSecurityEvent(request, "stage2", `github-no-permission:${username}`);
+    response.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
+    response.end(JSON.stringify({ error: "no-permission", message: "❌ Bu GitHub hesabının yönetici yetkisi bulunmuyor." }));
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/admin/auth/stage2-backup") {
+    const body = await readBody(request, 64_000);
+    const session = getAuthSession(body.authId);
+    if (!session || session.stage < 1) {
+      response.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "invalid-auth" }));
+      return;
+    }
+    if (githubConsecutiveFailures < 3) {
+      response.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "backup-not-available" }));
+      return;
+    }
+    const remaining = authLockRemaining(session, "backup");
+    if (remaining > 0) {
+      response.writeHead(429, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "locked", retryAfterSeconds: remaining, message: "⏳ Güvenlik nedeniyle 100 saniye boyunca yeni giriş denemesi yapılamaz." }));
+      return;
+    }
+    if (passwordHash(safeText(body.password, 500)) === adminBackupPasswordHash) {
+      session.stage = Math.max(session.stage, 2);
+      sendJson(response, { ok: true, message: "✅ Yedek doğrulama başarılı." });
+      return;
+    }
+    session.fails.backup += 1;
+    await logSecurityEvent(request, "stage2-backup", "wrong-backup-password");
+    if (session.fails.backup >= 3) {
+      session.fails.backup = 0;
+      session.lockedUntil.backup = Date.now() + 100_000;
+      await logSecurityEvent(request, "stage2-backup", "locked-100s");
+      response.writeHead(429, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "locked", retryAfterSeconds: 100, message: "⏳ Güvenlik nedeniyle 100 saniye boyunca yeni giriş denemesi yapılamaz." }));
+      return;
+    }
+    response.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
+    response.end(JSON.stringify({ error: "wrong-password", message: "❌ Yedek doğrulama başarısız." }));
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/admin/auth/stage3-challenge") {
+    const session = getAuthSession(url.searchParams.get("authId"));
+    if (!session || session.stage < 2) {
+      response.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "invalid-auth" }));
+      return;
+    }
+    const a = 1 + Math.floor(Math.random() * 9);
+    const b = 1 + Math.floor(Math.random() * 9);
+    session.challenge = String(a + b);
+    sendJson(response, { ok: true, question: `${a} + ${b} = ?` });
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/admin/auth/stage3") {
+    const body = await readBody(request, 64_000);
+    const session = getAuthSession(body.authId);
+    if (!session || session.stage < 2) {
+      response.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "invalid-auth" }));
+      return;
+    }
+    if (recaptchaSecret) {
+      let verified = false;
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 5000);
+        let verifyResponse;
+        try {
+          verifyResponse = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+            method: "POST",
+            signal: controller.signal,
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: `secret=${encodeURIComponent(recaptchaSecret)}&response=${encodeURIComponent(safeText(body.recaptchaToken, 2000))}`,
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+        const result = await verifyResponse.json();
+        verified = Boolean(result?.success);
+      } catch {
+        verified = false;
+      }
+      if (!verified) {
+        await logSecurityEvent(request, "stage3", "recaptcha-failed");
+        response.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
+        response.end(JSON.stringify({ error: "robot-check-failed", message: "❌ Robot doğrulaması başarısız." }));
+        return;
+      }
+    } else {
+      if (!session.challenge || safeText(body.answer, 10) !== session.challenge) {
+        await logSecurityEvent(request, "stage3", "robot-check-failed");
+        response.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
+        response.end(JSON.stringify({ error: "robot-check-failed", message: "❌ Robot doğrulaması başarısız." }));
+        return;
+      }
     }
     const token = randomBytes(24).toString("hex");
     adminTokens.set(token, Date.now() + 12 * 60 * 60 * 1000);
-    sendJson(response, { ok: true, token, message: "Hoş geldiniz, doğrulama başarılı" });
+    adminAuthSessions.delete(session.id);
+    sendJson(response, { ok: true, token, message: "✅ Robot doğrulaması başarılı." });
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/admin/logout") {
+    const body = await readBody(request, 64_000);
+    const header = request.headers.authorization || "";
+    const bearer = header.startsWith("Bearer ") ? header.slice(7) : "";
+    const token = safeText(bearer || body.token || "", 120);
+    if (token) adminTokens.delete(token);
+    sendJson(response, { ok: true });
     return;
   }
   if (request.method === "GET" && url.pathname === "/api/admin/state") {
     if (!requireAdmin(request, response, url, null)) return;
-    sendJson(response, adminState);
+    sendJson(response, { ...adminState, securityLog: securityLog.slice(0, 20) });
     return;
   }
   if (request.method === "POST" && url.pathname === "/api/admin/maintenance") {
@@ -1216,6 +1398,38 @@ function requireAdmin(request, response, url, body) {
   response.writeHead(401, { "Content-Type": "application/json; charset=utf-8" });
   response.end(JSON.stringify({ error: "no-admin-token" }));
   return false;
+}
+
+function getAuthSession(authId) {
+  const session = adminAuthSessions.get(safeText(authId, 120));
+  if (!session) return null;
+  if (session.expiresAt < Date.now()) {
+    adminAuthSessions.delete(session.id);
+    return null;
+  }
+  return session;
+}
+
+function authLockRemaining(session, key) {
+  return Math.max(0, Math.ceil(((session.lockedUntil[key] || 0) - Date.now()) / 1000));
+}
+
+function clientIp(request) {
+  const forwarded = request.headers["x-forwarded-for"];
+  const first = typeof forwarded === "string" ? forwarded.split(",")[0] : "";
+  return safeText(first, 80) || request.socket.remoteAddress || "";
+}
+
+async function logSecurityEvent(request, stage, reason) {
+  securityLog.unshift({
+    createdAt: new Date().toISOString(),
+    ip: clientIp(request),
+    userAgent: safeText(request.headers["user-agent"], 200),
+    stage,
+    reason,
+  });
+  securityLog = securityLog.slice(0, 200);
+  await writeJson("security-log.json", securityLog);
 }
 
 function clamp(value, min, max) {
