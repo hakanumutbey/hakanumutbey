@@ -726,7 +726,7 @@ async function handleApi(request, response) {
       response.end(JSON.stringify({ error: "locked", retryAfterSeconds: remaining, message: "⏳ Güvenlik nedeniyle 100 saniye boyunca yeni giriş denemesi yapılamaz." }));
       return;
     }
-    if (passwordHash(safeText(body.password, 500)) === adminPasswordHash) {
+    if (passwordHash(normalizePassword(body.password)) === adminPasswordHash) {
       session.stage = Math.max(session.stage, 1);
       sendJson(response, { ok: true, message: "✅ Yönetici şifresi doğrulandı." });
       return;
@@ -812,7 +812,7 @@ async function handleApi(request, response) {
       response.end(JSON.stringify({ error: "locked", retryAfterSeconds: remaining, message: "⏳ Güvenlik nedeniyle 100 saniye boyunca yeni giriş denemesi yapılamaz." }));
       return;
     }
-    if (passwordHash(safeText(body.password, 500)) === adminBackupPasswordHash) {
+    if (passwordHash(normalizePassword(body.password)) === adminBackupPasswordHash) {
       session.stage = Math.max(session.stage, 2);
       sendJson(response, { ok: true, message: "✅ Yedek doğrulama başarılı." });
       return;
@@ -1438,6 +1438,11 @@ function clamp(value, min, max) {
 
 function passwordHash(value) {
   return createHash("sha256").update(value || "", "utf8").digest("hex");
+}
+
+// Kopyala-yapıştır sırasında araya giren boşluk/satır sonları şifreyi bozmasın.
+function normalizePassword(value) {
+  return safeText(value, 500).replace(/\s+/g, "");
 }
 
 function normalizeAccounts(value) {
