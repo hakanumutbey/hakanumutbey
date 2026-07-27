@@ -15,7 +15,7 @@ const announcementPasswordHash =
   "7241bb00842e01487a32ea059136a43484969ae967f2dfd50e8ac15a4234d257";
 const adminPasswordHash =
   process.env.ADMIN_PASSWORD_HASH ||
-  "5e7846f35f3cad108c9bee897ded6261104e078c4e54e9f81f2784b123368ed7";
+  "5a17dd61a7a6808f9b5b7634cdcb8cfd70d2bc531309d32511a3ec60be97fa5a";
 const adminBackupPasswordHash =
   process.env.ADMIN_BACKUP_PASSWORD_HASH ||
   "0fb013de181a8ac917ee0c563bf0b674ecd3cccfa43f4dfe3de07cae050de7d4";
