@@ -3272,6 +3272,11 @@ h3 {
   padding: 24px;
 }
 
+/* Yönetici girişi, bakım ekranının (z-index: 90) üstünde kalmalı */
+.game-modal[data-admin-login] {
+  z-index: 95;
+}
+
 .modal-backdrop {
   position: absolute;
   inset: 0;

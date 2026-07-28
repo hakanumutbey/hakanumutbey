@@ -1239,6 +1239,7 @@ document.querySelector("#app").innerHTML = `
     <div class="admin-blocker-card">
       <h2>Bakım Arası</h2>
       <p>Birazdan döneceğiz!</p>
+      <button class="admin-entry" type="button" data-admin-open>Yönetici Girişi</button>
     </div>
   </div>
 
@@ -6129,7 +6130,9 @@ function adminLogout() {
 }
 
 function bindAdminRoom() {
-  document.querySelector("[data-admin-open]")?.addEventListener("click", openAdminEntry);
+  document.querySelectorAll("[data-admin-open]").forEach((button) => {
+    button.addEventListener("click", openAdminEntry);
+  });
   document.querySelectorAll("[data-admin-login-close]").forEach((button) => {
     button.addEventListener("click", closeAdminLogin);
   });
