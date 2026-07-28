@@ -87,6 +87,8 @@ const state = {
   healFxT: 0,
   mouseFire: false,
   touchFire: false,
+  trailT: 0,
+  shakeT: 0,
 };
 
 // ---------- Three.js temel ----------
@@ -548,6 +550,19 @@ function updatePlayer(dt) {
     player.position.z = c.z;
     state.facing = { x: ix / len, z: iz / len };
     player.rotation.y = Math.atan2(state.facing.x, state.facing.z);
+    // motor alevi: hareket halinde geminin arkasına hafif iz
+    state.trailT -= dt;
+    if (state.trailT <= 0) {
+      state.trailT = 0.07;
+      particles.spawnBurst(
+        player.position.x - state.facing.x * 0.9,
+        0.7,
+        player.position.z - state.facing.z * 0.9,
+        0x66ffee,
+        2,
+        1.4
+      );
+    }
   }
   player.position.y = 0.9 + Math.sin(clock.elapsedTime * 2.4) * 0.08;
   // hasar yanıp sönmesi
@@ -556,12 +571,20 @@ function updatePlayer(dt) {
 }
 
 const _camTarget = new THREE.Vector3();
-function updateCamera() {
+function updateCamera(dt) {
   _camTarget.set(player.position.x, 0, player.position.z);
   camera.position.lerp(
     new THREE.Vector3(player.position.x, 21, player.position.z + 14),
     0.08
   );
+  // hasar sarsıntısı: kısa ve hafif (~0.2 sn)
+  if (state.shakeT > 0) {
+    state.shakeT -= dt;
+    const mag = Math.max(0, state.shakeT) * 2.2;
+    camera.position.x += (Math.random() - 0.5) * mag;
+    camera.position.y += (Math.random() - 0.5) * mag * 0.5;
+    camera.position.z += (Math.random() - 0.5) * mag;
+  }
   camera.lookAt(_camTarget);
   playerLight.position.set(player.position.x, 3, player.position.z);
 }
@@ -685,6 +708,7 @@ function updateMonsters(dt) {
         if (state.invulnT <= 0) {
           state.hp = applyPlayerDamage(state.hp, HEART_HP);
           state.invulnT = 1.5;
+          state.shakeT = 0.22;
           particles.spawnSparks(px, 1, pz, 0xff3355, 12);
           sfx.hit();
           updateHud();
@@ -814,7 +838,7 @@ function updatePrompt() {
 function updatePlay(dt) {
   state.timeSec += dt;
   updatePlayer(dt);
-  updateCamera();
+  updateCamera(dt);
   state.shootCd = Math.max(0, state.shootCd - dt);
   if (state.mouseFire || state.touchFire) playerShoot();
   updateSpawning(dt);

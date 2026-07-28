@@ -224,6 +224,7 @@ const games = [
 ];
 
 const FUSION_GAME_PATH = "/oyunlar/birlesim-arenasi/";
+const NEW_GAME_SLUGS = new Set(["hentw", "hentw2", "hentw3", "hentw-premium"]);
 
 const upcomingGames = [
   {
@@ -680,6 +681,7 @@ document.querySelector("#app").innerHTML = `
   <main id="top">
     <section class="hero" aria-labelledby="hero-title">
       <div class="hero-media" aria-hidden="true"></div>
+      <canvas class="hero-stars" aria-hidden="true"></canvas>
       <div class="hero-content">
         <p class="eyebrow">Tarayıcıda oynanan oyunlar ve yaratıcı kod</p>
         <h1 id="hero-title">Hakorocks Studio</h1>
@@ -697,6 +699,10 @@ document.querySelector("#app").innerHTML = `
         <strong>12 oyun</strong>
         <span>Tek domain altında yayında</span>
       </aside>
+    </section>
+
+    <section class="section daily-game-section" aria-label="Günün oyunu">
+      ${renderDailyGame()}
     </section>
 
     <section class="section launcher-section" id="launcher" aria-labelledby="launcher-title">
@@ -1397,6 +1403,28 @@ function renderLauncherMissions() {
   `).join("");
 }
 
+function renderNewBadge(game) {
+  return NEW_GAME_SLUGS.has(game.slug) ? '<span class="new-badge">YENİ</span>' : "";
+}
+
+function getDailyGame() {
+  return games[hashString(`${dailyBadgeKey()}:daily-game`) % games.length];
+}
+
+function renderDailyGame() {
+  const game = getDailyGame();
+  return `
+    <a class="daily-game-card" href="${game.path}" data-play-game="${game.slug}">
+      <span class="daily-game-label">🎮 Günün Oyunu</span>
+      <span class="daily-game-body">
+        <strong>${game.title}</strong>
+        <span>${game.description}</span>
+      </span>
+      <span class="daily-game-cta">Oyna →</span>
+    </a>
+  `;
+}
+
 function renderLauncherGameCard(game) {
   const extra = gameExtra(game);
   const stats = latestStats.games?.[game.slug] ?? createGameStat(game, 0);
@@ -1407,7 +1435,7 @@ function renderLauncherGameCard(game) {
     : `<div class="game-poster poster-${game.accent}" aria-hidden="true"><span>${game.title.slice(0, 2)}</span></div>`;
   return `
     <article class="launcher-game-card">
-      <div class="launcher-game-media">${media}</div>
+      <div class="launcher-game-media">${media}${renderNewBadge(game)}</div>
       <div class="launcher-game-body">
         <div class="game-meta">
           <span>${game.type}</span>
@@ -2167,7 +2195,7 @@ function renderGameCard(game, index) {
     <article class="game-card${removal ? " is-removed" : ""}">
       <div class="game-card-inner">
         <button class="game-card-link" type="button" data-game-open="${game.slug}" aria-label="${game.title} detaylarını aç">
-          <div class="game-media">${media}</div>
+          <div class="game-media">${media}${renderNewBadge(game)}</div>
           <div class="game-body">
             <div class="game-meta">
               <span>${game.type}</span>
@@ -5040,10 +5068,84 @@ renderStudioPulsePanel();
 renderClickGamePanel();
 refreshLiveData();
 initAdminRoom();
+initHeroStars();
 setInterval(refreshLiveData, 10000);
 startPerformanceMonitor();
 startRevealAnimations();
 setInterval(refreshPerformancePing, 15000);
+
+function initHeroStars() {
+  const canvas = document.querySelector(".hero-stars");
+  const hero = document.querySelector(".hero");
+  if (!canvas || !hero) return;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const STAR_COUNT = 90;
+  let stars = [];
+  let width = 1;
+  let height = 1;
+  let heroVisible = true;
+
+  function resize() {
+    const rect = hero.getBoundingClientRect();
+    const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
+    width = Math.max(1, Math.floor(rect.width));
+    height = Math.max(1, Math.floor(rect.height));
+    canvas.width = Math.floor(width * ratio);
+    canvas.height = Math.floor(height * ratio);
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    stars = Array.from({ length: STAR_COUNT }, () => ({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      r: 0.4 + Math.random() * 1.3,
+      speed: 3 + Math.random() * 9,
+      phase: Math.random() * Math.PI * 2,
+      hue: Math.random() < 0.75 ? "205, 235, 255" : "196, 160, 255",
+    }));
+  }
+
+  function draw(time) {
+    ctx.clearRect(0, 0, width, height);
+    for (const star of stars) {
+      const twinkle = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(time / 900 + star.phase));
+      ctx.fillStyle = `rgba(${star.hue}, ${twinkle})`;
+      ctx.beginPath();
+      ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  resize();
+  draw(0);
+  window.addEventListener("resize", () => {
+    resize();
+    if (reducedMotion) draw(0);
+  });
+  if (reducedMotion) return; // reduced motion: statik yıldızlar, animasyon yok
+
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver((entries) => {
+      heroVisible = entries[0]?.isIntersecting ?? true;
+    }).observe(hero);
+  }
+  let last = performance.now();
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    if (!heroVisible) return; // hero ekranda değilken çizim yapma
+    for (const star of stars) {
+      star.x -= star.speed * dt;
+      if (star.x < -2) {
+        star.x = width + 2;
+        star.y = Math.random() * height;
+      }
+    }
+    draw(now);
+  }
+  requestAnimationFrame(frame);
+}
 
 function maybeNotifySocialChanges() {
   if (!("Notification" in window) || notificationPermission !== "granted" || !latestSocial.account) return;
