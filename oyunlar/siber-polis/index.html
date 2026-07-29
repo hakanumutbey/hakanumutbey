@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SİBER POLİS — Hakorocks Studio</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <!-- Üst çubuk -->
+  <header id="topbar">
+    <span id="topbar-title">🛡️ SİBER POLİS v1.0</span>
+    <span id="topbar-clock">--:--</span>
+  </header>
+
+  <!-- Masaüstü -->
+  <main id="desktop">
+    <div id="desktop-icons">
+      <button class="desktop-icon" data-app="vakalar">
+        <span class="icon-emoji">🗂️</span>
+        <span class="icon-label">Vakalar</span>
+      </button>
+      <button class="desktop-icon" data-app="dosyalar">
+        <span class="icon-emoji">📁</span>
+        <span class="icon-label">Dosyalar</span>
+      </button>
+      <button class="desktop-icon" data-app="rozetler">
+        <span class="icon-emoji">🏅</span>
+        <span class="icon-label">Rozetler</span>
+      </button>
+      <button class="desktop-icon" data-app="yardim">
+        <span class="icon-emoji">❓</span>
+        <span class="icon-label">Yardım</span>
+      </button>
+      <button class="desktop-icon" data-app="ihbar">
+        <span class="icon-emoji">🚨</span>
+        <span class="icon-label">İhbar Et</span>
+      </button>
+    </div>
+
+    <!-- Pencereler buraya JS ile eklenir -->
+    <div id="windows"></div>
+
+    <!-- Görev paneli -->
+    <aside id="mission-panel">
+      <h2>🎯 GÖREVLER</h2>
+      <ul id="mission-list"></ul>
+      <div id="score-box">PUAN: <span id="score-value">0</span></div>
+    </aside>
+  </main>
+
+  <!-- Alt görev çubuğu -->
+  <footer id="taskbar">
+    <span id="taskbar-start">🛡️ Başlat</span>
+    <div id="taskbar-items"></div>
+  </footer>
+
+  <!-- Açılış ekranı -->
+  <div id="intro-overlay">
+    <div id="intro-card">
+      <div id="intro-badge">HAKOROCKS STUDIOS</div>
+      <h1>🛡️ SİBER POLİS</h1>
+      <div id="intro-briefing">
+        <p><b>ŞEF:</b> Hoş geldin, çaylak! Acil bir görevimiz var.</p>
+        <p><b>HAYALET</b> adlı bir hacker sunucumuza sızdı ve izlerini gizledi.</p>
+        <p>Görevin: dosyaları incele, kilitli dosyaların şifrelerini kır,
+        ipuçlarını birleştir ve <b>HAYALET'in kimliğini</b> ortaya çıkar!</p>
+        <p>Yanlış cevapta ceza yok — dilediğin kadar deneyebilirsin. Bol şans, polis! 🫡</p>
+      </div>
+      <label id="easy-mode-row">
+        <input type="checkbox" id="chk-kolay" />
+        Kolay Mod (💡 ipuçları otomatik açık başlar)
+      </label>
+      <button id="btn-basla">🚀 GÖREVE BAŞLA</button>
+    </div>
+  </div>
+
+  <!-- Bitiş / seviye geçiş ekranı (içerik JS ile doldurulur) -->
+  <div id="end-screen" class="hidden">
+    <div id="end-card">
+      <div id="end-content"></div>
+    </div>
+  </div>
+
+  <div id="confetti-layer"></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

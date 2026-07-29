@@ -1,0 +1,11 @@
+{
+  "name": "siber-polis",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "SİBER POLİS — HAYALET hacker'ını sahte masaüstünde iz sürerek bulma oyunu",
+  "scripts": {
+    "test": "node --test js/gameLogic.test.js",
+    "start": "python3 -m http.server 8769"
+  }
+}

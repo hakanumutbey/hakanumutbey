@@ -25,7 +25,7 @@ const githubApiBase = process.env.GITHUB_API_BASE || "https://api.github.com";
 const sessions = new Map();
 const voiceRooms = new Map();
 const siyahAdamRooms = new Map();
-const games = ["annenden-kac", "bardak", "essiz-zindan", "skeleton-wars", "rhgpo", "siyah-adam", "birlesim-arenasi", "vale", "robot-avcisi", "hentw", "hentw2", "hentw3", "hentw-premium"];
+const games = ["annenden-kac", "bardak", "essiz-zindan", "skeleton-wars", "rhgpo", "siyah-adam", "birlesim-arenasi", "vale", "robot-avcisi", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis"];
 const baseValues = {
   "annenden-kac": 128,
   bardak: 96,
@@ -40,6 +40,7 @@ const baseValues = {
   hentw2: 148,
   hentw3: 176,
   "hentw-premium": 210,
+  "siber-polis": 140,
 };
 const averagePlayMinutes = {
   "annenden-kac": 6,
@@ -55,6 +56,7 @@ const averagePlayMinutes = {
   hentw2: 9,
   hentw3: 12,
   "hentw-premium": 14,
+  "siber-polis": 12,
 };
 const voteOptionIds = ["uzay-yarisi", "market-savasi", "okul-gorevi"];
 

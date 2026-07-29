@@ -221,10 +221,26 @@ const games = [
     updates: ["Sonsuz hayatta kalma modu", "İnşa sistemi: duvar, taret, can istasyonu", "Dokunmatik kontroller eklendi"],
     stockBase: 210,
   },
+  {
+    slug: "siber-polis",
+    title: "Siber Polis",
+    path: "/oyunlar/siber-polis/",
+    type: "Dedektiflik",
+    status: "Oynanabilir",
+    description: "Sahte masaüstünde dosyaları karıştır, kilitleri kır ve 11 vakada suçlu robotları ihbar et.",
+    longDescription: "Siber Polis Akademisi'ne hoş geldin! Sahte bir bilgisayar masaüstünde dosyaları incele, çark kilidi, kod, sinyal yakalama, yapboz ve fark bulma bulmacalarını çöz ve her vakanın sonunda şüpheliyi ihbar et. 11 seviye, kolay mod ve rozet sistemi var.",
+    accent: "sky",
+    controls: "Fare ve klavye (pencere sürükleme, çift tıklama)",
+    mobileStatus: "Masaüstü önerilir",
+    mobileNote: "Sahte masaüstü ve pencere sistemi fare ile en iyi oynanır.",
+    achievements: ["İlk vakayı çöz", "Tüm rozetleri topla", "11 vakayı bitirip Baş Siber Polis ol"],
+    updates: ["11 seviyeli vaka sistemi eklendi", "5 bulmaca türü: çark, kod, sinyal, yapboz, fark", "Kolay mod ve ilerleme kaydı hazır"],
+    stockBase: 140,
+  },
 ];
 
 const FUSION_GAME_PATH = "/oyunlar/birlesim-arenasi/";
-const NEW_GAME_SLUGS = new Set(["hentw", "hentw2", "hentw3", "hentw-premium"]);
+const NEW_GAME_SLUGS = new Set(["hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis"]);
 
 const upcomingGames = [
   {
@@ -696,7 +712,7 @@ document.querySelector("#app").innerHTML = `
         </div>
       </div>
       <aside class="hero-panel" aria-label="Stüdyo özeti">
-        <strong>12 oyun</strong>
+        <strong>13 oyun</strong>
         <span>Tek domain altında yayında</span>
       </aside>
     </section>

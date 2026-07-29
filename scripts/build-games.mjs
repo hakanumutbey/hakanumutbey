@@ -22,6 +22,7 @@ await copyStaticGame("hentw", ["package.json"]);
 await copyStaticGame("hentw2", ["package.json"]);
 await copyStaticGame("hentw3", ["package.json"]);
 await copyStaticGame("hentw-premium", ["package.json"]);
+await copyStaticGame("siber-polis", ["package.json", "js/gameLogic.test.js"]);
 await copyRobotAvcisi();
 
 async function buildViteGame(slug) {
