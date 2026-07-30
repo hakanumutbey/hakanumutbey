@@ -20,9 +20,10 @@ const WORLD = { width: 1280, height: 720 };
 const STORAGE_KEY = "hakorocks-rhgpo-high-score";
 const WIND_NAMES = ["Kuzey", "Kuzeydoğu", "Doğu", "Güneydoğu", "Güney", "Güneybatı", "Batı", "Kuzeybatı"];
 const ROUND_MODES = ["park", "tow"];
-const DAMAGE_COOLDOWN_MS = 700;
-const DOCK_MAX_SPEED = 90;
-const DOCK_MAX_ANGLE = 0.55;
+const DAMAGE_COOLDOWN_MS = 900;
+const DOCK_MAX_SPEED = 140;
+const DOCK_MAX_ANGLE = 0.95;
+const DOCK_AUTO_MS = 700;
 
 function readHighScore() {
   try {
@@ -61,9 +62,10 @@ const state = {
   worldScale: 1,
   time: 0,
   dockReady: false,
+  dockReadySince: 0,
   particles: [],
   wake: [],
-  wind: { x: 1, y: -0.4, strength: 26, timer: 0 },
+  wind: { x: 1, y: -0.4, strength: 22, timer: 0 },
   ship: {
     x: 180,
     y: 370,
@@ -166,6 +168,7 @@ function resetRun() {
   state.boardingUntil = 0;
   state.danceUntil = 0;
   state.dockReady = false;
+  state.dockReadySince = 0;
   state.particles = [];
   state.wake = [];
   state.obstacles = [];
@@ -208,13 +211,13 @@ function resetShip() {
 }
 
 function makeDock(round) {
-  const yOptions = [170, 250, 350, 430];
+  const yOptions = [180, 250, 340, 420];
   const y = yOptions[(round - 1) % yOptions.length];
   return {
-    x: 990,
+    x: 960,
     y,
-    w: 160,
-    h: 150,
+    w: 220,
+    h: 190,
     angle: 0,
   };
 }
@@ -234,17 +237,16 @@ function makeWind(round) {
   return {
     x: base.x,
     y: base.y,
-    strength: 18 + round * 4,
-    timer: 9 - Math.min(3, round * 0.35),
+    strength: 12 + round * 2.5,
+    timer: 10 - Math.min(3, round * 0.3),
   };
 }
 
 function makeObstacles(round) {
-  // Keep a clear corridor toward the dock/exit so the game stays playable.
+  // Keep a wide open lane to the dock / exit.
   return [
-    { x: 420 + round * 12, y: 210, r: 26, kind: "rock" },
-    { x: 640, y: 520 - round * 4, r: 24, kind: "buoy" },
-    { x: 860, y: 160 + round * 8, r: 24, kind: "rock" },
+    { x: 400 + round * 8, y: 150, r: 20, kind: "rock" },
+    { x: 700, y: 560 - round * 2, r: 18, kind: "buoy" },
   ];
 }
 
@@ -275,20 +277,24 @@ function handleKeyDown(event) {
   if (state.phase !== "playing") return;
 
   if (state.mode === "tow") {
-    // Halatlar bitmeden: Q sol, E sağ. Bitince: E / M motor aç-kapa.
+    // Halatlar bitmeden: Q sol, E sağ. Bitince: E / Space / M motor aç-kapa.
     if (!state.engineReady && !state.engineOn) {
-      if (event.code === "KeyQ") {
+      if (event.code === "KeyQ" || event.key === "q" || event.key === "Q") {
         event.preventDefault();
         pullRope("left");
         return;
       }
-      if (event.code === "KeyE") {
+      if (event.code === "KeyE" || event.key === "e" || event.key === "E") {
         event.preventDefault();
         pullRope("right");
         return;
       }
     }
-    if (state.engineReady && (event.code === "KeyE" || event.code === "KeyM")) {
+    if (
+      state.engineReady
+      && (event.code === "KeyE" || event.code === "KeyM" || event.code === "Space"
+        || event.key === "e" || event.key === "E" || event.key === "m" || event.key === "M")
+    ) {
       if (!event.repeat) {
         event.preventDefault();
         toggleEngine();
@@ -297,7 +303,7 @@ function handleKeyDown(event) {
     }
   }
 
-  if (state.mode !== "tow" && (event.code === "Space" || event.code === "KeyE")) {
+  if (state.mode !== "tow" && (event.code === "Space" || event.code === "KeyE" || event.key === "e" || event.key === "E")) {
     event.preventDefault();
     state.input.dock = true;
   }
@@ -435,7 +441,7 @@ function loop(now) {
     } else {
       checkDock(now);
     }
-    state.energy = Math.max(0, state.energy - dt * (0.7 + state.round * 0.1));
+    state.energy = Math.max(0, state.energy - dt * (0.25 + state.round * 0.05));
     if (state.energy <= 0) loseGame();
   } else if (state.phase === "transition" && now >= state.nextRoundAt) {
     if (state.round > TOTAL_ROUNDS) {
@@ -501,8 +507,8 @@ function updateWind(dt) {
     const next = windVectors[nextIndex];
     state.wind.x = next.x;
     state.wind.y = next.y;
-    state.wind.strength = 18 + state.round * 4 + Math.random() * 6;
-    state.wind.timer = 8 - Math.min(3, state.round * 0.35) + Math.random() * 1.5;
+    state.wind.strength = 12 + state.round * 2.5 + Math.random() * 4;
+    state.wind.timer = 9 - Math.min(2.5, state.round * 0.3) + Math.random() * 1.5;
     state.message = `Rüzgar değişti: ${WIND_NAMES[nextIndex]}.`;
   }
 }
@@ -512,18 +518,20 @@ function pullRope(side) {
   const expected = state.ropeOrder[state.ropeStage];
   if (!expected) return;
   if (side !== expected) {
-    state.message = "Yanlış halatı çektin. Sıralamayı baştan yap.";
-    state.ropeStage = 0;
+    const want = expected === "left" ? "SOL (Q)" : "SAĞ (E)";
+    state.message = `Yanlış halat! Şimdi ${want} çek.`;
+    // Don't full-reset — kids get stuck. Stay on the current step.
     return;
   }
   state.ropeStage += 1;
   if (state.ropeStage >= state.ropeOrder.length) {
     state.engineReady = true;
-    state.message = "Halatlar tamam. E ile motoru aç / kapat.";
+    state.message = "Halatlar tamam! E veya Space ile motoru AÇ.";
   } else {
-    state.message = side === "left"
-      ? "Sol halat çekildi. Şimdi rüzgar tarafını çek."
-      : "Sağ halat çekildi. Şimdi rüzgar tarafını çek.";
+    const next = state.ropeOrder[state.ropeStage];
+    state.message = next === "left"
+      ? "İyi! Şimdi SOL (Q) halatı çek."
+      : "İyi! Şimdi SAĞ (E) halatı çek.";
   }
 }
 
@@ -547,46 +555,45 @@ function toggleEngine(forceOn = false) {
 
 function updateShip(dt) {
   const ship = state.ship;
-  const turnSpeed = 2.8;
-  const thrust = 260;
-  const reverse = 150;
+  const turnSpeed = 3.2;
+  const thrust = 280;
+  const reverse = 170;
   const windForce = state.wind.strength;
-  const drag = 0.982;
+  const drag = 0.978;
   const towMode = state.mode === "tow";
   const canDrive = !towMode || state.engineOn;
-
-  if (canDrive) {
-    if (state.input.left) ship.angle -= turnSpeed * dt;
-    if (state.input.right) ship.angle += turnSpeed * dt;
-  }
+  // Always allow slow steering so the ship never feels "stuck".
+  const steer = canDrive ? turnSpeed : turnSpeed * 0.45;
+  if (state.input.left) ship.angle -= steer * dt;
+  if (state.input.right) ship.angle += steer * dt;
 
   const forwardX = Math.cos(ship.angle);
   const forwardY = Math.sin(ship.angle);
   if (canDrive && state.input.forward) {
     ship.vx += forwardX * thrust * dt;
     ship.vy += forwardY * thrust * dt;
-    state.energy = Math.max(0, state.energy - dt * 1.4);
+    state.energy = Math.max(0, state.energy - dt * 0.9);
   }
   if (canDrive && state.input.reverse) {
     ship.vx -= forwardX * reverse * dt;
     ship.vy -= forwardY * reverse * dt;
-    state.energy = Math.max(0, state.energy - dt * 0.8);
+    state.energy = Math.max(0, state.energy - dt * 0.5);
   }
 
   // Wind is a gentle push, not an unstoppable shove.
-  const windScale = towMode && !state.engineOn ? 0.1 : 0.35;
+  const windScale = towMode && !state.engineOn ? 0.06 : 0.22;
   ship.vx += state.wind.x * windForce * windScale * dt;
   ship.vy += state.wind.y * windForce * windScale * dt;
   if (towMode && !state.engineOn) {
-    ship.vx *= Math.pow(0.975, dt * 60);
-    ship.vy *= Math.pow(0.975, dt * 60);
+    ship.vx *= Math.pow(0.97, dt * 60);
+    ship.vy *= Math.pow(0.97, dt * 60);
   }
 
   ship.vx *= Math.pow(drag, dt * 60);
   ship.vy *= Math.pow(drag, dt * 60);
   // Soft speed cap so docking stays possible.
   const speedNow = Math.hypot(ship.vx, ship.vy);
-  const maxSpeed = towMode ? 320 : 280;
+  const maxSpeed = towMode ? 300 : 260;
   if (speedNow > maxSpeed) {
     ship.vx = (ship.vx / speedNow) * maxSpeed;
     ship.vy = (ship.vy / speedNow) * maxSpeed;
@@ -597,13 +604,13 @@ function updateShip(dt) {
 
   if (ship.x < 40 || ship.x > WORLD.width - 40) {
     ship.x = clamp(ship.x, 40, WORLD.width - 40);
-    ship.vx *= -0.35;
-    applyCollision("Sınır", towMode ? 12 : 3);
+    ship.vx *= -0.25;
+    applyCollision("Sınır", towMode ? 6 : 1);
   }
   if (ship.y < 40 || ship.y > WORLD.height - 40) {
     ship.y = clamp(ship.y, 40, WORLD.height - 40);
-    ship.vy *= -0.35;
-    applyCollision("Sınır", towMode ? 12 : 3);
+    ship.vy *= -0.25;
+    applyCollision("Sınır", towMode ? 6 : 1);
   }
 
   const obstacleHit = state.obstacles.find((obstacle) => distance(ship.x, ship.y, obstacle.x, obstacle.y) < obstacle.r + ship.radius);
@@ -613,9 +620,9 @@ function updateShip(dt) {
     const length = Math.max(1, Math.hypot(dx, dy));
     ship.x = obstacleHit.x + (dx / length) * (obstacleHit.r + ship.radius + 2);
     ship.y = obstacleHit.y + (dy / length) * (obstacleHit.r + ship.radius + 2);
-    ship.vx *= -0.3;
-    ship.vy *= -0.3;
-    applyCollision(obstacleHit.kind === "buoy" ? "Şamandıra" : "Kaya", towMode ? 12 : 6);
+    ship.vx *= -0.25;
+    ship.vy *= -0.25;
+    applyCollision(obstacleHit.kind === "buoy" ? "Şamandıra" : "Kaya", towMode ? 8 : 3);
   }
 }
 
@@ -650,24 +657,32 @@ function applyCollision(reason, energyLoss) {
 
 function checkDock(now) {
   const ship = state.ship;
-  const pad = 8;
+  const pad = 18;
   const inDock =
     ship.x > state.dock.x - pad &&
     ship.x < state.dock.x + state.dock.w + pad &&
     ship.y > state.dock.y - pad &&
     ship.y < state.dock.y + state.dock.h + pad;
   const speed = Math.hypot(ship.vx, ship.vy);
+  // Face roughly right (liman yönü); wide tolerance for kids.
   const angleDiff = Math.abs(normalizeAngle(ship.angle));
   state.dockReady = inDock && speed < DOCK_MAX_SPEED && angleDiff < DOCK_MAX_ANGLE;
 
-  if (state.dockReady && state.input.dock) {
-    completeRound(now);
-  } else if (inDock && !state.dockReady) {
-    state.message = speed >= DOCK_MAX_SPEED
-      ? "Çok hızlısın. Biraz yavaşla, sonra Space / E bas."
-      : "Açıyı düzelt. Gemi sağa (limana) bakmalı.";
-  } else if (state.dockReady) {
-    state.message = "Liman hazır! Space veya E ile park et.";
+  if (state.dockReady) {
+    if (!state.dockReadySince) state.dockReadySince = now;
+    const held = now - state.dockReadySince;
+    if (state.input.dock || held >= DOCK_AUTO_MS) {
+      completeRound(now);
+      return;
+    }
+    state.message = `Liman hazır! Space / E bas veya bekle (${Math.ceil((DOCK_AUTO_MS - held) / 100) / 10} sn)`;
+  } else {
+    state.dockReadySince = 0;
+    if (inDock) {
+      state.message = speed >= DOCK_MAX_SPEED
+        ? "Biraz yavaşla — limanda yeşil olunca park olur."
+        : "Burnu sağa (→) çevir, liman yeşile dönsün.";
+    }
   }
 }
 
@@ -689,6 +704,7 @@ function completeRound(now, mode = state.mode) {
   state.round += 1;
   state.phase = "transition";
   state.dockReady = false;
+  state.dockReadySince = 0;
   state.nextRoundAt = now + 1200;
   state.danceUntil = now + 1400;
   if (state.score > state.highScore) {
@@ -755,9 +771,9 @@ function renderHud() {
 
 function ropeHintText() {
   const expected = state.ropeOrder[state.ropeStage];
-  if (!expected) return "Halatlar tamam. E ile motoru aç / kapat.";
-  const label = expected === "left" ? "SOL" : "SAĞ";
-  return `Adım ${state.ropeStage + 1}/2: ${label} halatı çek (Q = sol, E = sağ).`;
+  if (!expected) return "Halatlar tamam. E veya Space ile motoru AÇ / KAPAT.";
+  const label = expected === "left" ? "SOL (Q)" : "SAĞ (E)";
+  return `Adım ${state.ropeStage + 1}/2: ${label} halatı çek.`;
 }
 
 function draw() {
