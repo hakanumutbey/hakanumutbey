@@ -240,9 +240,14 @@ h1 {
   background: rgba(255, 255, 255, 0.1);
   font-weight: 800;
 }
-.touch .act { background: rgba(255, 79, 216, 0.35); }
+.touch .act { background: rgba(255, 79, 216, 0.35); font-size: 0.72rem; padding: 4px; }
 .touch .kick { background: rgba(255, 122, 92, 0.4); }
+.touch .shield { background: rgba(93, 255, 154, 0.35); }
+.touch .beam { background: rgba(255, 210, 74, 0.4); }
 .touch .jump { background: rgba(61, 224, 255, 0.35); grid-column: 1 / -1; }
+.touch-act {
+  grid-template-columns: 1fr 1fr;
+}
 
 @media (max-width: 720px) {
   .top { flex-direction: column; }

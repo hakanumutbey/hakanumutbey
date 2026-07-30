@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <meta http-equiv="cache-control" content="no-store" />
     <title>Space Arena</title>
-    <link rel="stylesheet" href="styles.css?v=1" />
+    <link rel="stylesheet" href="styles.css?v=2" />
   </head>
   <body>
     <main class="shell">
@@ -54,29 +54,34 @@
 
       <section id="touchPanel" class="touch" hidden aria-label="Dokunmatik kontroller">
         <div class="touch-move">
-          <button type="button" data-k="left">◀</button>
-          <button type="button" data-k="up">▲</button>
-          <button type="button" data-k="right">▶</button>
-          <button type="button" data-k="down">▼</button>
+          <button type="button" data-k="left">◀ A</button>
+          <button type="button" data-k="up">▲ W</button>
+          <button type="button" data-k="right">▶ D</button>
+          <button type="button" data-k="down">▼ S</button>
         </div>
         <div class="touch-act">
-          <button type="button" data-k="punch" class="act">Yumruk</button>
-          <button type="button" data-k="kick" class="act kick">Tekme</button>
-          <button type="button" data-k="jump" class="act jump">Zıpla</button>
+          <button type="button" data-k="punch" class="act">J Yumruk 5</button>
+          <button type="button" data-k="kick" class="act kick">K Tekme 10</button>
+          <button type="button" data-k="shield" class="act shield">C Kalkan</button>
+          <button type="button" data-k="beam" class="act beam">H Işın</button>
+          <button type="button" data-k="jump" class="act jump">Space Zıpla</button>
         </div>
       </section>
 
       <section class="panel controls-help">
-        <h2>Kontroller</h2>
+        <h2>Kontroller (ekranda da yazıyor)</h2>
         <ul>
-          <li><strong>A/D</strong> veya oklar — hareket</li>
+          <li><strong>A / D</strong> veya oklar — hareket</li>
           <li><strong>W / Space</strong> — zıpla</li>
-          <li><strong>J</strong> — yumruk · <strong>K</strong> — tekme</li>
+          <li><strong>J</strong> — yumruk (<strong>5</strong> hasar)</li>
+          <li><strong>K</strong> — tekme (<strong>10</strong> hasar)</li>
+          <li><strong>C</strong> — kalkan 1 sn (hasar <strong>%50</strong>)</li>
+          <li><strong>H</strong> — özel ışın (bekleme <strong>1,5 dk</strong>)</li>
           <li><strong>Esc</strong> — menüye dön</li>
         </ul>
       </section>
     </main>
 
-    <script src="./game.js?v=1" defer></script>
+    <script src="./game.js?v=2" defer></script>
   </body>
 </html>

@@ -10,6 +10,13 @@
   const H = 180;
   const STORAGE = "hakorocks-space-arena-v1";
   const GROUND_Y = 148;
+  /** Fixed fight damage (user design) */
+  const DMG_PUNCH = 5;
+  const DMG_KICK = 10;
+  const DMG_BEAM = 25;
+  const SHIELD_DURATION = 1;
+  const SHIELD_DAMAGE_MULT = 0.5;
+  const BEAM_COOLDOWN = 90; // 1.5 minutes
 
   const CHARACTERS = [
     { id: "nova", name: "Nova", cost: 0, color: "#3de0ff", accent: "#e8f4ff", power: 1, speed: 1 },
@@ -64,6 +71,7 @@
   let fightTime = 0;
   let hitStop = 0;
   let floatTexts = [];
+  let beams = [];
 
   // Parkour state
   let runner = null;
@@ -151,6 +159,7 @@
     fightTime = 0;
     hitStop = 0;
     floatTexts = [];
+    beams = [];
     screen = "fight";
     if (menuPanel) menuPanel.hidden = true;
     if (charPanel) charPanel.hidden = true;
@@ -207,17 +216,20 @@
       hp: 100,
       maxHp: 100,
       onGround: true,
-      attack: 0, // frames left in attack
-      attackKind: null, // punch | kick
+      attack: 0,
+      attackKind: null, // punch | kick | beam
       hitbox: null,
       cooldown: 0,
       stun: 0,
+      shield: 0, // seconds left
+      beamCd: 0, // seconds until H ready (starts ready)
       color: char.color,
       accent: char.accent,
       power: char.power,
       speed: char.speed,
       isBot: false,
       anim: 0,
+      _hitThisSwing: false,
     };
   }
 
@@ -306,6 +318,8 @@
       punch: keys.has("KeyJ") || keys.has("KeyZ") || touch.has("punch"),
       kick: keys.has("KeyK") || keys.has("KeyX") || touch.has("kick"),
       jump: keys.has("KeyW") || keys.has("ArrowUp") || keys.has("Space") || touch.has("jump") || touch.has("up"),
+      shield: keys.has("KeyC") || touch.has("shield"),
+      beam: keys.has("KeyH") || touch.has("beam"),
     };
     return Boolean(map[name]);
   }
@@ -371,6 +385,7 @@
     controlFighter(player, dt, false);
     controlFighter(enemy, dt, true);
     resolveAttacks();
+    updateBeams(dt);
 
     floatTexts = floatTexts
       .map((t) => ({ ...t, y: t.y - 20 * dt, life: t.life - dt }))
@@ -381,11 +396,18 @@
     } else if (enemy.hp <= 0) {
       endFight(true);
     } else {
-      setHud("Dövüş", `vs ${enemy.name} · ${Math.ceil(player.hp)} HP`);
+      const beamLeft = player.beamCd > 0 ? `${Math.ceil(player.beamCd)}s` : "HAZIR";
+      setHud(
+        "Dövüş",
+        `vs ${enemy.name} · HP ${Math.ceil(player.hp)} · H:${beamLeft}`
+      );
     }
   }
 
   function controlFighter(f, dt, isBot) {
+    f.shield = Math.max(0, f.shield - dt);
+    f.beamCd = Math.max(0, f.beamCd - dt);
+
     if (f.stun > 0) {
       f.stun -= dt;
       f.vx *= 0.85;
@@ -395,12 +417,10 @@
       playerInput(f, dt);
     }
 
-    // gravity
     f.vy += 420 * dt;
     f.x += f.vx * dt;
     f.y += f.vy * dt;
 
-    // ground
     if (f.y >= GROUND_Y) {
       f.y = GROUND_Y;
       f.vy = 0;
@@ -409,7 +429,6 @@
       f.onGround = false;
     }
 
-    // walls
     f.x = Math.max(20, Math.min(W - 20, f.x));
     f.vx *= 0.82;
     f.cooldown = Math.max(0, f.cooldown - dt);
@@ -421,7 +440,7 @@
         f.attack = 0;
         f.attackKind = null;
         f.hitbox = null;
-      } else if (f.attackKind) {
+      } else if (f.attackKind === "punch" || f.attackKind === "kick") {
         const reach = f.attackKind === "kick" ? 18 : 14;
         const ox = f.facing * (f.w / 2 + reach / 2);
         f.hitbox = {
@@ -429,7 +448,7 @@
           y: f.y - f.h * 0.55,
           w: reach,
           h: f.attackKind === "kick" ? 10 : 8,
-          dmg: (f.attackKind === "kick" ? 14 : 10) * f.power,
+          dmg: f.attackKind === "kick" ? DMG_KICK : DMG_PUNCH,
           kind: f.attackKind,
         };
       }
@@ -449,6 +468,29 @@
     if (pressed("jump") && f.onGround) {
       f.vy = -165;
       f.onGround = false;
+    }
+    // C = shield 1s, 50% damage taken
+    if (pressed("shield") && f.shield <= 0 && f.cooldown <= 0.05) {
+      f.shield = SHIELD_DURATION;
+      floatTexts.push({
+        x: f.x - 10,
+        y: f.y - f.h - 8,
+        text: "KALKAN",
+        life: 0.7,
+        color: "#5dff9a",
+      });
+    }
+    // H = special beam, 90s cooldown
+    if (pressed("beam") && f.beamCd <= 0 && f.attack <= 0) {
+      fireBeam(f);
+      f.beamCd = BEAM_COOLDOWN;
+      floatTexts.push({
+        x: f.x - 8,
+        y: f.y - f.h - 10,
+        text: "ISIN!",
+        life: 0.8,
+        color: "#ffd24a",
+      });
     }
     if (f.cooldown <= 0 && f.attack <= 0) {
       if (pressed("punch")) startAttack(f, "punch");
@@ -471,8 +513,18 @@
 
     if (f.onGround && Math.random() < 0.008) f.vy = -150;
 
+    // rare shield when low hp
+    if (f.hp < 40 && f.shield <= 0 && Math.random() < 0.01) {
+      f.shield = SHIELD_DURATION;
+    }
+
     if (f.cooldown <= 0 && f.attack <= 0 && dist < 30) {
       startAttack(f, Math.random() < 0.45 ? "kick" : "punch");
+    }
+    // bot beam rare if ready and mid range
+    if (f.beamCd <= 0 && dist > 40 && dist < 120 && Math.random() < 0.004) {
+      fireBeam(f);
+      f.beamCd = BEAM_COOLDOWN;
     }
   }
 
@@ -481,6 +533,59 @@
     f.attack = kind === "kick" ? 0.28 : 0.2;
     f.cooldown = kind === "kick" ? 0.55 : 0.38;
     f.vx += f.facing * 20;
+    f._hitThisSwing = false;
+  }
+
+  function fireBeam(f) {
+    beams.push({
+      x: f.x + f.facing * 10,
+      y: f.y - f.h * 0.55,
+      vx: f.facing * 220,
+      life: 0.85,
+      dmg: DMG_BEAM,
+      owner: f,
+      color: f.accent || "#ffd24a",
+      w: 16,
+      h: 4,
+    });
+  }
+
+  function updateBeams(dt) {
+    for (let i = beams.length - 1; i >= 0; i -= 1) {
+      const b = beams[i];
+      b.x += b.vx * dt;
+      b.life -= dt;
+      const target = b.owner === player ? enemy : player;
+      if (
+        target &&
+        Math.abs(b.x - target.x) < (b.w + target.w) / 2 + 4 &&
+        Math.abs(b.y - (target.y - target.h / 2)) < (b.h + target.h) / 2
+      ) {
+        applyDamage(target, b.dmg, b.owner === player ? player.facing : enemy.facing);
+        beams.splice(i, 1);
+        continue;
+      }
+      if (b.life <= 0 || b.x < -20 || b.x > W + 20) beams.splice(i, 1);
+    }
+  }
+
+  function applyDamage(defender, rawDmg, knockFacing) {
+    let dmg = rawDmg;
+    if (defender.shield > 0) {
+      dmg = Math.max(1, Math.round(dmg * SHIELD_DAMAGE_MULT));
+    }
+    defender.hp = Math.max(0, defender.hp - dmg);
+    defender.stun = 0.22;
+    defender.vx = (knockFacing || 1) * 80;
+    defender.vy = -40;
+    hitStop = 0.05;
+    floatTexts.push({
+      x: defender.x,
+      y: defender.y - defender.h - 4,
+      text: `-${dmg}`,
+      life: 0.6,
+      color: defender.shield > 0 ? "#5dff9a" : "#ff6b8a",
+    });
   }
 
   function resolveAttacks() {
@@ -493,19 +598,7 @@
       const hb = attacker.hitbox;
       if (rectsOverlap(hb, bodyBox(defender))) {
         attacker._hitThisSwing = true;
-        const dmg = hb.dmg;
-        defender.hp = Math.max(0, defender.hp - dmg);
-        defender.stun = 0.22;
-        defender.vx = attacker.facing * 80;
-        defender.vy = -40;
-        hitStop = 0.05;
-        floatTexts.push({
-          x: defender.x,
-          y: defender.y - defender.h - 4,
-          text: `-${Math.round(dmg)}`,
-          life: 0.6,
-          color: "#ff6b8a",
-        });
+        applyDamage(defender, hb.dmg, attacker.facing);
       }
     }
     if (player.attack <= 0) player._hitThisSwing = false;
@@ -679,7 +772,6 @@
   }
 
   function drawFight() {
-    // arena bg
     const g = ctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, "#120828");
     g.addColorStop(0.6, "#1a1040");
@@ -690,17 +782,19 @@
       ctx.fillStyle = "#ffffff";
       ctx.fillRect((i * 53) % W, (i * 17) % 80, 1, 1);
     }
-    // floor
     ctx.fillStyle = "#243448";
     ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
     ctx.fillStyle = "#ff4fd8";
     ctx.fillRect(0, GROUND_Y, W, 2);
-    // rings
     ctx.fillStyle = "rgba(61,224,255,0.15)";
     ctx.fillRect(16, GROUND_Y - 4, W - 32, 4);
 
     drawHpBar(12, 10, 120, player.hp / player.maxHp, player.color, player.name);
     drawHpBar(W - 132, 10, 120, enemy.hp / enemy.maxHp, enemy.color, enemy.name);
+
+    // shield bubble
+    if (player.shield > 0) drawShieldBubble(player);
+    if (enemy.shield > 0) drawShieldBubble(enemy);
 
     drawPixelFighter(
       player.x,
@@ -709,7 +803,8 @@
       player.color,
       player.accent,
       player.anim,
-      player.attackKind
+      player.attackKind,
+      player.shield > 0
     );
     drawPixelFighter(
       enemy.x,
@@ -718,8 +813,17 @@
       enemy.color,
       enemy.accent,
       enemy.anim,
-      enemy.attackKind
+      enemy.attackKind,
+      enemy.shield > 0
     );
+
+    // beams
+    for (const b of beams) {
+      ctx.fillStyle = b.color;
+      ctx.fillRect(Math.floor(b.x - b.w / 2), Math.floor(b.y - b.h / 2), b.w, b.h);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(Math.floor(b.x - b.w / 2), Math.floor(b.y - 1), b.w, 2);
+    }
 
     for (const t of floatTexts) {
       ctx.globalAlpha = Math.max(0, t.life);
@@ -727,6 +831,40 @@
       pixelText(t.text, t.x - 6, t.y, 1);
       ctx.globalAlpha = 1;
     }
+
+    drawFightControlsOverlay();
+  }
+
+  function drawShieldBubble(f) {
+    ctx.strokeStyle = "rgba(93,255,154,0.85)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(Math.floor(f.x - 10), Math.floor(f.y - f.h - 4), 20, f.h + 6);
+  }
+
+  /** On-canvas button labels so moves are always visible in fight */
+  function drawFightControlsOverlay() {
+    const beamReady = player && player.beamCd <= 0;
+    const beamTxt = beamReady
+      ? "H ISIN HAZIR"
+      : `H ISIN ${Math.ceil(player ? player.beamCd : 0)}s`;
+    const shieldTxt = player && player.shield > 0 ? "C KALKAN ACIK" : "C KALKAN 1s";
+
+    ctx.fillStyle = "rgba(5, 10, 20, 0.72)";
+    ctx.fillRect(4, H - 34, W - 8, 30);
+
+    ctx.fillStyle = "#e8f4ff";
+    pixelText("A/D HAREKET  W ZIPLA", 8, H - 28, 1);
+
+    ctx.fillStyle = "#ff4fd8";
+    pixelText("J YUMRUK 5", 8, H - 18, 1);
+    ctx.fillStyle = "#ff7a5c";
+    pixelText("K TEKME 10", 100, H - 18, 1);
+
+    ctx.fillStyle = player && player.shield > 0 ? "#5dff9a" : "#8affb0";
+    pixelText(shieldTxt, 8, H - 8, 1);
+
+    ctx.fillStyle = beamReady ? "#ffd24a" : "#8aa8c4";
+    pixelText(beamTxt, 140, H - 8, 1);
   }
 
   function drawHpBar(x, y, w, ratio, color, name) {
@@ -791,35 +929,30 @@
     pixelText(`${Math.floor(distance)}m`, 8, 12, 1);
   }
 
-  function drawPixelFighter(x, y, facing, color, accent, t, attackKind) {
+  function drawPixelFighter(x, y, facing, color, accent, t, attackKind, shielded) {
     const fx = Math.floor(x);
     const fy = Math.floor(y);
     const dir = facing >= 0 ? 1 : -1;
     const bob = Math.floor(Math.sin(t) * 1);
 
-    // shadow
     ctx.fillStyle = "rgba(0,0,0,0.35)";
     ctx.fillRect(fx - 5, fy, 10, 2);
 
-    // legs
     const legSwing = attackKind === "kick" ? 4 * dir : Math.floor(Math.sin(t * 2) * 2) * dir;
     ctx.fillStyle = color;
     ctx.fillRect(fx - 3 + (dir < 0 ? 2 : 0), fy - 8 + bob, 3, 8);
     ctx.fillRect(fx + legSwing, fy - 8 + bob, 3, 8);
 
-    // body
     ctx.fillStyle = color;
     ctx.fillRect(fx - 4, fy - 16 + bob, 8, 10);
     ctx.fillStyle = accent;
     ctx.fillRect(fx - 2, fy - 14 + bob, 4, 3);
 
-    // head
     ctx.fillStyle = accent;
     ctx.fillRect(fx - 3, fy - 22 + bob, 6, 6);
     ctx.fillStyle = "#0a1020";
     ctx.fillRect(fx + (dir > 0 ? 1 : -3), fy - 20 + bob, 2, 2);
 
-    // arm / attack
     ctx.fillStyle = color;
     if (attackKind === "punch") {
       ctx.fillRect(fx + dir * 5, fy - 14 + bob, dir * 10, 3);
@@ -829,9 +962,13 @@
       ctx.fillRect(fx + dir * 4, fy - 14 + bob, 3, 6);
     }
 
-    // jetpack pixel
     ctx.fillStyle = "#ff6b3d";
     ctx.fillRect(fx - dir * 5, fy - 14 + bob, 2, 4);
+
+    if (shielded) {
+      ctx.fillStyle = "rgba(93,255,154,0.35)";
+      ctx.fillRect(fx - 8, fy - 24 + bob, 16, 24);
+    }
   }
 
   /** Tiny 3x5-ish bitmap text (ASCII subset) */
