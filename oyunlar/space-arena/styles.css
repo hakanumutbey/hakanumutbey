@@ -244,7 +244,8 @@ h1 {
 .touch .kick { background: rgba(255, 122, 92, 0.4); }
 .touch .shield { background: rgba(93, 255, 154, 0.35); }
 .touch .beam { background: rgba(255, 210, 74, 0.4); }
-.touch .jump { background: rgba(61, 224, 255, 0.35); grid-column: 1 / -1; }
+.touch .jump { background: rgba(61, 224, 255, 0.35); }
+.touch .sling { background: rgba(255, 210, 74, 0.45); grid-column: 1 / -1; font-weight: 900; }
 .touch-act {
   grid-template-columns: 1fr 1fr;
 }

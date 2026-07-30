@@ -85,6 +85,11 @@
   let hazardTimer = 0;
   /** Three horizontal “paths” — switch by jumping to dodge walkers/portals */
   const LANES = [GROUND_Y, GROUND_Y - 28, GROUND_Y - 56];
+  /** How far ahead of the player platforms stay visible (fog beyond) */
+  const VISION_AHEAD = 48;
+  const VISION_BEHIND = 90;
+  /** Slingshot (sapan) charge state */
+  let sling = { charging: false, power: 0, wasHeld: false };
 
   bindUI();
   bindInput();
@@ -187,7 +192,10 @@
       speed: me.speed,
       anim: 0,
       facing: 1,
+      jumpsLeft: 2,
+      maxJumps: 2,
     };
+    sling = { charging: false, power: 0, wasHeld: false };
     // Starting triple-path corridor so you can already switch lanes
     platforms = [];
     hazards = [];
@@ -426,6 +434,8 @@
       jump: keys.has("KeyW") || keys.has("ArrowUp") || keys.has("Space") || touch.has("jump") || touch.has("up"),
       shield: keys.has("KeyC") || touch.has("shield"),
       beam: keys.has("KeyH") || touch.has("beam"),
+      // L or F = slingshot (sapan) — hold to charge, release to fly
+      sling: keys.has("KeyL") || keys.has("KeyF") || touch.has("sling"),
     };
     return Boolean(map[name]);
   }
@@ -734,25 +744,84 @@
     if (!parkourAlive || !runner) return;
 
     const difficulty = Math.min(1.2, distance / 280);
-    // Manual movement only — no auto-forward
+    // Manual movement only — no auto-forward (unless mid-sling flight uses residual vx)
     const moveSpeed = 95 * runner.speed;
-    runner.vx = 0;
-    if (pressed("left")) {
-      runner.vx = -moveSpeed;
-      runner.facing = -1;
-    }
-    if (pressed("right")) {
-      runner.vx = moveSpeed;
-      runner.facing = 1;
-    }
-    if (pressed("jump") && runner.onGround) {
-      runner.vy = -195;
+    const slingHeld = pressed("sling");
+
+    // —— Sapan: basılı tut = şarj, bırak = fırla (platform sisinin içine) ——
+    if (slingHeld) {
+      sling.charging = true;
+      sling.power = Math.min(1, sling.power + dt * 1.15);
+      // while charging on ground, slight pull-back feel
+      if (runner.onGround) {
+        runner.vx = -runner.facing * 12 * sling.power;
+      }
+    } else if (sling.wasHeld && sling.power > 0.12) {
+      // release launch
+      const power = sling.power;
+      const angleUp = 0.55 + power * 0.55; // radians-ish blend
+      const speed = (140 + power * 220) * runner.speed;
+      runner.vx = runner.facing * speed * Math.cos(angleUp * 0.7);
+      runner.vy = -speed * Math.sin(0.75 + power * 0.4);
       runner.onGround = false;
+      // keep one air jump after sling
+      runner.jumpsLeft = Math.max(1, runner.jumpsLeft);
+      sling.power = 0;
+      sling.charging = false;
+    } else if (!slingHeld) {
+      sling.power = 0;
+      sling.charging = false;
+    }
+    sling.wasHeld = slingHeld;
+
+    if (!sling.charging) {
+      // walk only when not charging sling (air keeps momentum)
+      if (runner.onGround) {
+        runner.vx = 0;
+        if (pressed("left")) {
+          runner.vx = -moveSpeed;
+          runner.facing = -1;
+        }
+        if (pressed("right")) {
+          runner.vx = moveSpeed;
+          runner.facing = 1;
+        }
+      } else {
+        // light air steer
+        if (pressed("left")) {
+          runner.vx -= moveSpeed * 2.2 * dt;
+          runner.facing = -1;
+        }
+        if (pressed("right")) {
+          runner.vx += moveSpeed * 2.2 * dt;
+          runner.facing = 1;
+        }
+        runner.vx *= 0.995;
+      }
+    }
+
+    // Double jump: ground jump + one mid-air jump (edge-triggered)
+    if (pressed("jump") && !sling.charging && !runner._jumpLatched) {
+      if (runner.onGround) {
+        runner.jumpsLeft = runner.maxJumps - 1;
+        runner.vy = -195;
+        runner.onGround = false;
+        runner._jumpLatched = true;
+      } else if (runner.jumpsLeft > 0) {
+        runner.jumpsLeft -= 1;
+        runner.vy = -175;
+        runner._jumpLatched = true;
+      }
+    } else if (!pressed("jump")) {
+      runner._jumpLatched = false;
     }
 
     runner.vy += 520 * dt;
+    // cap fall
+    if (runner.vy > 280) runner.vy = 280;
     runner.x += runner.vx * dt;
     runner.y += runner.vy * dt;
+    const wasOnGround = runner.onGround;
     runner.onGround = false;
 
     // Platform collisions (feet on top)
@@ -769,8 +838,14 @@
       ) {
         runner.y = p.y;
         runner.vy = 0;
+        runner.vx *= 0.85;
         runner.onGround = true;
+        runner.jumpsLeft = runner.maxJumps;
       }
+    }
+
+    if (!wasOnGround && runner.onGround) {
+      runner.jumpsLeft = runner.maxJumps;
     }
 
     // Don't walk through solid from the side lightly
@@ -832,7 +907,13 @@
           : distance < 35
             ? "yuruyen engeller"
             : "meteor yagiyor!";
-    setHud("Parkur", `${Math.floor(distance)} m · ${nextHint}`);
+    const slingHud = sling.charging
+      ? `sapan ${Math.floor(sling.power * 100)}%`
+      : "L sapan";
+    setHud(
+      "Parkur",
+      `${Math.floor(distance)} m · cift zip · ${slingHud} · ${nextHint}`
+    );
 
     platforms = platforms.filter((p) => p.x + p.w > camX - 50);
     hazards = hazards.filter((h) => h.x + (h.w || 0) > camX - 50);
@@ -1087,38 +1168,44 @@
     ctx.fillStyle = "#5dff9a";
     ctx.fillRect(Math.floor(228 - camX * 0.1), 38, 8, 8);
 
-    // faint lane guides
+    // faint lane guides only in vision cone
+    const visionEdge = runner ? runner.x + VISION_AHEAD : camX + 60;
     for (const y of LANES) {
       ctx.fillStyle = "rgba(61,224,255,0.06)";
-      ctx.fillRect(0, Math.floor(y) - 1, W, 1);
+      ctx.fillRect(0, Math.floor(y) - 1, Math.max(0, Math.floor(visionEdge - camX)), 1);
     }
 
     for (const p of platforms) {
       const px = Math.floor(p.x - camX);
       if (px + p.w < 0 || px > W) continue;
+      if (!isInVision(p.x, p.w)) {
+        // Hidden ahead — only rare ghost pixel so fog feels deep (no real layout leak)
+        continue;
+      }
       ctx.fillStyle = "#3de0ff";
       ctx.fillRect(px, Math.floor(p.y), Math.floor(p.w), 2);
       ctx.fillStyle = "#1a4060";
       ctx.fillRect(px, Math.floor(p.y) + 2, Math.floor(p.w), Math.floor(p.h));
     }
 
-    // Draw meteor impact zones first (under entities)
+    // Fog wall ahead: can't see platform layout — must slingshot / double-jump into the unknown
+    drawParkourFog();
+
+    // Draw meteor impact zones first (under entities) — only if impact is in vision or near
     for (const h of hazards) {
       if (h.type !== "meteor" || h.landed) continue;
       const ix = Math.floor(h.impactX - camX);
       const iy = Math.floor(h.impactY);
       if (ix < -20 || ix > W + 20) continue;
+      // Red mark always shows (warning) even in fog — you see danger, not platforms
       const pulse = 0.45 + Math.sin(anim * 10) * 0.2;
-      // red danger pad on the lane where it will hit
       ctx.fillStyle = `rgba(255, 40, 60, ${pulse})`;
       ctx.fillRect(ix - 10, iy - 3, 20, 6);
       ctx.fillStyle = "#ff2040";
       ctx.fillRect(ix - 8, iy - 2, 16, 4);
-      // crosshair
       ctx.fillStyle = "#ff6677";
       ctx.fillRect(ix - 1, iy - 10, 2, 10);
       ctx.fillRect(ix - 6, iy - 1, 12, 2);
-      // vertical dashed drop line
       ctx.fillStyle = "rgba(255, 60, 80, 0.35)";
       for (let yy = 12; yy < iy - 4; yy += 6) {
         ctx.fillRect(ix - 1, yy, 2, 3);
@@ -1126,6 +1213,8 @@
     }
 
     for (const h of hazards) {
+      // Hide walkers/portals/spikes deep in fog (except meteors — already drawn mark)
+      if (h.type !== "meteor" && !isInVision(h.x, h.w || 12)) continue;
       const hx = Math.floor(h.x - camX);
       const hy = Math.floor(h.y);
       if (hx > W + 20 || hx < -20) continue;
@@ -1177,18 +1266,71 @@
         false,
         false
       );
+      // slingshot rubber band while charging
+      if (sling.charging && sling.power > 0) {
+        const sx = Math.floor(runner.x - camX);
+        const sy = Math.floor(runner.y - 10);
+        const pull = Math.floor(sling.power * 14);
+        ctx.strokeStyle = "#ffd24a";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(sx - runner.facing * 6, sy);
+        ctx.lineTo(sx - runner.facing * (10 + pull), sy + 4);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(sx - runner.facing * 6, sy);
+        ctx.lineTo(sx - runner.facing * (10 + pull), sy - 4);
+        ctx.stroke();
+        // power bar
+        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        ctx.fillRect(sx - 12, sy - 18, 24, 4);
+        ctx.fillStyle = "#ffd24a";
+        ctx.fillRect(sx - 12, sy - 18, Math.floor(24 * sling.power), 4);
+      }
     }
 
     // controls strip for parkour
     ctx.fillStyle = "rgba(5, 10, 20, 0.72)";
-    ctx.fillRect(4, H - 22, W - 8, 18);
+    ctx.fillRect(4, H - 28, W - 8, 24);
     ctx.fillStyle = "#e8f4ff";
-    pixelText("A/D YURU  W ZIPLA", 8, H - 16, 1);
-    ctx.fillStyle = "#b44dff";
-    pixelText("PORTAL=UST YOL", 140, H - 16, 1);
+    pixelText("A/D YURU  W CIFT ZIP", 8, H - 22, 1);
+    ctx.fillStyle = "#ffd24a";
+    pixelText("L SAPAN TUT BIRAK", 8, H - 12, 1);
+    ctx.fillStyle = "#8aa8c4";
+    pixelText("SIS=GOREMEZSIN", 160, H - 12, 1);
 
     ctx.fillStyle = "#ffd24a";
     pixelText(`${Math.floor(distance)}m`, 8, 12, 1);
+    if (runner) {
+      ctx.fillStyle = runner.jumpsLeft >= 2 ? "#5dff9a" : runner.jumpsLeft === 1 ? "#ffd24a" : "#ff6b8a";
+      pixelText(`ZIP${runner.jumpsLeft}`, W - 40, 12, 1);
+    }
+  }
+
+  function isInVision(worldX, width) {
+    if (!runner) return true;
+    const left = runner.x - VISION_BEHIND;
+    const right = runner.x + VISION_AHEAD;
+    return worldX + width > left && worldX < right;
+  }
+
+  function drawParkourFog() {
+    if (!runner) return;
+    const edge = Math.floor(runner.x + VISION_AHEAD - camX);
+    if (edge >= W) return;
+    // dark fog covering unknown platforms ahead
+    const fogX = Math.max(0, edge);
+    ctx.fillStyle = "rgba(4, 8, 18, 0.82)";
+    ctx.fillRect(fogX, 0, W - fogX, H - 28);
+    // mist stripes
+    ctx.fillStyle = "rgba(40, 60, 90, 0.25)";
+    for (let x = fogX; x < W; x += 8) {
+      const wobble = Math.floor(Math.sin(anim * 2 + x * 0.08) * 3);
+      ctx.fillRect(x, 20 + wobble, 4, H - 60);
+    }
+    ctx.fillStyle = "rgba(255, 210, 74, 0.55)";
+    pixelText("?", fogX + 12, 40, 2);
+    pixelText("SIS", fogX + 8, 60, 1);
   }
 
   function drawPixelFighter(x, y, facing, color, accent, t, attackKind, shielded) {

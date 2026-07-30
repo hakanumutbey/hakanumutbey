@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <meta http-equiv="cache-control" content="no-store" />
     <title>Space Arena</title>
-    <link rel="stylesheet" href="styles.css?v=4" />
+    <link rel="stylesheet" href="styles.css?v=5" />
   </head>
   <body>
     <main class="shell">
@@ -38,8 +38,9 @@
         </div>
         <p class="hint">
           Dövüş: rastgele rakiple kapış, kazanırsan SpaceCoin.<br />
-          Parkur: sen yürürsün; engeller ilerledikçe çıkar. Meteorun düşeceği yer
-          kırmızı işaretlenir — oradan kaç. Mesafe = SpaceCoin.
+          Parkur: yürürsün, <strong>çift zıplama</strong> var.
+          İlerisi sisli — platformları göremezsin; <strong>L sapan</strong> ile tut-bırak uç.
+          Engeller yolda çıkar; meteor yeri kırmızı.
         </p>
         <button type="button" id="btnChars" class="secondary">Karakterler (10)</button>
       </section>
@@ -65,24 +66,24 @@
           <button type="button" data-k="kick" class="act kick">K Tekme 10</button>
           <button type="button" data-k="shield" class="act shield">C Kalkan</button>
           <button type="button" data-k="beam" class="act beam">H Işın</button>
-          <button type="button" data-k="jump" class="act jump">Space Zıpla</button>
+          <button type="button" data-k="jump" class="act jump">W Çift Zıpla</button>
+          <button type="button" data-k="sling" class="act sling">L Sapan</button>
         </div>
       </section>
 
       <section class="panel controls-help">
         <h2>Kontroller (ekranda da yazıyor)</h2>
         <ul>
-          <li><strong>A / D</strong> veya oklar — hareket</li>
-          <li><strong>W / Space</strong> — zıpla</li>
-          <li><strong>J</strong> — yumruk (<strong>5</strong> hasar)</li>
-          <li><strong>K</strong> — tekme (<strong>10</strong> hasar)</li>
-          <li><strong>C</strong> — kalkan 1 sn (hasar <strong>%50</strong>)</li>
-          <li><strong>H</strong> — özel ışın (bekleme <strong>1,5 dk</strong>)</li>
+          <li><strong>A / D</strong> — hareket</li>
+          <li><strong>W / Space</strong> — zıpla · <strong>havada tekrar</strong> = çift zıplama</li>
+          <li><strong>L</strong> veya <strong>F</strong> — sapan (basılı tut = güç, bırak = uç)</li>
+          <li>Parkurda ilerisi <strong>sisli</strong> — platformu görmeden sapanla atla</li>
+          <li><strong>J</strong> yumruk 5 · <strong>K</strong> tekme 10 · <strong>C</strong> kalkan · <strong>H</strong> ışın</li>
           <li><strong>Esc</strong> — menüye dön</li>
         </ul>
       </section>
     </main>
 
-    <script src="./game.js?v=4" defer></script>
+    <script src="./game.js?v=5" defer></script>
   </body>
 </html>
