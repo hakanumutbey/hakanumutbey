@@ -274,28 +274,27 @@ function handleKeyDown(event) {
   }
   if (state.phase !== "playing") return;
 
-  if (state.mode === "tow" && !state.engineOn) {
-    if (event.code === "KeyQ") {
-      event.preventDefault();
-      pullRope("left");
+  if (state.mode === "tow") {
+    // Halatlar bitmeden: Q sol, E sağ. Bitince: E / M motor aç-kapa.
+    if (!state.engineReady && !state.engineOn) {
+      if (event.code === "KeyQ") {
+        event.preventDefault();
+        pullRope("left");
+        return;
+      }
+      if (event.code === "KeyE") {
+        event.preventDefault();
+        pullRope("right");
+        return;
+      }
+    }
+    if (state.engineReady && (event.code === "KeyE" || event.code === "KeyM")) {
+      if (!event.repeat) {
+        event.preventDefault();
+        toggleEngine();
+      }
       return;
     }
-    if (event.code === "KeyE") {
-      event.preventDefault();
-      pullRope("right");
-      return;
-    }
-    if (event.code === "KeyM") {
-      event.preventDefault();
-      startEngine();
-      return;
-    }
-  }
-
-  if (state.mode === "tow" && event.code === "KeyM") {
-    event.preventDefault();
-    startEngine();
-    return;
   }
 
   if (state.mode !== "tow" && (event.code === "Space" || event.code === "KeyE")) {
@@ -347,7 +346,7 @@ function setTouch(action, pressed) {
   if (!pressed) return;
   if (action === "rope-left") pullRope("left");
   if (action === "rope-right") pullRope("right");
-  if (action === "engine") startEngine();
+  if (action === "engine") toggleEngine();
 }
 
 function pollGamepadInput() {
@@ -397,7 +396,7 @@ function pollGamepadInput() {
     if (leftRope && pressedOnce(nextButtons, "left-rope")) pullRope("left");
     if (rightRope && pressedOnce(nextButtons, "right-rope")) pullRope("right");
     if ((primary && pressedOnce(nextButtons, "primary")) || (start && pressedOnce(nextButtons, "start")) || (rightTrigger && pressedOnce(nextButtons, "right-trigger"))) {
-      startEngine();
+      toggleEngine();
     }
   }
 
@@ -520,7 +519,7 @@ function pullRope(side) {
   state.ropeStage += 1;
   if (state.ropeStage >= state.ropeOrder.length) {
     state.engineReady = true;
-    state.message = "Halatlar tamam. Motoru çalıştırabilirsin.";
+    state.message = "Halatlar tamam. E ile motoru aç / kapat.";
   } else {
     state.message = side === "left"
       ? "Sol halat çekildi. Şimdi rüzgar tarafını çek."
@@ -529,9 +528,21 @@ function pullRope(side) {
 }
 
 function startEngine() {
-  if (state.mode !== "tow" || !state.engineReady || state.engineOn || state.phase !== "playing") return;
-  state.engineOn = true;
-  state.message = "Motor çalıştı. Çıkışa doğru ilerle.";
+  toggleEngine(true);
+}
+
+function toggleEngine(forceOn = false) {
+  if (state.mode !== "tow" || !state.engineReady || state.phase !== "playing") return;
+  if (forceOn === true) {
+    if (state.engineOn) return;
+    state.engineOn = true;
+    state.message = "Motor çalıştı. Çıkışa git. E ile kapatabilirsin.";
+    return;
+  }
+  state.engineOn = !state.engineOn;
+  state.message = state.engineOn
+    ? "Motor açık. Çıkışa doğru ilerle. E ile kapat."
+    : "Motor kapalı. Gemi süzülür. E ile tekrar aç.";
 }
 
 function updateShip(dt) {
@@ -744,7 +755,7 @@ function renderHud() {
 
 function ropeHintText() {
   const expected = state.ropeOrder[state.ropeStage];
-  if (!expected) return "Halatlar tamam. Motoru çalıştır (M).";
+  if (!expected) return "Halatlar tamam. E ile motoru aç / kapat.";
   const label = expected === "left" ? "SOL" : "SAĞ";
   return `Adım ${state.ropeStage + 1}/2: ${label} halatı çek (Q = sol, E = sağ).`;
 }
@@ -973,7 +984,11 @@ function drawRopes() {
   ctx.fillStyle = rightDone ? "#96f06f" : expected === "right" ? "#ffd166" : "rgba(255,255,255,0.7)";
   ctx.fillText(rightDone ? "Sağ ✓" : expected === "right" ? "Sağ → şimdi" : "Sağ halat", rightX + 10, y + 14);
   ctx.fillStyle = state.engineReady ? "#96f06f" : "rgba(255,255,255,0.85)";
-  ctx.fillText(state.engineOn ? "Motor açık" : state.engineReady ? "Motor hazır (M)" : "Halat sırası", ship.x - 52, ship.y - 36);
+  ctx.fillText(
+    state.engineOn ? "Motor açık (E kapat)" : state.engineReady ? "Motor hazır (E aç)" : "Halat sırası",
+    ship.x - 64,
+    ship.y - 36,
+  );
   ctx.restore();
 }
 
@@ -1000,7 +1015,11 @@ function drawRopeChecklist() {
     ctx.fillText(`${done ? "✓" : current ? "→" : `${index + 1}.`} ${label}${windMark}`, panelX + 16, panelY + 56 + index * 26);
   });
   ctx.fillStyle = state.engineOn ? "#96f06f" : state.engineReady ? "#ffd166" : "rgba(255,255,255,0.5)";
-  ctx.fillText(state.engineOn ? "✓ Motor çalışıyor" : state.engineReady ? "→ Motoru çalıştır (M)" : "3. Motor", panelX + 16, panelY + 108);
+  ctx.fillText(
+    state.engineOn ? "✓ Motor açık — E kapat" : state.engineReady ? "→ Motor aç/kapa (E)" : "3. Motor (E)",
+    panelX + 16,
+    panelY + 108,
+  );
   ctx.restore();
 }
 
