@@ -1,5 +1,7 @@
 FROM node:22-alpine AS build
 WORKDIR /app
+ENV DOCKER_BUILD=1
+ENV NODE_OPTIONS=--max-old-space-size=1536
 COPY package*.json ./
 RUN npm ci
 COPY . .
