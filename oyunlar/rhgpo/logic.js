@@ -190,6 +190,34 @@
   }
 
   /**
+   * Terminal phase changes only while actively playing.
+   * Prevents same-frame races: completeRound → energy drain → lose,
+   * or crash lose → dock/goal still completing the round.
+   */
+  function mayCompleteRound(phase) {
+    return phase === "playing";
+  }
+
+  function mayApplyLose(phase) {
+    return phase === "playing";
+  }
+
+  /**
+   * Drain energy only while phase is still playing.
+   * @returns {{ energy: number, phase: string, lost: boolean, drained: boolean }}
+   */
+  function applyEnergyDrainWhilePlaying(phase, energy, dt, rate) {
+    if (phase !== "playing") {
+      return { energy, phase, lost: false, drained: false };
+    }
+    const nextEnergy = Math.max(0, energy - dt * rate);
+    if (isEnergyLost(nextEnergy)) {
+      return { energy: nextEnergy, phase: "lost", lost: true, drained: true };
+    }
+    return { energy: nextEnergy, phase: "playing", lost: false, drained: true };
+  }
+
+  /**
    * Score bump when a round is completed.
    */
   function scoreForRoundComplete(round, energy, speed) {
@@ -199,9 +227,11 @@
 
   /**
    * After completing a round, advance. Returns win when finished round was TOTAL_ROUNDS.
-   * @returns {{ nextRound: number, won: boolean, scoreDelta: number, score: number }}
+   * No-ops conceptually if phase is not playing (caller must gate with mayCompleteRound).
+   * @returns {{ nextRound: number, won: boolean, scoreDelta: number, score: number, phase: string }|null}
    */
-  function completeRoundTransition(round, score, energy, speed) {
+  function completeRoundTransition(round, score, energy, speed, phase = "playing") {
+    if (!mayCompleteRound(phase)) return null;
     const scoreDelta = scoreForRoundComplete(round, energy, speed);
     const nextScore = score + scoreDelta;
     const nextRound = round + 1;
@@ -211,6 +241,7 @@
       won,
       scoreDelta,
       score: nextScore,
+      phase: "transition",
     };
   }
 
@@ -290,6 +321,9 @@
     applyRopePull,
     applyCollisionDamage,
     isEnergyLost,
+    mayCompleteRound,
+    mayApplyLose,
+    applyEnergyDrainWhilePlaying,
     scoreForRoundComplete,
     completeRoundTransition,
     windName,

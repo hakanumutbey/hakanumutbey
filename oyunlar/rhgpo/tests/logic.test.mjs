@@ -204,6 +204,7 @@ test("completing round 5 yields won", () => {
   const r = L.completeRoundTransition(5, 500, 80, 30);
   assert.equal(r.won, true);
   assert.equal(r.nextRound, 6);
+  assert.equal(r.phase, "transition");
   assert.ok(r.score > 500);
   assert.ok(r.scoreDelta > 0);
 });
@@ -222,6 +223,55 @@ test("score increases on completeRound", () => {
   assert.equal(r.scoreDelta, L.scoreForRoundComplete(2, 90, 20));
 });
 
+// —— same-frame phase races (skeptic) ——
+test("mayCompleteRound / mayApplyLose only while playing", () => {
+  assert.equal(L.mayCompleteRound("playing"), true);
+  assert.equal(L.mayApplyLose("playing"), true);
+  for (const phase of ["menu", "boarding", "transition", "won", "lost"]) {
+    assert.equal(L.mayCompleteRound(phase), false, `complete blocked in ${phase}`);
+    assert.equal(L.mayApplyLose(phase), false, `lose blocked in ${phase}`);
+  }
+});
+
+test("completeRoundTransition no-ops when phase is not playing", () => {
+  assert.equal(L.completeRoundTransition(5, 500, 1, 0, "transition"), null);
+  assert.equal(L.completeRoundTransition(5, 500, 1, 0, "won"), null);
+  assert.equal(L.completeRoundTransition(5, 500, 1, 0, "lost"), null);
+});
+
+test("after completeRound (transition), energy drain cannot force lost", () => {
+  // Simulate: round 5 finished with near-zero energy, then same-frame drain.
+  const finished = L.completeRoundTransition(5, 900, 0.05, 10, "playing");
+  assert.ok(finished);
+  assert.equal(finished.won, true);
+  assert.equal(finished.phase, "transition");
+  const drain = L.applyEnergyDrainWhilePlaying(
+    finished.phase,
+    0.05,
+    1 / 60,
+    0.25 + 5 * 0.05
+  );
+  assert.equal(drain.drained, false);
+  assert.equal(drain.lost, false);
+  assert.equal(drain.phase, "transition");
+});
+
+test("crash lost then completeRound blocked (phase no longer playing)", () => {
+  // After lose, complete must not flip to transition.
+  assert.equal(L.mayCompleteRound("lost"), false);
+  assert.equal(L.completeRoundTransition(2, 100, 50, 20, "lost"), null);
+});
+
+test("energy drain while playing can lose; not after transition", () => {
+  const mid = L.applyEnergyDrainWhilePlaying("playing", 0.01, 1, 1);
+  assert.equal(mid.lost, true);
+  assert.equal(mid.phase, "lost");
+  assert.ok(mid.energy <= 0);
+
+  const afterWinPath = L.applyEnergyDrainWhilePlaying("transition", 0, 1, 10);
+  assert.equal(afterWinPath.lost, false);
+  assert.equal(afterWinPath.phase, "transition");
+});
 test("round modes alternate park / tow", () => {
   assert.equal(L.getRoundMode(1), "park");
   assert.equal(L.getRoundMode(2), "tow");

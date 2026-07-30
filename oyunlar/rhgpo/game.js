@@ -27,6 +27,9 @@
     applyRopePull,
     applyCollisionDamage,
     isEnergyLost,
+    mayCompleteRound,
+    mayApplyLose,
+    applyEnergyDrainWhilePlaying,
     completeRoundTransition,
     windName,
     makeWindForRound,
@@ -465,13 +468,25 @@
       updateWind(dt);
       updateShip(dt);
       updateWake(dt);
-      if (state.mode === "tow") {
-        checkTowGoal(now);
-      } else {
-        checkDock(now);
+      // Crash/energy inside updateShip may have already set phase to lost — do not complete a round after that.
+      if (state.phase === "playing") {
+        if (state.mode === "tow") {
+          checkTowGoal(now);
+        } else {
+          checkDock(now);
+        }
       }
-      state.energy = Math.max(0, state.energy - dt * (0.25 + state.round * 0.05));
-      if (isEnergyLost(state.energy)) loseGame();
+      // Energy only drains while still playing (skip after same-frame completeRound → transition).
+      if (state.phase === "playing") {
+        const drain = applyEnergyDrainWhilePlaying(
+          state.phase,
+          state.energy,
+          dt,
+          0.25 + state.round * 0.05
+        );
+        state.energy = drain.energy;
+        if (drain.lost) loseGame();
+      }
     } else if (state.phase === "transition" && now >= state.nextRoundAt) {
       if (state.round > TOTAL_ROUNDS) {
         winGame();
@@ -616,6 +631,7 @@
   }
 
   function applyCollision(reason, energyLoss) {
+    if (state.phase !== "playing") return;
     const now = performance.now();
     const result = applyCollisionDamage(
       {
@@ -652,6 +668,7 @@
   }
 
   function checkDock(now) {
+    if (state.phase !== "playing" || state.mode === "tow") return;
     const ship = state.ship;
     state.dockReady = isDockReady({
       shipX: ship.x,
@@ -686,6 +703,7 @@
   }
 
   function checkTowGoal() {
+    if (state.phase !== "playing" || state.mode !== "tow") return;
     const ship = state.ship;
     const goalDistance = distance(ship.x, ship.y, state.goal.x, state.goal.y);
     if (state.engineOn && goalDistance < state.goal.r + ship.radius + 4) {
@@ -694,13 +712,16 @@
   }
 
   function completeRound(now, mode = state.mode) {
+    if (!mayCompleteRound(state.phase)) return;
     const speed = Math.hypot(state.ship.vx, state.ship.vy);
     const result = completeRoundTransition(
       state.round,
       state.score,
       state.energy,
-      speed
+      speed,
+      state.phase
     );
+    if (!result) return;
     state.score = result.score;
     state.message =
       mode === "tow"
@@ -713,7 +734,7 @@
       22
     );
     state.round = result.nextRound;
-    state.phase = "transition";
+    state.phase = result.phase; // "transition"
     state.dockReady = false;
     state.nextRoundAt = now + 1200;
     state.danceUntil = now + 1400;
@@ -721,6 +742,7 @@
   }
 
   function winGame() {
+    if (state.phase === "won" || state.phase === "lost") return;
     state.phase = "won";
     state.message = "Beş tur tamamlandı. RHGPO kazandın!";
     spawnParticles(state.ship.x, state.ship.y, "#ffd166", 36);
@@ -729,7 +751,8 @@
   }
 
   function loseGame() {
-    if (state.phase === "lost" || state.phase === "won") return;
+    // Only lose while actively playing — never clobber transition/won after a finish.
+    if (!mayApplyLose(state.phase)) return;
     state.phase = "lost";
     state.message = "Oyun bitti. Tekrar dene.";
     spawnParticles(state.ship.x, state.ship.y, "#ff6b7a", 18);
