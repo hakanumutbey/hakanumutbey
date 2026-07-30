@@ -73,14 +73,18 @@
   let floatTexts = [];
   let beams = [];
 
-  // Parkour state
+  // Parkour state (manual move — no auto-run)
   let runner = null;
   let platforms = [];
+  let hazards = []; // walkers, portals, spikes, meteors
   let camX = 0;
   let distance = 0;
   let parkourAlive = true;
   let stars = [];
   let spawnX = 0;
+  let hazardTimer = 0;
+  /** Three horizontal “paths” — switch by jumping to dodge walkers/portals */
+  const LANES = [GROUND_Y, GROUND_Y - 28, GROUND_Y - 56];
 
   bindUI();
   bindInput();
@@ -171,35 +175,41 @@
   function startParkour() {
     const me = selectedChar();
     runner = {
-      x: 40,
-      y: GROUND_Y - 16,
+      x: 48,
+      y: GROUND_Y,
       vx: 0,
       vy: 0,
       w: 10,
       h: 16,
-      onGround: false,
+      onGround: true,
       color: me.color,
       accent: me.accent,
       speed: me.speed,
       anim: 0,
+      facing: 1,
     };
-    platforms = [
-      { x: 0, y: GROUND_Y, w: 120, h: 8 },
-      { x: 140, y: GROUND_Y - 10, w: 50, h: 8 },
-      { x: 210, y: GROUND_Y, w: 80, h: 8 },
-    ];
+    // Starting triple-path corridor so you can already switch lanes
+    platforms = [];
+    hazards = [];
+    for (let i = 0; i < 4; i += 1) {
+      const x = i * 90;
+      for (const y of LANES) {
+        platforms.push({ x, y, w: 86, h: 8, solid: true });
+      }
+    }
     camX = 0;
     distance = 0;
     parkourAlive = true;
-    spawnX = 300;
+    spawnX = 360;
+    hazardTimer = 1.2;
     stars = makeStars();
-    for (let i = 0; i < 8; i += 1) spawnPlatform();
+    for (let i = 0; i < 6; i += 1) spawnParkourChunk();
     screen = "parkour";
     if (menuPanel) menuPanel.hidden = true;
     if (charPanel) charPanel.hidden = true;
     if (hud) hud.hidden = false;
     if (touchPanel) touchPanel.hidden = false;
-    setHud("Parkur", "0 m");
+    setHud("Parkur", "A/D yuru · zip ile yol degistir");
   }
 
   function makeFighter(char, x, y, facing) {
@@ -245,24 +255,98 @@
     return list;
   }
 
-  function spawnPlatform() {
-    const difficulty = Math.min(1, distance / 400);
-    const gap = 24 + Math.random() * (20 + difficulty * 30);
-    const width = Math.max(28, 70 - difficulty * 35 + Math.random() * 20);
-    const heightVar = Math.floor(Math.random() * 3);
-    const y = GROUND_Y - heightVar * (12 + difficulty * 8);
-    const last = platforms[platforms.length - 1];
-    const x = (last ? last.x + last.w : spawnX) + gap;
-    platforms.push({ x, y, w: width, h: 8 });
-    spawnX = x + width;
-    // hazard spike sometimes
-    if (difficulty > 0.25 && Math.random() < 0.22 + difficulty * 0.2) {
-      platforms.push({
-        x: x + width * 0.3,
-        y: y - 6,
+  /**
+   * Build the next world chunk: multi-lane platforms + optional gaps/spikes.
+   * Walkers/portals spawn on one lane so the player must switch path.
+   */
+  function spawnParkourChunk() {
+    const difficulty = Math.min(1.15, distance / 280);
+    const chunkW = 70 + Math.floor(Math.random() * 30);
+    const gap = 10 + Math.random() * (8 + difficulty * 18);
+    const x0 = spawnX + gap;
+
+    // Always keep at least 2 lanes so dodging is possible
+    const laneMask = [true, Math.random() > 0.2, Math.random() > 0.35];
+    if (!laneMask[1] && !laneMask[2]) laneMask[1] = true;
+    laneMask[0] = true;
+
+    for (let li = 0; li < LANES.length; li += 1) {
+      if (!laneMask[li]) continue;
+      const y = LANES[li];
+      // small internal gap on harder chunks
+      if (difficulty > 0.4 && Math.random() < 0.25) {
+        const half = Math.floor(chunkW * 0.45);
+        platforms.push({ x: x0, y, w: half, h: 8, solid: true });
+        platforms.push({
+          x: x0 + half + 12 + difficulty * 10,
+          y,
+          w: chunkW - half - 12,
+          h: 8,
+          solid: true,
+        });
+      } else {
+        platforms.push({ x: x0, y, w: chunkW, h: 8, solid: true });
+      }
+      // spikes on a lane
+      if (difficulty > 0.15 && Math.random() < 0.18 + difficulty * 0.15) {
+        hazards.push({
+          type: "spike",
+          x: x0 + chunkW * (0.3 + Math.random() * 0.4),
+          y: y - 6,
+          w: 10,
+          h: 6,
+          vx: 0,
+          lane: li,
+        });
+      }
+    }
+
+    spawnX = x0 + chunkW;
+
+    // Approaching portal walker on a random existing lane (walks left toward player)
+    if (Math.random() < 0.55 + difficulty * 0.25) {
+      const openLanes = LANES.map((_, i) => i).filter((i) => laneMask[i]);
+      const lane = openLanes[Math.floor(Math.random() * openLanes.length)];
+      const speed = -(28 + difficulty * 40 + Math.random() * 20);
+      hazards.push({
+        type: "portal",
+        x: spawnX + 40 + Math.random() * 60,
+        y: LANES[lane] - 14,
+        w: 12,
+        h: 14,
+        vx: speed,
+        lane,
+        pulse: Math.random() * Math.PI * 2,
+      });
+    }
+
+    // Straight-walking drone (same idea, different look)
+    if (difficulty > 0.2 && Math.random() < 0.35) {
+      const openLanes = LANES.map((_, i) => i).filter((i) => laneMask[i]);
+      const lane = openLanes[Math.floor(Math.random() * openLanes.length)];
+      hazards.push({
+        type: "walker",
+        x: spawnX + 20,
+        y: LANES[lane] - 12,
+        w: 10,
+        h: 12,
+        vx: -(35 + difficulty * 50),
+        lane,
+        anim: 0,
+      });
+    }
+
+    // Falling meteor from top (dodge by moving)
+    if (difficulty > 0.35 && Math.random() < 0.28) {
+      hazards.push({
+        type: "meteor",
+        x: spawnX - chunkW * 0.5,
+        y: 20,
         w: 8,
-        h: 6,
-        spike: true,
+        h: 8,
+        vx: -10 - Math.random() * 15,
+        vy: 40 + difficulty * 50,
+        lane: -1,
       });
     }
   }
@@ -627,42 +711,37 @@
   function updateParkour(dt) {
     if (!parkourAlive || !runner) return;
 
-    const difficulty = Math.min(1.2, distance / 350);
-    const baseRun = 55 + difficulty * 45;
-    runner.vx = baseRun * runner.speed;
-
-    if (pressed("left")) runner.vx -= 25;
-    if (pressed("right")) runner.vx += 18;
+    const difficulty = Math.min(1.2, distance / 280);
+    // Manual movement only — no auto-forward
+    const moveSpeed = 95 * runner.speed;
+    runner.vx = 0;
+    if (pressed("left")) {
+      runner.vx = -moveSpeed;
+      runner.facing = -1;
+    }
+    if (pressed("right")) {
+      runner.vx = moveSpeed;
+      runner.facing = 1;
+    }
     if (pressed("jump") && runner.onGround) {
-      runner.vy = -175;
+      runner.vy = -195;
       runner.onGround = false;
     }
 
-    runner.vy += 480 * dt;
+    runner.vy += 520 * dt;
     runner.x += runner.vx * dt;
     runner.y += runner.vy * dt;
     runner.onGround = false;
 
+    // Platform collisions (feet on top)
     for (const p of platforms) {
-      if (p.spike) {
-        if (
-          runner.x + runner.w / 2 > p.x &&
-          runner.x - runner.w / 2 < p.x + p.w &&
-          runner.y > p.y - 2 &&
-          runner.y - runner.h < p.y + p.h
-        ) {
-          finishParkour(false);
-          return;
-        }
-        continue;
-      }
-      // land on platform
+      if (!p.solid) continue;
       const feet = runner.y;
       const prevFeet = feet - runner.vy * dt;
       if (
         runner.vy >= 0 &&
-        prevFeet <= p.y &&
-        feet >= p.y &&
+        prevFeet <= p.y + 1 &&
+        feet >= p.y - 1 &&
         runner.x + runner.w / 2 > p.x + 1 &&
         runner.x - runner.w / 2 < p.x + p.w - 1
       ) {
@@ -672,21 +751,79 @@
       }
     }
 
-    // fall
-    if (runner.y > H + 20) {
+    // Don't walk through solid from the side lightly
+    runner.x = Math.max(8, runner.x);
+
+    if (runner.y > H + 24) {
       finishParkour(false);
       return;
     }
 
-    camX = Math.max(0, runner.x - 80);
-    distance = Math.max(distance, runner.x / 8);
-    setHud("Parkur", `${Math.floor(distance)} m · zorluk ${Math.floor(difficulty * 100)}%`);
+    // Hazards
+    for (let i = hazards.length - 1; i >= 0; i -= 1) {
+      const h = hazards[i];
+      if (h.type === "portal" || h.type === "walker") {
+        h.x += h.vx * dt;
+        h.pulse = (h.pulse || 0) + dt * 6;
+        h.anim = (h.anim || 0) + dt * 10;
+        // stay locked to lane height
+        if (h.lane >= 0) h.y = LANES[h.lane] - (h.type === "portal" ? 14 : 12);
+      } else if (h.type === "meteor") {
+        h.x += (h.vx || 0) * dt;
+        h.y += (h.vy || 50) * dt;
+      }
 
-    // recycle platforms
-    platforms = platforms.filter((p) => p.x + p.w > camX - 40);
-    while (spawnX < camX + W + 100) spawnPlatform();
+      if (h.x + h.w < camX - 40 || h.y > H + 30) {
+        hazards.splice(i, 1);
+        continue;
+      }
 
-    runner.anim += dt * 12;
+      if (parkourHitsRunner(h)) {
+        finishParkour(false);
+        return;
+      }
+    }
+
+    camX = Math.max(0, runner.x - 70);
+    distance = Math.max(distance, runner.x / 10);
+    setHud(
+      "Parkur",
+      `${Math.floor(distance)} m · kac: ust yola zip`
+    );
+
+    platforms = platforms.filter((p) => p.x + p.w > camX - 50);
+    hazards = hazards.filter((h) => h.x + (h.w || 0) > camX - 50);
+    while (spawnX < camX + W + 140) spawnParkourChunk();
+
+    // Timed extra portal from the right if world is quiet
+    hazardTimer -= dt;
+    if (hazardTimer <= 0) {
+      hazardTimer = 2.2 - difficulty * 0.8;
+      const lane = Math.floor(Math.random() * LANES.length);
+      hazards.push({
+        type: Math.random() < 0.55 ? "portal" : "walker",
+        x: camX + W + 10,
+        y: LANES[lane] - 14,
+        w: 12,
+        h: 14,
+        vx: -(40 + difficulty * 55),
+        lane,
+        pulse: 0,
+        anim: 0,
+      });
+    }
+
+    runner.anim += dt * (Math.abs(runner.vx) > 5 ? 12 : 4);
+  }
+
+  function parkourHitsRunner(h) {
+    if (!runner) return false;
+    const rx = runner.x;
+    const ry = runner.y - runner.h / 2;
+    return (
+      Math.abs(rx - (h.x + h.w / 2)) < (runner.w + h.w) / 2 &&
+      Math.abs(ry - (h.y + h.h / 2)) < (runner.h + h.h) / 2
+    );
   }
 
   function finishParkour(voluntary) {
@@ -889,27 +1026,63 @@
       ctx.fillRect(Math.floor(sx), Math.floor(s.y), s.s, s.s);
     }
 
-    // planets
     ctx.fillStyle = "#3d2060";
     ctx.fillRect(Math.floor(220 - camX * 0.1), 30, 24, 24);
     ctx.fillStyle = "#5dff9a";
     ctx.fillRect(Math.floor(228 - camX * 0.1), 38, 8, 8);
 
+    // faint lane guides
+    for (const y of LANES) {
+      ctx.fillStyle = "rgba(61,224,255,0.06)";
+      ctx.fillRect(0, Math.floor(y) - 1, W, 1);
+    }
+
     for (const p of platforms) {
       const px = Math.floor(p.x - camX);
       if (px + p.w < 0 || px > W) continue;
-      if (p.spike) {
+      ctx.fillStyle = "#3de0ff";
+      ctx.fillRect(px, Math.floor(p.y), Math.floor(p.w), 2);
+      ctx.fillStyle = "#1a4060";
+      ctx.fillRect(px, Math.floor(p.y) + 2, Math.floor(p.w), Math.floor(p.h));
+    }
+
+    for (const h of hazards) {
+      const hx = Math.floor(h.x - camX);
+      const hy = Math.floor(h.y);
+      if (hx > W + 20 || hx < -20) continue;
+      if (h.type === "spike") {
         ctx.fillStyle = "#ff4d5f";
-        ctx.fillRect(px, Math.floor(p.y), p.w, p.h);
-        // spikes
-        for (let i = 0; i < p.w; i += 4) {
-          ctx.fillRect(px + i, Math.floor(p.y) - 3, 2, 3);
+        for (let i = 0; i < h.w; i += 3) {
+          ctx.fillRect(hx + i, hy, 2, h.h);
+          ctx.fillRect(hx + i, hy - 3, 2, 3);
         }
-      } else {
-        ctx.fillStyle = "#3de0ff";
-        ctx.fillRect(px, Math.floor(p.y), Math.floor(p.w), 2);
-        ctx.fillStyle = "#1a4060";
-        ctx.fillRect(px, Math.floor(p.y) + 2, Math.floor(p.w), Math.floor(p.h));
+      } else if (h.type === "portal") {
+        const pulse = 1 + Math.sin(h.pulse || 0) * 0.2;
+        ctx.fillStyle = "#b44dff";
+        ctx.fillRect(hx, hy, h.w, h.h);
+        ctx.fillStyle = "#ffd24a";
+        ctx.fillRect(hx + 2, hy + 2, Math.max(2, h.w - 4), Math.max(2, h.h - 4));
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(hx + 4, hy + 4, 2, 2);
+        // motion trail
+        ctx.fillStyle = "rgba(180,77,255,0.4)";
+        ctx.fillRect(hx + h.w, hy + 4, Math.floor(8 * pulse), 4);
+      } else if (h.type === "walker") {
+        ctx.fillStyle = "#ff4fd8";
+        ctx.fillRect(hx, hy, h.w, h.h);
+        ctx.fillStyle = "#0a1020";
+        ctx.fillRect(hx + 2, hy + 3, 2, 2);
+        ctx.fillRect(hx + 6, hy + 3, 2, 2);
+        // legs
+        const leg = Math.floor(Math.sin(h.anim || 0) * 2);
+        ctx.fillStyle = "#ff4fd8";
+        ctx.fillRect(hx + 1, hy + h.h, 2, 3 + leg);
+        ctx.fillRect(hx + 6, hy + h.h, 2, 3 - leg);
+      } else if (h.type === "meteor") {
+        ctx.fillStyle = "#ff6b3d";
+        ctx.fillRect(hx, hy, h.w, h.h);
+        ctx.fillStyle = "#ffd24a";
+        ctx.fillRect(hx + 2, hy + 2, 3, 3);
       }
     }
 
@@ -917,13 +1090,22 @@
       drawPixelFighter(
         runner.x - camX,
         runner.y,
-        1,
+        runner.facing || 1,
         runner.color,
         runner.accent,
         runner.anim,
+        false,
         false
       );
     }
+
+    // controls strip for parkour
+    ctx.fillStyle = "rgba(5, 10, 20, 0.72)";
+    ctx.fillRect(4, H - 22, W - 8, 18);
+    ctx.fillStyle = "#e8f4ff";
+    pixelText("A/D YURU  W ZIPLA", 8, H - 16, 1);
+    ctx.fillStyle = "#b44dff";
+    pixelText("PORTAL=UST YOL", 140, H - 16, 1);
 
     ctx.fillStyle = "#ffd24a";
     pixelText(`${Math.floor(distance)}m`, 8, 12, 1);
