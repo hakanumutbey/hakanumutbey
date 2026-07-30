@@ -33,16 +33,16 @@
             <p id="hintLabel">WASD / ok tuşları ile sür, Space veya E ile park et.</p>
           </div>
           <div class="touch-controls" aria-label="Dokunmatik kontroller">
-            <button data-action="left">◀</button>
-            <button data-action="forward">▲</button>
-            <button data-action="dock">E</button>
-            <button data-action="reverse">▼</button>
-            <button data-action="right">▶</button>
+            <button type="button" data-action="left">◀</button>
+            <button type="button" data-action="forward">▲</button>
+            <button type="button" data-action="dock">E</button>
+            <button type="button" data-action="reverse">▼</button>
+            <button type="button" data-action="right">▶</button>
           </div>
           <div class="tow-controls" data-tow-controls hidden aria-label="Halat ve motor kontrolleri">
-            <button data-action="rope-left">Sol halat</button>
-            <button data-action="engine">Motor aç/kapa (E)</button>
-            <button data-action="rope-right">Sağ halat</button>
+            <button type="button" data-action="rope-left">Sol halat</button>
+            <button type="button" data-action="engine">Motor aç/kapa (E)</button>
+            <button type="button" data-action="rope-right">Sağ halat</button>
           </div>
         </div>
       </section>
@@ -63,16 +63,17 @@
           <h2>Kurallar</h2>
           <ul>
             <li>Park: rüzgarlı limana yanaş, yavaşla ve açıyı tut; yeşil olunca Space / E bas (otomatik park yok).</li>
-            <li>Motor: ekrandaki sırayla sol (Q) / sağ (E) halatı çek.</li>
+            <li>Motor: ekrandaki sırayla sol (Q) / sağ (E) halatı çek (önce rüzgarın tersi, sonra rüzgar yönü).</li>
             <li>Halatlar bitince E veya Space ile motoru aç/kapat; mavi çıkışa git.</li>
-            <li>Motor turunda üç ağır çarpma olursa oyun biter.</li>
+            <li>Motor turunda üç ağır çarpma olursa oyun biter. Enerji bitince de kaybedersin.</li>
+            <li>Beş tur (park → motor → park → motor → park) tamamlanınca kazanırsın.</li>
           </ul>
         </article>
         <article class="panel">
           <h2>İpuçları</h2>
           <ul>
             <li>Ekrandaki ok rüzgarın yönünü gösterir.</li>
-            <li>Liman yeşile dönerse park için hazırsın.</li>
+            <li>Liman yeşile dönerse park için hazırsın — Space / E ile onayla.</li>
             <li>Halat sırasında ekranda 1 → 2 adımları görünür.</li>
             <li>Kayalara ve şamandıralara çarpmadan ilerle.</li>
           </ul>
@@ -80,6 +81,8 @@
       </section>
     </main>
 
+    <!-- Plain scripts (file:// and static server friendly; no ES modules). -->
+    <script src="./logic.js"></script>
     <script src="./game.js" defer></script>
   </body>
 </html>
