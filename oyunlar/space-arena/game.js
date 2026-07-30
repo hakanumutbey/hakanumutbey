@@ -61,7 +61,10 @@
   const save = loadSave();
   let screen = "menu"; // menu | chars | fight | parkour | result
   let resultMsg = "";
+  let resultSub = "";
   let resultCoins = 0;
+  /** "winner" | "gameover" | "info" — colors WINNER green, GAME OVER red */
+  let resultKind = "info";
   let last = performance.now();
   let anim = 0;
 
@@ -77,9 +80,15 @@
   let runner = null;
   let platforms = [];
   let hazards = []; // walkers, portals, spikes, meteors
+  let checkpoints = []; // blue flags
   let camX = 0;
   let distance = 0;
   let parkourAlive = true;
+  let parkourLives = 5;
+  const PARKOUR_MAX_LIVES = 5;
+  let parkourIFrames = 0;
+  let lastCheckpoint = { x: 48, y: GROUND_Y, camX: 0 };
+  let nextCheckpointAt = 80;
   let stars = [];
   let spawnX = 0;
   let hazardTimer = 0;
@@ -196,9 +205,9 @@
       maxJumps: 2,
     };
     sling = { charging: false, power: 0, wasHeld: false };
-    // Starting triple-path corridor so you can already switch lanes
     platforms = [];
     hazards = [];
+    checkpoints = [];
     for (let i = 0; i < 4; i += 1) {
       const x = i * 90;
       for (const y of LANES) {
@@ -208,18 +217,22 @@
     camX = 0;
     distance = 0;
     parkourAlive = true;
+    parkourLives = PARKOUR_MAX_LIVES;
+    parkourIFrames = 0;
+    lastCheckpoint = { x: 48, y: GROUND_Y, camX: 0 };
+    nextCheckpointAt = 70;
+    // Start blue flag
+    checkpoints.push({ x: 40, y: GROUND_Y, activated: true });
     spawnX = 360;
-    // Safe start: no timed spawns until player has walked a bit
     hazardTimer = 4;
     stars = makeStars();
-    // Only build empty multi-lane path first — obstacles unlock with distance
     for (let i = 0; i < 5; i += 1) spawnParkourChunk({ forceSafe: true });
     screen = "parkour";
     if (menuPanel) menuPanel.hidden = true;
     if (charPanel) charPanel.hidden = true;
     if (hud) hud.hidden = false;
     if (touchPanel) touchPanel.hidden = false;
-    setHud("Parkur", "Ilerle — engeller yolda cikar");
+    setHud("Parkur", `5 hak · mavi bayrak = checkpoint`);
   }
 
   function makeFighter(char, x, y, facing) {
@@ -320,6 +333,16 @@
     spawnX = x0 + chunkW;
     const openLanes = LANES.map((_, i) => i).filter((i) => laneMask[i]);
 
+    // Blue checkpoint flags along the bottom path as you go
+    if (!forceSafe && spawnX >= nextCheckpointAt) {
+      checkpoints.push({
+        x: x0 + 8,
+        y: LANES[0],
+        activated: false,
+      });
+      nextCheckpointAt = spawnX + 90 + Math.random() * 50;
+    }
+
     if (allowPortals && Math.random() < 0.2 + dens * 0.45) {
       const lane = openLanes[Math.floor(Math.random() * openLanes.length)];
       const speed = -(28 + dens * 50 + Math.random() * 20);
@@ -394,22 +417,50 @@
       if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) {
         e.preventDefault();
       }
+      // Result screens: click OR Enter/Space/Esc to continue
+      if (screen === "result") {
+        if (e.code === "Enter" || e.code === "Space" || e.code === "Escape") {
+          e.preventDefault();
+          dismissResult();
+        }
+        return;
+      }
       if (e.code === "Escape") {
         e.preventDefault();
-        if (screen === "fight" || screen === "parkour" || screen === "result") {
-          endToMenu(0, "Menüye döndün.");
+        if (screen === "fight") {
+          showResultScreen(0, "GAME OVER", "Esc — menuye", "gameover");
+        } else if (screen === "parkour") {
+          const coins = Math.max(0, Math.floor(distance / 4));
+          if (coins > 0) {
+            save.coins += coins;
+            persist();
+            updateCoinUI();
+          }
+          showResultScreen(coins, "GAME OVER", `Esc · ${Math.floor(distance)} m`, "gameover");
         } else if (screen === "chars") showMenu();
-      }
-      if (screen === "result" && (e.code === "Enter" || e.code === "Space")) {
-        showMenu();
       }
     });
     window.addEventListener("keyup", (e) => keys.delete(e.code));
+
+    // Click / tap on canvas or page to dismiss WINNER / GAME OVER
+    const dismiss = (ev) => {
+      if (screen !== "result") return;
+      ev.preventDefault();
+      dismissResult();
+    };
+    canvas.addEventListener("pointerdown", dismiss);
+    window.addEventListener("pointerdown", (ev) => {
+      if (screen === "result") dismiss(ev);
+    });
 
     document.querySelectorAll("[data-k]").forEach((btn) => {
       const k = btn.dataset.k;
       const down = (ev) => {
         ev.preventDefault();
+        if (screen === "result") {
+          dismissResult();
+          return;
+        }
         touch.add(k);
       };
       const up = (ev) => {
@@ -421,6 +472,11 @@
       btn.addEventListener("pointerleave", up);
       btn.addEventListener("pointercancel", up);
     });
+  }
+
+  function dismissResult() {
+    if (screen !== "result") return;
+    showMenu();
   }
 
   function pressed(name) {
@@ -483,10 +539,14 @@
     last = now;
     anim += dt;
     if (screen === "fight") updateFight(dt);
-    else if (screen === "parkour") updateParkour(dt);
-    else if (screen === "result") {
-      /* idle */
+    else if (screen === "parkour") {
+      updateParkour(dt);
+      // age float texts in parkour
+      floatTexts = floatTexts
+        .map((t) => ({ ...t, y: t.y - 18 * dt, life: t.life - dt }))
+        .filter((t) => t.life > 0);
     }
+    // result: frozen until click
     draw();
     requestAnimationFrame(loop);
   }
@@ -737,7 +797,11 @@
     save.coins += coins;
     persist();
     updateCoinUI();
-    endToMenu(coins, won ? `Kazandın! +${coins} SpaceCoin` : `Kaybettin. +${coins} SpaceCoin (teselli)`);
+    if (won) {
+      showResultScreen(coins, "WINNER", `+${coins} SpaceCoin · tikla`, "winner");
+    } else {
+      showResultScreen(coins, "GAME OVER", `+${coins} SpaceCoin · tikla`, "gameover");
+    }
   }
 
   function updateParkour(dt) {
@@ -848,12 +912,32 @@
       runner.jumpsLeft = runner.maxJumps;
     }
 
-    // Don't walk through solid from the side lightly
     runner.x = Math.max(8, runner.x);
+    parkourIFrames = Math.max(0, parkourIFrames - dt);
 
+    // Fall off = 1 damage / life
     if (runner.y > H + 24) {
-      finishParkour(false);
+      parkourTakeHit("dustun");
       return;
+    }
+
+    // Activate blue flag checkpoints
+    for (const cp of checkpoints) {
+      if (cp.activated) continue;
+      if (
+        Math.abs(runner.x - cp.x) < 14 &&
+        Math.abs(runner.y - cp.y) < 20
+      ) {
+        cp.activated = true;
+        lastCheckpoint = { x: cp.x + 6, y: cp.y, camX: Math.max(0, cp.x - 70) };
+        floatTexts.push({
+          x: cp.x,
+          y: cp.y - 20,
+          text: "BAYRAK",
+          life: 0.9,
+          color: "#3de0ff",
+        });
+      }
     }
 
     // Hazards
@@ -867,12 +951,10 @@
       } else if (h.type === "meteor") {
         h.age = (h.age || 0) + dt;
         const t = Math.min(1, h.age / (h.fallTime || 1.5));
-        // ease-in fall toward impact mark
         const ease = t * t;
         h.x = h.startX + (h.impactX - h.startX) * ease;
         h.y = h.startY + (h.impactY - 8 - h.startY) * ease;
         if (t >= 1) {
-          // splash then remove — still deadly on the mark for a blink
           h.landed = true;
           h.x = h.impactX;
           h.y = h.impactY - 8;
@@ -891,32 +973,31 @@
         continue;
       }
 
-      if (parkourHitsRunner(h)) {
-        finishParkour(false);
+      if (parkourIFrames <= 0 && parkourHitsRunner(h)) {
+        // remove hazard so it doesn't multi-hit same frame
+        if (h.type === "spike" || h.type === "meteor") {
+          /* keep spikes */
+        } else {
+          hazards.splice(i, 1);
+        }
+        parkourTakeHit("hasar");
         return;
       }
     }
 
     camX = Math.max(0, runner.x - 70);
     distance = Math.max(distance, runner.x / 10);
-    const nextHint =
-      distance < 12
-        ? "guvenli bolge — ilerle"
-        : distance < 22
-          ? "diken/portal basliyor"
-          : distance < 35
-            ? "yuruyen engeller"
-            : "meteor yagiyor!";
     const slingHud = sling.charging
       ? `sapan ${Math.floor(sling.power * 100)}%`
       : "L sapan";
     setHud(
       "Parkur",
-      `${Math.floor(distance)} m · cift zip · ${slingHud} · ${nextHint}`
+      `${Math.floor(distance)} m · hak ${parkourLives}/${PARKOUR_MAX_LIVES} · ${slingHud}`
     );
 
     platforms = platforms.filter((p) => p.x + p.w > camX - 50);
     hazards = hazards.filter((h) => h.x + (h.w || 0) > camX - 50);
+    checkpoints = checkpoints.filter((c) => c.x > camX - 80);
     while (spawnX < camX + W + 140) spawnParkourChunk();
 
     // Timed spawns only after progress — more often the farther you go
@@ -963,32 +1044,60 @@
     );
   }
 
-  function finishParkour(voluntary) {
-    if (!parkourAlive) return;
-    parkourAlive = false;
-    const coins = Math.max(1, Math.floor(distance / 4));
-    save.coins += coins;
-    persist();
-    updateCoinUI();
-    endToMenu(
-      coins,
-      voluntary
-        ? `Parkur bitti. +${coins} SpaceCoin`
-        : `${Math.floor(distance)} m! +${coins} SpaceCoin`
-    );
+  /** 1 damage; respawn at last blue flag; 5th hit = GAME OVER */
+  function parkourTakeHit(reason) {
+    if (!parkourAlive || !runner) return;
+    if (parkourIFrames > 0) return;
+    parkourLives -= 1;
+    if (parkourLives <= 0) {
+      parkourAlive = false;
+      const coins = Math.max(0, Math.floor(distance / 4));
+      if (coins > 0) {
+        save.coins += coins;
+        persist();
+        updateCoinUI();
+      }
+      showResultScreen(
+        coins,
+        "GAME OVER",
+        `${Math.floor(distance)} m · +${coins} SC · tikla`,
+        "gameover"
+      );
+      return;
+    }
+    // Respawn at last blue checkpoint
+    runner.x = lastCheckpoint.x;
+    runner.y = lastCheckpoint.y;
+    runner.vx = 0;
+    runner.vy = 0;
+    runner.onGround = true;
+    runner.jumpsLeft = runner.maxJumps;
+    camX = lastCheckpoint.camX;
+    parkourIFrames = 1.6;
+    sling = { charging: false, power: 0, wasHeld: false };
+    floatTexts.push({
+      x: runner.x,
+      y: runner.y - 24,
+      text: `-${1} HAK`,
+      life: 1,
+      color: "#ff6b8a",
+    });
+    setHud("Parkur", `hasar (${reason}) · kalan ${parkourLives}`);
   }
 
-  function endToMenu(coins, msg) {
+  function showResultScreen(coins, title, sub, kind) {
     screen = "result";
     resultCoins = coins;
-    resultMsg = msg;
+    resultMsg = title;
+    resultSub = sub || "";
+    resultKind = kind || "info";
+    parkourAlive = false;
     if (touchPanel) touchPanel.hidden = true;
     if (hud) hud.hidden = false;
-    setHud("Sonuç", msg);
-    // brief then allow click — auto menu after 2.5s via timer on next inputs
-    setTimeout(() => {
-      if (screen === "result") showMenu();
-    }, 2800);
+    if (menuPanel) menuPanel.hidden = true;
+    if (charPanel) charPanel.hidden = true;
+    setHud("Sonuc", `${title} · tikla / Enter`);
+    // NO auto-advance — user must click the text / screen
   }
 
   // ——— Draw (pixel) ———
@@ -1037,12 +1146,45 @@
   }
 
   function drawResultOverlay() {
-    ctx.fillStyle = "rgba(5,8,16,0.55)";
-    ctx.fillRect(40, 60, W - 80, 50);
-    ctx.fillStyle = "#5dff9a";
-    pixelText(resultMsg.slice(0, 28), 50, 78, 1);
-    ctx.fillStyle = "#8aa8c4";
-    pixelText("Menuye donuluyor...", 50, 94, 1);
+    // Dim whole arena
+    ctx.fillStyle = "rgba(4, 8, 16, 0.72)";
+    ctx.fillRect(0, 0, W, H);
+
+    const isWin = resultKind === "winner";
+    const isOver = resultKind === "gameover";
+    const titleColor = isWin ? "#5dff9a" : isOver ? "#ff3b4a" : "#ffd24a";
+    const title = (resultMsg || "SONUC").toUpperCase();
+
+    // Big centered title (green WINNER / red GAME OVER)
+    const scale = title.length > 8 ? 2 : 3;
+    const tw = title.length * 4 * scale;
+    const tx = Math.floor((W - tw) / 2);
+    const ty = 58;
+    ctx.fillStyle = titleColor;
+    pixelText(title, tx, ty, scale);
+
+    // Glow bar under title
+    ctx.fillStyle = titleColor;
+    ctx.globalAlpha = 0.35;
+    ctx.fillRect(tx - 4, ty + 5 * scale + 4, tw + 8, 3);
+    ctx.globalAlpha = 1;
+
+    ctx.fillStyle = "#e8f4ff";
+    const sub = (resultSub || "").slice(0, 34);
+    pixelText(sub, Math.max(8, Math.floor((W - sub.length * 4) / 2)), 100, 1);
+
+    // Click hint — always visible
+    const hint = "TIKLA VEYA ENTER";
+    ctx.fillStyle = isWin ? "#8affb0" : isOver ? "#ff8899" : "#ffd24a";
+    const pulse = 0.55 + Math.sin(anim * 6) * 0.45;
+    ctx.globalAlpha = pulse;
+    pixelText(hint, Math.floor((W - hint.length * 4) / 2), 128, 1);
+    ctx.globalAlpha = 1;
+
+    // Clickable-looking box
+    ctx.strokeStyle = titleColor;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(36, 48, W - 72, 100);
   }
 
   function drawFight() {
@@ -1179,13 +1321,28 @@
       const px = Math.floor(p.x - camX);
       if (px + p.w < 0 || px > W) continue;
       if (!isInVision(p.x, p.w)) {
-        // Hidden ahead — only rare ghost pixel so fog feels deep (no real layout leak)
         continue;
       }
       ctx.fillStyle = "#3de0ff";
       ctx.fillRect(px, Math.floor(p.y), Math.floor(p.w), 2);
       ctx.fillStyle = "#1a4060";
       ctx.fillRect(px, Math.floor(p.y) + 2, Math.floor(p.w), Math.floor(p.h));
+    }
+
+    // Blue checkpoint flags
+    for (const cp of checkpoints) {
+      const fx = Math.floor(cp.x - camX);
+      const fy = Math.floor(cp.y);
+      if (fx < -10 || fx > W + 10) continue;
+      if (!isInVision(cp.x, 12) && !cp.activated) continue;
+      // pole
+      ctx.fillStyle = "#c0d0e0";
+      ctx.fillRect(fx, fy - 22, 2, 22);
+      // flag (blue)
+      ctx.fillStyle = cp.activated ? "#5dff9a" : "#2080ff";
+      ctx.fillRect(fx + 2, fy - 22, 12, 8);
+      ctx.fillStyle = cp.activated ? "#c8ffe0" : "#60b0ff";
+      ctx.fillRect(fx + 3, fy - 20, 4, 4);
     }
 
     // Fog wall ahead: can't see platform layout — must slingshot / double-jump into the unknown
@@ -1256,16 +1413,19 @@
     }
 
     if (runner) {
-      drawPixelFighter(
-        runner.x - camX,
-        runner.y,
-        runner.facing || 1,
-        runner.color,
-        runner.accent,
-        runner.anim,
-        false,
-        false
-      );
+      // blink while invincible after hit
+      if (parkourIFrames <= 0 || Math.floor(anim * 12) % 2 === 0) {
+        drawPixelFighter(
+          runner.x - camX,
+          runner.y,
+          runner.facing || 1,
+          runner.color,
+          runner.accent,
+          runner.anim,
+          false,
+          false
+        );
+      }
       // slingshot rubber band while charging
       if (sling.charging && sling.power > 0) {
         const sx = Math.floor(runner.x - camX);
@@ -1301,9 +1461,19 @@
 
     ctx.fillStyle = "#ffd24a";
     pixelText(`${Math.floor(distance)}m`, 8, 12, 1);
+    // lives hearts
+    ctx.fillStyle = "#ff6b8a";
+    pixelText(`HAK${parkourLives}`, 8, 22, 1);
     if (runner) {
       ctx.fillStyle = runner.jumpsLeft >= 2 ? "#5dff9a" : runner.jumpsLeft === 1 ? "#ffd24a" : "#ff6b8a";
       pixelText(`ZIP${runner.jumpsLeft}`, W - 40, 12, 1);
+    }
+    // floating damage texts
+    for (const t of floatTexts) {
+      ctx.globalAlpha = Math.max(0, t.life);
+      ctx.fillStyle = t.color;
+      pixelText(t.text, Math.floor(t.x - camX - 8), Math.floor(t.y), 1);
+      ctx.globalAlpha = 1;
     }
   }
 
