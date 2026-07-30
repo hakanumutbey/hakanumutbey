@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta http-equiv="cache-control" content="no-store" />
+    <title>Space Arena</title>
+    <link rel="stylesheet" href="styles.css?v=1" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="top">
+        <div>
+          <p class="eyebrow">Hakorocks · 2D piksel</p>
+          <h1>Space Arena</h1>
+          <p class="tagline">Dövüş veya sonsuz parkur. SpaceCoin topla, 10 karakteri aç.</p>
+        </div>
+        <div class="coin-box" aria-label="SpaceCoin">
+          <span>SpaceCoin</span>
+          <strong id="coinLabel">0</strong>
+        </div>
+      </header>
+
+      <section class="stage">
+        <canvas id="game" width="320" height="180" aria-label="Space Arena oyun alanı"></canvas>
+        <div id="hud" class="hud" hidden>
+          <div><span>Mod</span><strong id="modeLabel">—</strong></div>
+          <div><span>Durum</span><strong id="statusLabel">—</strong></div>
+          <div><span>Karakter</span><strong id="charLabel">Nova</strong></div>
+        </div>
+      </section>
+
+      <section id="menuPanel" class="panel menu-panel">
+        <h2>Mod seç</h2>
+        <div class="mode-row">
+          <button type="button" id="btnFight" class="big fight">Dövüş</button>
+          <button type="button" id="btnParkour" class="big parkour">Parkur</button>
+        </div>
+        <p class="hint">
+          Dövüş: rastgele rakiple kapış, kazanırsan SpaceCoin.<br />
+          Parkur: ne kadar gidersen o kadar coin; gittikçe zorlaşır.
+        </p>
+        <button type="button" id="btnChars" class="secondary">Karakterler (10)</button>
+      </section>
+
+      <section id="charPanel" class="panel char-panel" hidden>
+        <div class="char-head">
+          <h2>Karakterler</h2>
+          <button type="button" id="btnCharBack" class="secondary">Geri</button>
+        </div>
+        <p class="hint">Seçtiğin karakter dövüş ve parkurda kullanılır. Kilitliler SpaceCoin ile açılır.</p>
+        <div id="charGrid" class="char-grid"></div>
+      </section>
+
+      <section id="touchPanel" class="touch" hidden aria-label="Dokunmatik kontroller">
+        <div class="touch-move">
+          <button type="button" data-k="left">◀</button>
+          <button type="button" data-k="up">▲</button>
+          <button type="button" data-k="right">▶</button>
+          <button type="button" data-k="down">▼</button>
+        </div>
+        <div class="touch-act">
+          <button type="button" data-k="punch" class="act">Yumruk</button>
+          <button type="button" data-k="kick" class="act kick">Tekme</button>
+          <button type="button" data-k="jump" class="act jump">Zıpla</button>
+        </div>
+      </section>
+
+      <section class="panel controls-help">
+        <h2>Kontroller</h2>
+        <ul>
+          <li><strong>A/D</strong> veya oklar — hareket</li>
+          <li><strong>W / Space</strong> — zıpla</li>
+          <li><strong>J</strong> — yumruk · <strong>K</strong> — tekme</li>
+          <li><strong>Esc</strong> — menüye dön</li>
+        </ul>
+      </section>
+    </main>
+
+    <script src="./game.js?v=1" defer></script>
+  </body>
+</html>

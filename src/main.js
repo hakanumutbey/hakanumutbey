@@ -237,6 +237,22 @@ const games = [
     updates: ["11 seviyeli vaka sistemi eklendi", "5 bulmaca türü: çark, kod, sinyal, yapboz, fark", "Kolay mod ve ilerleme kaydı hazır"],
     stockBase: 140,
   },
+  {
+    slug: "space-arena",
+    title: "Space Arena",
+    path: "/oyunlar/space-arena/",
+    type: "Piksel Dövüş / Parkur",
+    status: "Oynanabilir",
+    description: "2D piksel yan görünüm: rastgele rakiple dövüş veya sonsuz parkur. SpaceCoin topla, 10 karakteri aç.",
+    longDescription: "Space Arena — yumruk ve tekme ile dövüş, rastgele bot rakip; ya da gittikçe zorlaşan sonsuz parkurda mesafe koş. SpaceCoin ile 10 uzay savaşçısını aç. Tamamen piksel grafik.",
+    accent: "cosmos",
+    controls: "WASD/oklar, Space zıpla, J yumruk, K tekme · dokunmatik",
+    mobileStatus: "Mobil uyumlu",
+    mobileNote: "Ekran altı hareket ve yumruk/tekme/zıpla düğmeleri var.",
+    achievements: ["İlk dövüşü kazan", "100 m parkur", "Tüm karakterleri aç"],
+    updates: ["Dövüş ve parkur modları", "10 kilitli karakter + SpaceCoin", "Piksel 2D yan görünüm"],
+    stockBase: 188,
+  },
 ];
 
 const FUSION_GAME_PATH = "/oyunlar/birlesim-arenasi/";

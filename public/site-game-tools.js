@@ -12,6 +12,12 @@ const gameTitles = {
   "birlesim-arenasi": "Birleşim Arenası",
   vale: "Vale",
   "robot-avcisi": "Robot Avcısı",
+  "space-arena": "Space Arena",
+  hentw: "HENTW",
+  hentw2: "HENTW 2",
+  hentw3: "HENTW 3",
+  "hentw-premium": "HENTW Premium",
+  "siber-polis": "Siber Polis",
 };
 
 const keyBindings = {
@@ -83,6 +89,11 @@ const mobileControlConfigs = {
       { label: "Tam", code: "KeyF" },
     ],
   },
+  "space-arena": {
+    hint: "Space Arena kendi dokunmatik paneline sahip (yumruk / tekme / zıpla).",
+    look: false,
+    actions: [],
+  },
 };
 
 localStorage.setItem(sessionKey, sessionId);
@@ -92,6 +103,7 @@ if (slug) {
   injectMobileGameShell();
   injectMobileGamepad();
   injectPhotoHint();
+  injectStudioCredit();
   sendJson("/api/game-open", { sessionId, slug });
   heartbeat();
   setInterval(heartbeat, 10000);
@@ -114,6 +126,41 @@ if (window.__hakorocksFusionPlayed) {
 
 function createSessionId() {
   return crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+/** Footer on every game page: Hakorocks Studios credit */
+function injectStudioCredit() {
+  if (document.querySelector("[data-hakorocks-studio-credit]")) return;
+  const style = document.createElement("style");
+  style.setAttribute("data-hakorocks-studio-credit-style", "1");
+  style.textContent = `
+    [data-hakorocks-studio-credit] {
+      display: block;
+      width: 100%;
+      margin: 28px 0 0;
+      padding: 16px 12px 28px;
+      text-align: center;
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: rgba(200, 220, 240, 0.72);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      background: transparent;
+    }
+    [data-hakorocks-studio-credit] span {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(85, 214, 255, 0.22);
+      background: rgba(8, 14, 24, 0.55);
+    }
+  `;
+  document.head.appendChild(style);
+  const footer = document.createElement("footer");
+  footer.setAttribute("data-hakorocks-studio-credit", "1");
+  footer.innerHTML = "<span>Hakorocks Studios tarafından yapılmıştır</span>";
+  document.body.appendChild(footer);
 }
 
 function deviceType() {

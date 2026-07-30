@@ -25,7 +25,7 @@ const githubApiBase = process.env.GITHUB_API_BASE || "https://api.github.com";
 const sessions = new Map();
 const voiceRooms = new Map();
 const siyahAdamRooms = new Map();
-const games = ["annenden-kac", "bardak", "essiz-zindan", "skeleton-wars", "rhgpo", "siyah-adam", "birlesim-arenasi", "vale", "robot-avcisi", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis"];
+const games = ["annenden-kac", "bardak", "essiz-zindan", "skeleton-wars", "rhgpo", "siyah-adam", "birlesim-arenasi", "vale", "robot-avcisi", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "space-arena"];
 const baseValues = {
   "annenden-kac": 128,
   bardak: 96,
