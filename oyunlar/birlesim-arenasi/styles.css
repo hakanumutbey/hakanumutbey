@@ -153,7 +153,9 @@ canvas {
   display: block;
   width: 100%;
   aspect-ratio: 16 / 9;
-  background: #101820;
+  /* Never pure black — empty buffer still looks like a playable field */
+  background: linear-gradient(160deg, #1a4a5c 0%, #123040 45%, #0c2430 100%);
+  border-radius: 8px;
 }
 
 .arena-hud {

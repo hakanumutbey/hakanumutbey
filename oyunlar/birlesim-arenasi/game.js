@@ -1,5 +1,5 @@
 const canvas = document.querySelector("#arena");
-const ctx = canvas.getContext("2d");
+const ctx = canvas ? canvas.getContext("2d") : null;
 const startButton = document.querySelector("#startButton");
 const restartButton = document.querySelector("#restartButton");
 const statusText = document.querySelector("#statusText");
@@ -7,6 +7,10 @@ const timeLabel = document.querySelector("#timeLabel");
 const teamLabel = document.querySelector("#teamLabel");
 const p1Label = document.querySelector("#p1Label");
 const p2Label = document.querySelector("#p2Label");
+
+if (!canvas || !ctx) {
+  console.error("Birleşim Arenası: canvas bulunamadı.");
+}
 
 const games = [
   {
@@ -114,22 +118,41 @@ let sourcePulse = 0;
 
 setupPage();
 resetGame();
-requestAnimationFrame(loop);
+if (ctx) requestAnimationFrame(loop);
 
-startButton.addEventListener("click", () => {
-  if (!started || finished) resetGame();
+if (startButton) {
+  startButton.addEventListener("click", () => {
+    if (!started || finished) resetGame();
+    started = true;
+    finished = false;
+    markFusionPlayed();
+    setStatus("Birleşim başladı: iki oyunun özellikleri aynı arenada.");
+  });
+}
+
+if (restartButton) {
+  restartButton.addEventListener("click", () => {
+    resetGame();
+    started = true;
+    finished = false;
+    markFusionPlayed();
+    setStatus("Yeni tur başladı.");
+  });
+}
+
+// Deep-link from homepage: start immediately so it doesn't look "stuck empty".
+if (params.get("base") || params.get("source") || params.get("autostart") === "1") {
   started = true;
   finished = false;
   markFusionPlayed();
-  setStatus("Birleşim başladı: iki oyunun özellikleri aynı arenada.");
-});
-
-restartButton.addEventListener("click", () => {
-  resetGame();
-  started = true;
-  markFusionPlayed();
-  setStatus("Yeni tur başladı.");
-});
+  if (fusion.invalidParams) {
+    setStatus(
+      `Bu birleşim arenada yoktu; bugünün çiftine geçildi: ${fusion.base.title} + ${fusion.source.title}. Oyna!`
+    );
+  } else {
+    setStatus("Birleşim başladı: iki oyunun özellikleri aynı arenada.");
+  }
+}
 
 window.addEventListener("keydown", (event) => {
   keys.add(event.code);
@@ -157,14 +180,27 @@ document.querySelectorAll("[data-touch]").forEach((button) => {
 });
 
 function setupPage() {
-  document.querySelector("#fusionTitle").textContent = `${fusion.base.title} + ${fusion.source.title}`;
-  document.querySelector("#fusionSummary").textContent =
-    `${fusion.base.title} oyunundan ${fusion.base.objective}, ${fusion.source.title} oyunundan ${fusion.source.power} alındı.`;
-  document.querySelector("#baseFeature").textContent = `${fusion.base.title}: ${fusion.base.objective}`;
-  document.querySelector("#baseDescription").textContent =
-    `Arena ${fusion.base.arena}; toplanacak hedef ${fusion.base.objectName}.`;
-  document.querySelector("#sourceFeature").textContent = `${fusion.source.title}: ${fusion.source.power}`;
-  document.querySelector("#sourceDescription").textContent = fusion.source.rule;
+  const set = (sel, value) => {
+    const el = document.querySelector(sel);
+    if (el) el.textContent = value;
+  };
+  set("#fusionTitle", `${fusion.base.title} + ${fusion.source.title}`);
+  set(
+    "#fusionSummary",
+    `${fusion.base.title} oyunundan ${fusion.base.objective}, ${fusion.source.title} oyunundan ${fusion.source.power} alındı.`
+  );
+  set("#baseFeature", `${fusion.base.title}: ${fusion.base.objective}`);
+  set(
+    "#baseDescription",
+    `Arena ${fusion.base.arena}; toplanacak hedef ${fusion.base.objectName}.`
+  );
+  set("#sourceFeature", `${fusion.source.title}: ${fusion.source.power}`);
+  set("#sourceDescription", fusion.source.rule);
+  if (fusion.invalidParams) {
+    setStatus(
+      `Bu birleşim arenada yoktu; bugünün çiftine geçildi: ${fusion.base.title} + ${fusion.source.title}.`
+    );
+  }
 }
 
 function resetGame() {
@@ -400,6 +436,7 @@ function finishGame(message) {
 }
 
 function draw(dt) {
+  if (!ctx || !canvas) return;
   drawBackground();
   drawSourceZones();
   items.forEach(drawItem);
@@ -407,14 +444,39 @@ function draw(dt) {
   hazards.forEach(drawHazard);
   players.forEach(drawPlayer);
   updateParticles(dt);
+  if (!started || finished) drawIdleBanner();
+}
+
+function drawIdleBanner() {
+  ctx.save();
+  ctx.fillStyle = "rgba(4, 16, 24, 0.45)";
+  ctx.fillRect(0, canvas.height / 2 - 70, canvas.width, 140);
+  ctx.fillStyle = "#f7f4ea";
+  ctx.font = "900 42px system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(
+    finished ? "Tur bitti — Yenile veya Başlat" : "Başlat'a bas ve topla!",
+    canvas.width / 2,
+    canvas.height / 2 - 8
+  );
+  ctx.font = "700 20px system-ui, sans-serif";
+  ctx.fillStyle = fusion.base.color;
+  ctx.fillText(
+    `${fusion.base.title} + ${fusion.source.title}`,
+    canvas.width / 2,
+    canvas.height / 2 + 32
+  );
+  ctx.textAlign = "start";
+  ctx.restore();
 }
 
 function drawBackground() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // Brighter field so arena never looks like a blank/black broken screen
   const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-  gradient.addColorStop(0, "#0b1117");
-  gradient.addColorStop(0.5, mixColor(fusion.base.color, "#0b1117", 0.78));
-  gradient.addColorStop(1, mixColor(fusion.source.color, "#0b1117", 0.78));
+  gradient.addColorStop(0, "#16485a");
+  gradient.addColorStop(0.45, mixColor(fusion.base.color, "#123848", 0.55));
+  gradient.addColorStop(1, mixColor(fusion.source.color, "#0f2c3c", 0.55));
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -688,14 +750,14 @@ function shadowZone() {
 }
 
 function updateLabels() {
-  timeLabel.textContent = Math.ceil(timeLeft);
-  teamLabel.textContent = Math.floor(teamScore);
-  p1Label.textContent = Math.floor(players[0].score);
-  p2Label.textContent = Math.floor(players[1].score);
+  if (timeLabel) timeLabel.textContent = String(Math.ceil(timeLeft));
+  if (teamLabel) teamLabel.textContent = String(Math.floor(teamScore));
+  if (p1Label) p1Label.textContent = String(Math.floor(players[0].score));
+  if (p2Label) p2Label.textContent = String(Math.floor(players[1].score));
 }
 
 function setStatus(message) {
-  statusText.textContent = message;
+  if (statusText) statusText.textContent = message;
 }
 
 function markFusionPlayed() {
@@ -708,13 +770,19 @@ function getFusion() {
   const forcedBase = games.find((game) => game.slug === params.get("base"));
   const forcedSource = games.find((game) => game.slug === params.get("source"));
   if (forcedBase && forcedSource && forcedBase.slug !== forcedSource.slug) {
-    return { base: forcedBase, source: forcedSource };
+    return { base: forcedBase, source: forcedSource, forced: true };
   }
+  // Unknown ?base/?source (e.g. hentw from old homepage links) → daily arena pair.
   const dayKey = todayKey();
   const baseIndex = hashString(`${dayKey}:base`) % games.length;
   let sourceIndex = hashString(`${dayKey}:source`) % (games.length - 1);
   if (sourceIndex >= baseIndex) sourceIndex += 1;
-  return { base: games[baseIndex], source: games[sourceIndex] };
+  return {
+    base: games[baseIndex],
+    source: games[sourceIndex],
+    forced: false,
+    invalidParams: Boolean(params.get("base") || params.get("source")),
+  };
 }
 
 function todayKey(date = new Date()) {

@@ -241,6 +241,17 @@ const games = [
 
 const FUSION_GAME_PATH = "/oyunlar/birlesim-arenasi/";
 const NEW_GAME_SLUGS = new Set(["hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis"]);
+/** Only games the Birleşim Arenası client actually implements. */
+const FUSION_GAME_SLUGS = new Set([
+  "annenden-kac",
+  "bardak",
+  "essiz-zindan",
+  "skeleton-wars",
+  "rhgpo",
+  "siyah-adam",
+  "vale",
+  "robot-avcisi",
+]);
 
 const upcomingGames = [
   {
@@ -3102,14 +3113,26 @@ function awardFusionBonus(dayKey = dailyBadgeKey()) {
   leagueState = refreshLeagueState(next);
 }
 
+function getFusionGames() {
+  return games.filter((game) => FUSION_GAME_SLUGS.has(game.slug));
+}
+
 function getDailyFusion(dayKey = dailyBadgeKey()) {
-  const baseIndex = hashString(`${dayKey}:base`) % games.length;
-  let sourceIndex = hashString(`${dayKey}:source`) % (games.length - 1);
+  const pool = getFusionGames();
+  if (pool.length < 2) {
+    return {
+      base: games[0],
+      source: games[1] || games[0],
+      feature: fusionFeaturePool[0],
+    };
+  }
+  const baseIndex = hashString(`${dayKey}:base`) % pool.length;
+  let sourceIndex = hashString(`${dayKey}:source`) % (pool.length - 1);
   if (sourceIndex >= baseIndex) sourceIndex += 1;
   const featureIndex = hashString(`${dayKey}:feature`) % fusionFeaturePool.length;
   return {
-    base: games[baseIndex],
-    source: games[sourceIndex],
+    base: pool[baseIndex],
+    source: pool[sourceIndex],
     feature: fusionFeaturePool[featureIndex],
   };
 }

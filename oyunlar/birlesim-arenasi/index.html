@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta http-equiv="cache-control" content="no-store" />
     <title>Birleşim Arenası</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=fix1" />
   </head>
   <body>
     <main class="fusion-shell">
@@ -77,23 +77,24 @@
       <div class="touch-controls" aria-label="Mobil kontroller">
         <div class="touch-side">
           <span>P1</span>
-          <button data-touch="p1-up">▲</button>
-          <button data-touch="p1-left">◀</button>
-          <button data-touch="p1-action">●</button>
-          <button data-touch="p1-right">▶</button>
-          <button data-touch="p1-down">▼</button>
+          <button type="button" data-touch="p1-up">▲</button>
+          <button type="button" data-touch="p1-left">◀</button>
+          <button type="button" data-touch="p1-action">●</button>
+          <button type="button" data-touch="p1-right">▶</button>
+          <button type="button" data-touch="p1-down">▼</button>
         </div>
         <div class="touch-side">
           <span>P2</span>
-          <button data-touch="p2-up">▲</button>
-          <button data-touch="p2-left">◀</button>
-          <button data-touch="p2-action">●</button>
-          <button data-touch="p2-right">▶</button>
-          <button data-touch="p2-down">▼</button>
+          <button type="button" data-touch="p2-up">▲</button>
+          <button type="button" data-touch="p2-left">◀</button>
+          <button type="button" data-touch="p2-action">●</button>
+          <button type="button" data-touch="p2-right">▶</button>
+          <button type="button" data-touch="p2-down">▼</button>
         </div>
       </div>
     </main>
 
-    <script type="module" src="./game.js"></script>
+    <!-- Classic script (not type=module) so file:// and static hosting always load. -->
+    <script src="./game.js?v=fix1" defer></script>
   </body>
 </html>
