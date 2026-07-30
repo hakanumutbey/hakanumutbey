@@ -101,7 +101,8 @@ h1 {
   display: block;
   border: 1px solid var(--line);
   border-radius: 20px;
-  background: linear-gradient(180deg, #11253c, #09111d 62%, #060a11);
+  /* Match ocean so empty/loading never looks black/broken */
+  background: linear-gradient(180deg, #2a6a9a, #1a4f7a 55%, #0e2f4a);
 }
 .overlay {
   position: absolute;
@@ -111,12 +112,14 @@ h1 {
   gap: 12px;
   justify-items: end;
   pointer-events: none;
+  max-width: min(340px, 46vw);
 }
 .overlay > div {
   padding: 12px 14px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: rgba(7, 10, 16, 0.72);
+  background: rgba(7, 10, 16, 0.55);
+  backdrop-filter: blur(8px);
 }
 .overlay strong { display: block; margin-bottom: 4px; }
 .overlay p { margin: 0; color: var(--muted); }
@@ -190,22 +193,38 @@ h1 {
   .hud strong {
     font-size: 1rem;
   }
+  /* Keep canvas clear: status + touch controls sit under the game, not on top. */
+  .viewport {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
   #gameCanvas {
-    height: clamp(320px, 58vh, 520px);
+    height: clamp(280px, 48vh, 480px);
     border-radius: 14px;
   }
   .overlay {
-    inset: auto 10px 10px 10px;
-    justify-items: stretch;
-    padding: 8px;
+    position: static;
+    inset: auto;
+    padding: 0;
     gap: 8px;
+    max-width: none;
+    justify-items: stretch;
   }
   .overlay > div {
     width: 100%;
-    padding: 9px 10px;
+    padding: 8px 10px;
+    background: rgba(7, 10, 16, 0.72);
+  }
+  .overlay strong {
+    font-size: 0.9rem;
   }
   .overlay p {
-    font-size: 0.8rem;
+    font-size: 0.78rem;
+  }
+  .touch-controls {
+    justify-self: center;
+    max-width: 240px;
   }
   .hero-actions,
   .touch-controls,
