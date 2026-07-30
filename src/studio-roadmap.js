@@ -54,17 +54,17 @@ export const gameExtras = {
     changelog: ["Mobil gamepad", "Skeleton Wars 2 hazırlığı", "Canlı fotoğraf sistemi"],
   },
   rhgpo: {
-    progress: 72,
+    progress: 94,
     difficulty: "Orta",
     averagePlayTime: "7 dk",
-    lastUpdated: "Park ve motor modu eklendi",
+    lastUpdated: "Kontrol ve hasar düzeltmesi, daha oynanabilir liman",
     hiddenAchievements: ["Rüzgar ustası", "Çarpmasız kaptan"],
     wiki: {
       characters: ["Kaptan", "Liman görevlisi"],
       weapons: ["Halatlar", "Motor", "Rüzgar yönü"],
       craft: ["Doğru halat sırası + motor = güvenli çıkış"],
     },
-    changelog: ["Halat sırası kuralı", "Çarpma limiti", "Mobil sürüş düğmeleri"],
+    changelog: ["Hasar bekleme süresi", "Daha yumuşak rüzgar", "Kolay park açısı", "Çökme koruması"],
   },
   "siyah-adam": {
     progress: 80,

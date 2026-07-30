@@ -1,5 +1,5 @@
 const canvas = document.querySelector("#gameCanvas");
-const ctx = canvas.getContext("2d");
+const ctx = canvas ? canvas.getContext("2d") : null;
 const startButton = document.querySelector("#startButton");
 const restartButton = document.querySelector("#restartButton");
 const roundLabel = document.querySelector("#roundLabel");
@@ -9,6 +9,8 @@ const energyLabel = document.querySelector("#energyLabel");
 const windLabel = document.querySelector("#windLabel");
 const crashLabel = document.querySelector("#crashLabel");
 const speedLabel = document.querySelector("#speedLabel");
+const highScoreLabel = document.querySelector("#highScoreLabel");
+const bestScoreLabel = document.querySelector("#bestScoreLabel");
 const statusLabel = document.querySelector("#statusLabel");
 const hintLabel = document.querySelector("#hintLabel");
 const towControls = document.querySelector("[data-tow-controls]");
@@ -18,6 +20,25 @@ const WORLD = { width: 1280, height: 720 };
 const STORAGE_KEY = "hakorocks-rhgpo-high-score";
 const WIND_NAMES = ["Kuzey", "Kuzeydoğu", "Doğu", "Güneydoğu", "Güney", "Güneybatı", "Batı", "Kuzeybatı"];
 const ROUND_MODES = ["park", "tow"];
+const DAMAGE_COOLDOWN_MS = 700;
+const DOCK_MAX_SPEED = 90;
+const DOCK_MAX_ANGLE = 0.55;
+
+function readHighScore() {
+  try {
+    return Number(localStorage.getItem(STORAGE_KEY) || 0) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeHighScore(value) {
+  try {
+    localStorage.setItem(STORAGE_KEY, String(value));
+  } catch {
+    // private mode / blocked storage
+  }
+}
 
 const state = {
   phase: "menu",
@@ -30,18 +51,23 @@ const state = {
   ropeOrder: [],
   engineReady: false,
   engineOn: false,
-  highScore: Number(localStorage.getItem(STORAGE_KEY) || 0),
+  highScore: readHighScore(),
   message: "Hazır olduğunda Başla'ya bas.",
   nextRoundAt: 0,
   boardingUntil: 0,
   danceUntil: 0,
   lastFrame: performance.now(),
+  lastDamageAt: 0,
   worldScale: 1,
-  wind: { x: 1, y: -0.4, strength: 32, timer: 0 },
+  time: 0,
+  dockReady: false,
+  particles: [],
+  wake: [],
+  wind: { x: 1, y: -0.4, strength: 26, timer: 0 },
   ship: {
     x: 180,
     y: 370,
-    angle: -0.12,
+    angle: 0,
     vx: 0,
     vy: 0,
     radius: 22,
@@ -53,6 +79,11 @@ const state = {
   gamepad: { left: false, right: false, forward: false, reverse: false, dock: false },
   touch: { active: null },
 };
+
+if (!canvas || !ctx || !startButton || !restartButton) {
+  console.error("RHGPO: gerekli DOM elemanları bulunamadı.");
+  if (statusLabel) statusLabel.textContent = "Oyun yüklenemedi. Sayfayı yenile.";
+}
 
 const keys = new Set();
 const GAMEPAD_DEADZONE = 0.35;
@@ -68,33 +99,43 @@ const windVectors = [
   { x: -0.7, y: -0.7 },
 ];
 
-startButton.addEventListener("click", startGame);
-restartButton.addEventListener("click", restartGame);
-canvas.addEventListener("click", () => {
-  if (state.phase === "menu") startGame();
-});
-document.addEventListener("keydown", handleKeyDown);
-document.addEventListener("keyup", handleKeyUp);
-window.addEventListener("resize", resizeCanvas);
-window.addEventListener("load", resizeCanvas);
-window.addEventListener("blur", resetInput);
-window.addEventListener("pagehide", resetInput);
-window.addEventListener("gamepaddisconnected", () => {
-  resetGamepadInput();
-  syncKeys();
-});
+if (canvas && ctx && startButton && restartButton) {
+  startButton.addEventListener("click", startGame);
+  restartButton.addEventListener("click", restartGame);
+  canvas.addEventListener("click", () => {
+    if (state.phase === "menu") startGame();
+  });
+  document.addEventListener("keydown", handleKeyDown);
+  document.addEventListener("keyup", handleKeyUp);
+  window.addEventListener("resize", resizeCanvas);
+  window.addEventListener("load", resizeCanvas);
+  window.addEventListener("blur", resetInput);
+  window.addEventListener("pagehide", resetInput);
+  window.addEventListener("gamepaddisconnected", () => {
+    resetGamepadInput();
+    syncKeys();
+  });
 
-document.querySelectorAll("[data-action]").forEach((button) => {
-  const action = button.dataset.action;
-  button.addEventListener("pointerdown", () => setTouch(action, true));
-  button.addEventListener("pointerup", () => setTouch(action, false));
-  button.addEventListener("pointerleave", () => setTouch(action, false));
-  button.addEventListener("pointercancel", () => setTouch(action, false));
-});
+  document.querySelectorAll("[data-action]").forEach((button) => {
+    const action = button.dataset.action;
+    const down = (event) => {
+      event.preventDefault();
+      setTouch(action, true);
+    };
+    const up = (event) => {
+      event.preventDefault();
+      setTouch(action, false);
+    };
+    button.addEventListener("pointerdown", down);
+    button.addEventListener("pointerup", up);
+    button.addEventListener("pointerleave", up);
+    button.addEventListener("pointercancel", up);
+  });
 
-resizeCanvas();
-renderHud();
-requestAnimationFrame(loop);
+  resizeCanvas();
+  renderHud();
+  requestAnimationFrame(loop);
+}
 
 function startGame() {
   resetRun();
@@ -124,6 +165,9 @@ function resetRun() {
   state.nextRoundAt = 0;
   state.boardingUntil = 0;
   state.danceUntil = 0;
+  state.dockReady = false;
+  state.particles = [];
+  state.wake = [];
   state.obstacles = [];
   state.goal = { x: 1120, y: 340, r: 34 };
   resetShip();
@@ -157,9 +201,10 @@ function spawnRound(first = false) {
 function resetShip() {
   state.ship.x = 180;
   state.ship.y = 370;
-  state.ship.angle = -0.12;
+  state.ship.angle = 0;
   state.ship.vx = 0;
   state.ship.vy = 0;
+  state.lastDamageAt = performance.now();
 }
 
 function makeDock(round) {
@@ -189,16 +234,17 @@ function makeWind(round) {
   return {
     x: base.x,
     y: base.y,
-    strength: 28 + round * 7,
-    timer: 8 - Math.min(4, round * 0.45),
+    strength: 18 + round * 4,
+    timer: 9 - Math.min(3, round * 0.35),
   };
 }
 
 function makeObstacles(round) {
+  // Keep a clear corridor toward the dock/exit so the game stays playable.
   return [
-    { x: 430 + round * 18, y: 280, r: 30 },
-    { x: 650, y: 500 - round * 6, r: 28 },
-    { x: 820, y: 180 + round * 12, r: 26 },
+    { x: 420 + round * 12, y: 210, r: 26, kind: "rock" },
+    { x: 640, y: 520 - round * 4, r: 24, kind: "buoy" },
+    { x: 860, y: 160 + round * 8, r: 24, kind: "rock" },
   ];
 }
 
@@ -375,6 +421,7 @@ function deadzone(value) {
 function loop(now) {
   const dt = Math.min(0.033, (now - state.lastFrame) / 1000);
   state.lastFrame = now;
+  state.time += dt;
   resizeCanvas();
   pollGamepadInput();
 
@@ -383,12 +430,13 @@ function loop(now) {
   } else if (state.phase === "playing") {
     updateWind(dt);
     updateShip(dt);
+    updateWake(dt);
     if (state.mode === "tow") {
       checkTowGoal(now);
     } else {
       checkDock(now);
     }
-    state.energy = Math.max(0, state.energy - dt * (1.6 + state.round * 0.18));
+    state.energy = Math.max(0, state.energy - dt * (0.7 + state.round * 0.1));
     if (state.energy <= 0) loseGame();
   } else if (state.phase === "transition" && now >= state.nextRoundAt) {
     if (state.round > TOTAL_ROUNDS) {
@@ -398,9 +446,53 @@ function loop(now) {
     }
   }
 
+  updateParticles(dt);
   draw();
   renderHud();
   requestAnimationFrame(loop);
+}
+
+function spawnParticles(x, y, color, count = 14) {
+  for (let i = 0; i < count; i += 1) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 40 + Math.random() * 120;
+    const life = 0.5 + Math.random() * 0.55;
+    state.particles.push({
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life,
+      maxLife: life,
+      size: 2 + Math.random() * 4,
+      color,
+    });
+  }
+}
+
+function updateParticles(dt) {
+  state.particles = state.particles
+    .map((p) => ({
+      ...p,
+      x: p.x + p.vx * dt,
+      y: p.y + p.vy * dt,
+      vy: p.vy + 30 * dt,
+      life: p.life - dt,
+    }))
+    .filter((p) => p.life > 0);
+}
+
+function updateWake(dt) {
+  const speed = Math.hypot(state.ship.vx, state.ship.vy);
+  if (speed > 18 && state.phase === "playing") {
+    const backX = state.ship.x - Math.cos(state.ship.angle) * 22;
+    const backY = state.ship.y - Math.sin(state.ship.angle) * 22;
+    state.wake.push({ x: backX, y: backY, life: 0.7, r: 4 + speed * 0.03 });
+  }
+  state.wake = state.wake
+    .map((w) => ({ ...w, life: w.life - dt, r: w.r + dt * 12 }))
+    .filter((w) => w.life > 0)
+    .slice(-40);
 }
 
 function updateWind(dt) {
@@ -410,8 +502,8 @@ function updateWind(dt) {
     const next = windVectors[nextIndex];
     state.wind.x = next.x;
     state.wind.y = next.y;
-    state.wind.strength = 28 + state.round * 7 + Math.random() * 8;
-    state.wind.timer = 7.5 - Math.min(4, state.round * 0.45) + Math.random() * 1.5;
+    state.wind.strength = 18 + state.round * 4 + Math.random() * 6;
+    state.wind.timer = 8 - Math.min(3, state.round * 0.35) + Math.random() * 1.5;
     state.message = `Rüzgar değişti: ${WIND_NAMES[nextIndex]}.`;
   }
 }
@@ -444,11 +536,11 @@ function startEngine() {
 
 function updateShip(dt) {
   const ship = state.ship;
-  const turnSpeed = 2.4;
-  const thrust = 240;
-  const reverse = 128;
+  const turnSpeed = 2.8;
+  const thrust = 260;
+  const reverse = 150;
   const windForce = state.wind.strength;
-  const drag = 0.985;
+  const drag = 0.982;
   const towMode = state.mode === "tow";
   const canDrive = !towMode || state.engineOn;
 
@@ -462,39 +554,45 @@ function updateShip(dt) {
   if (canDrive && state.input.forward) {
     ship.vx += forwardX * thrust * dt;
     ship.vy += forwardY * thrust * dt;
-    state.energy = Math.max(0, state.energy - dt * 2.5);
+    state.energy = Math.max(0, state.energy - dt * 1.4);
   }
   if (canDrive && state.input.reverse) {
     ship.vx -= forwardX * reverse * dt;
     ship.vy -= forwardY * reverse * dt;
-    state.energy = Math.max(0, state.energy - dt * 1.3);
+    state.energy = Math.max(0, state.energy - dt * 0.8);
   }
 
+  // Wind is a gentle push, not an unstoppable shove.
+  const windScale = towMode && !state.engineOn ? 0.1 : 0.35;
+  ship.vx += state.wind.x * windForce * windScale * dt;
+  ship.vy += state.wind.y * windForce * windScale * dt;
   if (towMode && !state.engineOn) {
-    ship.vx += state.wind.x * windForce * dt * 0.12;
-    ship.vy += state.wind.y * windForce * dt * 0.12;
-    ship.vx *= Math.pow(0.98, dt * 60);
-    ship.vy *= Math.pow(0.98, dt * 60);
-  } else {
-    ship.vx += state.wind.x * windForce * dt;
-    ship.vy += state.wind.y * windForce * dt;
+    ship.vx *= Math.pow(0.975, dt * 60);
+    ship.vy *= Math.pow(0.975, dt * 60);
   }
+
   ship.vx *= Math.pow(drag, dt * 60);
   ship.vy *= Math.pow(drag, dt * 60);
+  // Soft speed cap so docking stays possible.
+  const speedNow = Math.hypot(ship.vx, ship.vy);
+  const maxSpeed = towMode ? 320 : 280;
+  if (speedNow > maxSpeed) {
+    ship.vx = (ship.vx / speedNow) * maxSpeed;
+    ship.vy = (ship.vy / speedNow) * maxSpeed;
+  }
+
   ship.x += ship.vx * dt;
   ship.y += ship.vy * dt;
 
   if (ship.x < 40 || ship.x > WORLD.width - 40) {
     ship.x = clamp(ship.x, 40, WORLD.width - 40);
     ship.vx *= -0.35;
-    if (towMode) registerCrash("Sınır");
-    else state.energy = Math.max(0, state.energy - 4);
+    applyCollision("Sınır", towMode ? 12 : 3);
   }
   if (ship.y < 40 || ship.y > WORLD.height - 40) {
     ship.y = clamp(ship.y, 40, WORLD.height - 40);
     ship.vy *= -0.35;
-    if (towMode) registerCrash("Sınır");
-    else state.energy = Math.max(0, state.energy - 4);
+    applyCollision("Sınır", towMode ? 12 : 3);
   }
 
   const obstacleHit = state.obstacles.find((obstacle) => distance(ship.x, ship.y, obstacle.x, obstacle.y) < obstacle.r + ship.radius);
@@ -502,37 +600,63 @@ function updateShip(dt) {
     const dx = ship.x - obstacleHit.x;
     const dy = ship.y - obstacleHit.y;
     const length = Math.max(1, Math.hypot(dx, dy));
-    ship.x = obstacleHit.x + (dx / length) * (obstacleHit.r + ship.radius + 1);
-    ship.y = obstacleHit.y + (dy / length) * (obstacleHit.r + ship.radius + 1);
-    ship.vx *= -0.25;
-    ship.vy *= -0.25;
-    if (towMode) {
-      registerCrash("Kaya");
-    } else {
-      state.energy = Math.max(0, state.energy - 8);
-      state.message = "Kayaya dokundun. Direksiyonu düzelt.";
-    }
+    ship.x = obstacleHit.x + (dx / length) * (obstacleHit.r + ship.radius + 2);
+    ship.y = obstacleHit.y + (dy / length) * (obstacleHit.r + ship.radius + 2);
+    ship.vx *= -0.3;
+    ship.vy *= -0.3;
+    applyCollision(obstacleHit.kind === "buoy" ? "Şamandıra" : "Kaya", towMode ? 12 : 6);
   }
-
 }
 
-function registerCrash(reason) {
-  state.crashes += 1;
-  state.energy = Math.max(0, state.energy - 12);
-  state.message = `${reason} çarpması oldu. ${3 - state.crashes} hak kaldı.`;
-  resetShip();
-  if (state.crashes >= 3) {
-    loseGame();
+function canTakeDamage(now = performance.now()) {
+  return now - state.lastDamageAt >= DAMAGE_COOLDOWN_MS;
+}
+
+function applyCollision(reason, energyLoss) {
+  const now = performance.now();
+  if (!canTakeDamage(now)) return;
+  state.lastDamageAt = now;
+
+  if (state.mode === "tow") {
+    state.crashes += 1;
+    state.energy = Math.max(0, state.energy - energyLoss);
+    state.message = `${reason} çarpması! ${Math.max(0, 3 - state.crashes)} hak kaldı.`;
+    spawnParticles(state.ship.x, state.ship.y, "#ff6b7a", 10);
+    if (state.crashes >= 3) {
+      loseGame();
+      return;
+    }
+    // Soft reset: only bounce back a bit, don't teleport every time.
+    state.ship.vx *= 0.2;
+    state.ship.vy *= 0.2;
+    return;
   }
+
+  state.energy = Math.max(0, state.energy - energyLoss);
+  state.message = `${reason}'a çarptın. Direksiyonu düzelt.`;
+  spawnParticles(state.ship.x, state.ship.y, "#ffd166", 8);
 }
 
 function checkDock(now) {
   const ship = state.ship;
-  const inDock = ship.x > state.dock.x && ship.x < state.dock.x + state.dock.w && ship.y > state.dock.y && ship.y < state.dock.y + state.dock.h;
+  const pad = 8;
+  const inDock =
+    ship.x > state.dock.x - pad &&
+    ship.x < state.dock.x + state.dock.w + pad &&
+    ship.y > state.dock.y - pad &&
+    ship.y < state.dock.y + state.dock.h + pad;
   const speed = Math.hypot(ship.vx, ship.vy);
   const angleDiff = Math.abs(normalizeAngle(ship.angle));
-  if (inDock && speed < 62 && angleDiff < 0.35 && state.input.dock) {
+  state.dockReady = inDock && speed < DOCK_MAX_SPEED && angleDiff < DOCK_MAX_ANGLE;
+
+  if (state.dockReady && state.input.dock) {
     completeRound(now);
+  } else if (inDock && !state.dockReady) {
+    state.message = speed >= DOCK_MAX_SPEED
+      ? "Çok hızlısın. Biraz yavaşla, sonra Space / E bas."
+      : "Açıyı düzelt. Gemi sağa (limana) bakmalı.";
+  } else if (state.dockReady) {
+    state.message = "Liman hazır! Space veya E ile park et.";
   }
 }
 
@@ -550,114 +674,190 @@ function completeRound(now, mode = state.mode) {
   state.message = mode === "tow"
     ? `Tur ${state.round} tamamlandı. Motor modunda çıkışı geçtin.`
     : `Tur ${state.round} tamamlandı. Limana yanaştın.`;
+  spawnParticles(state.ship.x, state.ship.y, mode === "tow" ? "#55d6ff" : "#96f06f", 22);
   state.round += 1;
   state.phase = "transition";
+  state.dockReady = false;
   state.nextRoundAt = now + 1200;
   state.danceUntil = now + 1400;
   if (state.score > state.highScore) {
     state.highScore = state.score;
-    localStorage.setItem(STORAGE_KEY, String(state.highScore));
+    writeHighScore(state.highScore);
   }
 }
 
 function winGame() {
   state.phase = "won";
-  state.message = "Beş tur tamamlandı. RHGPO kazandın.";
+  state.message = "Beş tur tamamlandı. RHGPO kazandın!";
+  spawnParticles(state.ship.x, state.ship.y, "#ffd166", 36);
+  spawnParticles(WORLD.width / 2, WORLD.height / 2, "#96f06f", 28);
   if (state.score > state.highScore) {
     state.highScore = state.score;
-    localStorage.setItem(STORAGE_KEY, String(state.highScore));
+    writeHighScore(state.highScore);
   }
 }
 
 function loseGame() {
   state.phase = "lost";
   state.message = "Oyun bitti. Tekrar dene.";
+  spawnParticles(state.ship.x, state.ship.y, "#ff6b7a", 18);
   if (state.score > state.highScore) {
     state.highScore = state.score;
-    localStorage.setItem(STORAGE_KEY, String(state.highScore));
+    writeHighScore(state.highScore);
   }
 }
 
+function setText(el, value) {
+  if (el) el.textContent = value;
+}
+
 function renderHud() {
-  roundLabel.textContent = `${Math.min(state.round, TOTAL_ROUNDS)} / ${TOTAL_ROUNDS}`;
-  modeLabel.textContent = state.mode === "tow" ? "Motor" : "Liman";
-  scoreLabel.textContent = String(state.score);
-  energyLabel.textContent = `${Math.round(state.energy)}%`;
-  windLabel.textContent = windName(state.wind.x, state.wind.y);
-  crashLabel.textContent = state.mode === "tow" ? `${state.crashes} / 3` : "Hazır";
-  speedLabel.textContent = `${Math.round(Math.hypot(state.ship.vx, state.ship.vy))} km/s`;
-  statusLabel.textContent = state.message;
+  setText(roundLabel, `${Math.min(state.round, TOTAL_ROUNDS)} / ${TOTAL_ROUNDS}`);
+  setText(modeLabel, state.mode === "tow" ? "Motor" : "Liman");
+  setText(scoreLabel, String(state.score));
+  setText(energyLabel, `${Math.round(state.energy)}%`);
+  setText(windLabel, windName(state.wind.x, state.wind.y));
+  setText(crashLabel, state.mode === "tow" ? `${state.crashes} / 3` : "Hazır");
+  setText(speedLabel, `${Math.round(Math.hypot(state.ship.vx, state.ship.vy))} km/s`);
+  setText(highScoreLabel, String(state.highScore));
+  setText(bestScoreLabel, `En iyi skor: ${state.highScore}`);
+  setText(statusLabel, state.message);
   if (towControls) towControls.hidden = state.phase !== "playing" || state.mode !== "tow";
+  if (!hintLabel) return;
   hintLabel.textContent =
     state.phase === "boarding"
       ? "Gemimize bindin. Biraz bekle."
       : state.phase === "playing"
         ? state.mode === "tow" && !state.engineOn
-          ? `Önce diğer halatı, sonra ${windwardSide(state.wind) === "left" ? "sol" : "sağ"} halatı çek. Sonra motoru çalıştır.`
+          ? ropeHintText()
           : state.mode === "tow"
-            ? "Motor açık. Rotayı temiz tut ve çıkışa git."
-            : "WASD / ok tuşları ile sür, Space veya E ile park et."
+            ? "Motor açık. Rotayı temiz tut ve mavi çıkışa git."
+            : state.dockReady
+              ? "Park hazır! Space veya E bas."
+              : "WASD / ok tuşları ile sür, limana yanaş, Space veya E ile park et."
       : state.phase === "won"
         ? `Kazandın. En iyi skor: ${state.highScore}`
         : state.phase === "lost"
           ? `Kaybettin. En iyi skor: ${state.highScore}`
-          : `En iyi skor: ${state.highScore}`;
+          : `En iyi skor: ${state.highScore}. Enter veya Başla ile başla.`;
+}
+
+function ropeHintText() {
+  const expected = state.ropeOrder[state.ropeStage];
+  if (!expected) return "Halatlar tamam. Motoru çalıştır (M).";
+  const label = expected === "left" ? "SOL" : "SAĞ";
+  return `Adım ${state.ropeStage + 1}/2: ${label} halatı çek (Q = sol, E = sağ).`;
 }
 
 function draw() {
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const scale = Math.min(canvas.width / WORLD.width, canvas.height / WORLD.height);
-  const offsetX = (canvas.width - WORLD.width * scale) / 2;
-  const offsetY = (canvas.height - WORLD.height * scale) / 2;
-  ctx.setTransform(scale, 0, 0, scale, offsetX, offsetY);
-  drawBackground();
-  drawWater();
-  if (state.mode === "tow") drawGoal();
-  drawDock();
-  drawWind();
-  drawObstacles();
-  if (state.mode === "tow") drawRopes();
-  drawShip();
-  drawOverlayText();
+  if (!ctx || !canvas) return;
+  try {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const scale = Math.min(canvas.width / WORLD.width, canvas.height / WORLD.height) || 1;
+    const offsetX = (canvas.width - WORLD.width * scale) / 2;
+    const offsetY = (canvas.height - WORLD.height * scale) / 2;
+    ctx.setTransform(scale, 0, 0, scale, offsetX, offsetY);
+    drawBackground();
+    drawWater();
+    drawHarbor();
+    if (state.mode === "tow") drawGoal();
+    drawDock();
+    drawWind();
+    drawObstacles();
+    drawWake();
+    if (state.mode === "tow") drawRopes();
+    drawShip();
+    drawParticles();
+    if (state.mode === "tow" && state.phase === "playing") drawRopeChecklist();
+    drawOverlayText();
+  } catch (error) {
+    console.error("RHGPO çizim hatası:", error);
+  }
 }
 
 function drawBackground() {
   const gradient = ctx.createLinearGradient(0, 0, 0, WORLD.height);
-  gradient.addColorStop(0, "#13324f");
-  gradient.addColorStop(0.55, "#091322");
-  gradient.addColorStop(1, "#05070b");
-  ctx.fillStyle = gradient;
+  if (gradient && typeof gradient.addColorStop === "function") {
+    gradient.addColorStop(0, "#163a58");
+    gradient.addColorStop(0.45, "#0b1a2c");
+    gradient.addColorStop(1, "#05070b");
+    ctx.fillStyle = gradient;
+  } else {
+    ctx.fillStyle = "#0b1a2c";
+  }
   ctx.fillRect(0, 0, WORLD.width, WORLD.height);
 }
 
 function drawWater() {
   ctx.save();
-  ctx.fillStyle = "rgba(255,255,255,0.03)";
+  // animated wave bands
+  for (let i = 0; i < 8; i += 1) {
+    const y = 80 + i * 80 + Math.sin(state.time * 1.4 + i) * 6;
+    ctx.strokeStyle = `rgba(85, 214, 255, ${0.04 + (i % 2) * 0.03})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let x = 0; x <= WORLD.width; x += 24) {
+      const waveY = y + Math.sin(state.time * 2 + x * 0.02 + i) * 8;
+      if (x === 0) ctx.moveTo(x, waveY);
+      else ctx.lineTo(x, waveY);
+    }
+    ctx.stroke();
+  }
+  ctx.fillStyle = "rgba(255,255,255,0.045)";
   for (let row = 0; row < 12; row += 1) {
     for (let col = 0; col < 18; col += 1) {
-      const x = col * 76 + (row % 2) * 20;
-      const y = row * 64;
+      const x = col * 76 + (row % 2) * 20 + Math.sin(state.time + row) * 2;
+      const y = row * 64 + Math.cos(state.time * 0.8 + col) * 2;
       ctx.beginPath();
-      ctx.arc(x + 18, y + 18, 1.5, 0, Math.PI * 2);
+      ctx.arc(x + 18, y + 18, 1.6, 0, Math.PI * 2);
       ctx.fill();
     }
   }
   ctx.restore();
 }
 
-function drawDock() {
+function drawHarbor() {
+  // distant pier wall on the right
   ctx.save();
-  ctx.fillStyle = "rgba(120, 194, 255, 0.12)";
+  ctx.fillStyle = "rgba(28, 40, 54, 0.95)";
+  ctx.fillRect(1180, 40, 120, WORLD.height - 80);
+  ctx.fillStyle = "rgba(60, 78, 96, 0.7)";
+  for (let y = 70; y < WORLD.height - 60; y += 48) {
+    ctx.fillRect(1190, y, 18, 28);
+    ctx.fillRect(1240, y + 10, 18, 28);
+  }
+  ctx.fillStyle = "rgba(255, 209, 102, 0.35)";
+  ctx.fillRect(1180, 40, 8, WORLD.height - 80);
+  ctx.restore();
+}
+
+function drawDock() {
+  const ready = state.dockReady && state.mode === "park";
+  const pulse = 0.55 + Math.sin(state.time * 6) * 0.25;
+  ctx.save();
+  // wooden pier base
+  ctx.fillStyle = "rgba(92, 64, 42, 0.55)";
+  ctx.fillRect(state.dock.x - 10, state.dock.y - 10, state.dock.w + 20, state.dock.h + 20);
+  for (let i = 0; i < 5; i += 1) {
+    ctx.fillStyle = i % 2 === 0 ? "rgba(120, 84, 52, 0.45)" : "rgba(78, 54, 34, 0.45)";
+    ctx.fillRect(state.dock.x + i * (state.dock.w / 5), state.dock.y, state.dock.w / 5 - 2, state.dock.h);
+  }
+  // posts
+  ctx.fillStyle = "rgba(40, 28, 18, 0.9)";
+  [[0, 0], [state.dock.w, 0], [0, state.dock.h], [state.dock.w, state.dock.h]].forEach(([px, py]) => {
+    ctx.beginPath();
+    ctx.arc(state.dock.x + px, state.dock.y + py, 8, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.fillStyle = ready ? `rgba(150, 240, 111, ${0.18 + pulse * 0.12})` : "rgba(120, 194, 255, 0.12)";
   ctx.fillRect(state.dock.x - 18, state.dock.y - 18, state.dock.w + 36, state.dock.h + 36);
-  ctx.strokeStyle = "rgba(153, 240, 111, 0.65)";
-  ctx.lineWidth = 4;
+  ctx.strokeStyle = ready ? `rgba(150, 240, 111, ${0.75 + pulse * 0.2})` : "rgba(153, 240, 111, 0.55)";
+  ctx.lineWidth = ready ? 6 : 4;
   ctx.strokeRect(state.dock.x, state.dock.y, state.dock.w, state.dock.h);
-  ctx.fillStyle = "rgba(153, 240, 111, 0.14)";
-  ctx.fillRect(state.dock.x + 18, state.dock.y + 18, state.dock.w - 36, state.dock.h - 36);
-  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
   ctx.font = "700 22px Inter, sans-serif";
-  ctx.fillText("LİMAN", state.dock.x + 40, state.dock.y + 36);
+  ctx.fillText(ready ? "PARK ET!" : "LİMAN", state.dock.x + 36, state.dock.y + 36);
   ctx.restore();
 }
 
@@ -689,28 +889,57 @@ function drawWind() {
 function drawObstacles() {
   for (const obstacle of state.obstacles) {
     ctx.save();
-    ctx.fillStyle = "rgba(150, 94, 53, 0.9)";
-    ctx.beginPath();
-    ctx.arc(obstacle.x, obstacle.y, obstacle.r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255, 209, 102, 0.35)";
-    ctx.lineWidth = 3;
-    ctx.stroke();
+    if (obstacle.kind === "buoy") {
+      ctx.fillStyle = "rgba(220, 60, 70, 0.95)";
+      ctx.beginPath();
+      ctx.arc(obstacle.x, obstacle.y, obstacle.r * 0.75, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.fillRect(obstacle.x - 3, obstacle.y - obstacle.r - 8, 6, obstacle.r + 4);
+      ctx.strokeStyle = "rgba(255, 209, 102, 0.55)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(obstacle.x, obstacle.y, obstacle.r, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = "rgba(96, 78, 62, 0.95)";
+      ctx.beginPath();
+      ctx.moveTo(obstacle.x, obstacle.y - obstacle.r);
+      ctx.lineTo(obstacle.x + obstacle.r * 0.9, obstacle.y - obstacle.r * 0.2);
+      ctx.lineTo(obstacle.x + obstacle.r * 0.7, obstacle.y + obstacle.r * 0.8);
+      ctx.lineTo(obstacle.x - obstacle.r * 0.75, obstacle.y + obstacle.r * 0.7);
+      ctx.lineTo(obstacle.x - obstacle.r * 0.95, obstacle.y - obstacle.r * 0.15);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255, 209, 102, 0.28)";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.12)";
+      ctx.beginPath();
+      ctx.arc(obstacle.x - 6, obstacle.y - 6, obstacle.r * 0.25, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
   }
 }
 
 function drawGoal() {
+  const pulse = 10 + Math.sin(state.time * 4) * 5;
   ctx.save();
   ctx.fillStyle = "rgba(85, 214, 255, 0.12)";
   ctx.beginPath();
-  ctx.arc(state.goal.x, state.goal.y, state.goal.r + 16, 0, Math.PI * 2);
+  ctx.arc(state.goal.x, state.goal.y, state.goal.r + 16 + pulse * 0.3, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = "rgba(85, 214, 255, 0.9)";
+  ctx.strokeStyle = state.engineOn ? "rgba(150, 240, 111, 0.95)" : "rgba(85, 214, 255, 0.9)";
   ctx.lineWidth = 4;
   ctx.beginPath();
   ctx.arc(state.goal.x, state.goal.y, state.goal.r, 0, Math.PI * 2);
   ctx.stroke();
+  ctx.setLineDash([8, 8]);
+  ctx.beginPath();
+  ctx.arc(state.goal.x, state.goal.y, state.goal.r + pulse, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
   ctx.fillStyle = "rgba(255,255,255,0.9)";
   ctx.font = "700 18px Inter, sans-serif";
   ctx.fillText("ÇIKIŞ", state.goal.x - 26, state.goal.y - 44);
@@ -723,24 +952,91 @@ function drawRopes() {
   const rightX = ship.x + 26;
   const y = ship.y - 8;
   const windSide = windwardSide(state.wind);
+  const expected = state.ropeOrder[state.ropeStage];
+  const leftDone = state.ropeOrder.slice(0, state.ropeStage).includes("left") || (state.engineReady && state.ropeOrder.includes("left"));
+  const rightDone = state.ropeOrder.slice(0, state.ropeStage).includes("right") || (state.engineReady && state.ropeOrder.includes("right"));
   ctx.save();
-  ctx.strokeStyle = "rgba(255,255,255,0.35)";
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = leftDone ? "rgba(150, 240, 111, 0.9)" : expected === "left" ? "rgba(255, 209, 102, 0.95)" : "rgba(255,255,255,0.35)";
   ctx.beginPath();
   ctx.moveTo(leftX, y);
   ctx.lineTo(leftX - 60, y + (windSide === "left" ? -18 : 18));
   ctx.stroke();
+  ctx.strokeStyle = rightDone ? "rgba(150, 240, 111, 0.9)" : expected === "right" ? "rgba(255, 209, 102, 0.95)" : "rgba(255,255,255,0.35)";
   ctx.beginPath();
   ctx.moveTo(rightX, y);
   ctx.lineTo(rightX + 60, y + (windSide === "right" ? -18 : 18));
   ctx.stroke();
-  ctx.fillStyle = state.ropeStage > 0 ? "#96f06f" : "#ffd166";
   ctx.font = "700 14px Inter, sans-serif";
-  ctx.fillText("Sol halat", leftX - 76, y + 14);
-  ctx.fillText("Sağ halat", rightX + 10, y + 14);
-  ctx.fillStyle = "rgba(255,255,255,0.8)";
-  ctx.fillText(state.engineReady ? "Motor hazır" : "Halat sırası", ship.x - 48, ship.y - 34);
+  ctx.fillStyle = leftDone ? "#96f06f" : expected === "left" ? "#ffd166" : "rgba(255,255,255,0.7)";
+  ctx.fillText(leftDone ? "Sol ✓" : expected === "left" ? "Sol ← şimdi" : "Sol halat", leftX - 88, y + 14);
+  ctx.fillStyle = rightDone ? "#96f06f" : expected === "right" ? "#ffd166" : "rgba(255,255,255,0.7)";
+  ctx.fillText(rightDone ? "Sağ ✓" : expected === "right" ? "Sağ → şimdi" : "Sağ halat", rightX + 10, y + 14);
+  ctx.fillStyle = state.engineReady ? "#96f06f" : "rgba(255,255,255,0.85)";
+  ctx.fillText(state.engineOn ? "Motor açık" : state.engineReady ? "Motor hazır (M)" : "Halat sırası", ship.x - 52, ship.y - 36);
   ctx.restore();
+}
+
+function drawRopeChecklist() {
+  const panelX = 24;
+  const panelY = 120;
+  ctx.save();
+  ctx.fillStyle = "rgba(7, 12, 20, 0.72)";
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.lineWidth = 2;
+  roundRect(panelX, panelY, 250, 118, 12);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#ffd166";
+  ctx.font = "800 16px Inter, sans-serif";
+  ctx.fillText("HALAT SIRASI", panelX + 16, panelY + 28);
+  state.ropeOrder.forEach((side, index) => {
+    const done = index < state.ropeStage || state.engineReady;
+    const current = index === state.ropeStage && !state.engineReady;
+    const label = side === "left" ? "Sol halat" : "Sağ halat";
+    const windMark = windwardSide(state.wind) === side ? " (rüzgar)" : "";
+    ctx.fillStyle = done ? "#96f06f" : current ? "#55d6ff" : "rgba(255,255,255,0.65)";
+    ctx.font = "700 15px Inter, sans-serif";
+    ctx.fillText(`${done ? "✓" : current ? "→" : `${index + 1}.`} ${label}${windMark}`, panelX + 16, panelY + 56 + index * 26);
+  });
+  ctx.fillStyle = state.engineOn ? "#96f06f" : state.engineReady ? "#ffd166" : "rgba(255,255,255,0.5)";
+  ctx.fillText(state.engineOn ? "✓ Motor çalışıyor" : state.engineReady ? "→ Motoru çalıştır (M)" : "3. Motor", panelX + 16, panelY + 108);
+  ctx.restore();
+}
+
+function drawWake() {
+  for (const w of state.wake) {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, w.life * 0.45);
+    ctx.strokeStyle = "rgba(180, 230, 255, 0.8)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(w.x, w.y, w.r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawParticles() {
+  for (const p of state.particles) {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, p.life / (p.maxLife || 1));
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
 }
 
 function drawShip() {
@@ -748,29 +1044,49 @@ function drawShip() {
   ctx.save();
   ctx.translate(ship.x, ship.y);
   ctx.rotate(ship.angle);
-  ctx.shadowColor = "rgba(0,0,0,0.4)";
+  ctx.shadowColor = "rgba(0,0,0,0.45)";
   ctx.shadowBlur = 16;
-  ctx.fillStyle = "#0f1724";
-  ctx.fillRect(-10, -26, 8, 12);
-  ctx.strokeStyle = "rgba(255,255,255,0.35)";
+  // hull
+  ctx.fillStyle = "#1a2738";
+  ctx.strokeStyle = "rgba(255,255,255,0.4)";
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(30, 0);
-  ctx.lineTo(-18, -16);
-  ctx.lineTo(-24, 0);
-  ctx.lineTo(-18, 16);
+  ctx.moveTo(34, 0);
+  ctx.lineTo(-16, -18);
+  ctx.lineTo(-28, 0);
+  ctx.lineTo(-16, 18);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
-  ctx.fillStyle = "rgba(85, 214, 255, 0.55)";
+  // cabin
+  ctx.fillStyle = "#0f1724";
+  ctx.fillRect(-12, -14, 14, 12);
+  ctx.fillStyle = "rgba(85, 214, 255, 0.65)";
+  ctx.fillRect(-10, -12, 8, 6);
+  // stripe
+  ctx.strokeStyle = "rgba(255, 209, 102, 0.75)";
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.arc(-8, 0, 10, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,0.7)";
+  ctx.moveTo(20, -6);
+  ctx.lineTo(-12, -6);
+  ctx.moveTo(20, 6);
+  ctx.lineTo(-12, 6);
+  ctx.stroke();
+  // mast
+  ctx.strokeStyle = "rgba(255,255,255,0.75)";
   ctx.beginPath();
   ctx.moveTo(-2, -24);
-  ctx.lineTo(-2, 22);
+  ctx.lineTo(-2, 20);
   ctx.stroke();
+  if (state.engineOn || state.mode === "park") {
+    ctx.fillStyle = "rgba(85, 214, 255, 0.35)";
+    ctx.beginPath();
+    ctx.moveTo(-28, 0);
+    ctx.lineTo(-40 - Math.sin(state.time * 12) * 3, -5);
+    ctx.lineTo(-40 - Math.sin(state.time * 12) * 3, 5);
+    ctx.closePath();
+    ctx.fill();
+  }
   drawCaptain(state.phase === "won" || state.danceUntil > performance.now() ? "dance" : "idle");
   ctx.restore();
 }
@@ -822,17 +1138,27 @@ function drawOverlayText() {
     ctx.font = "700 24px Inter, sans-serif";
     ctx.fillText("Yeniden Başlat ile tekrar dene.", 435, 370);
   } else if (state.phase === "menu") {
-    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    roundRect(300, 250, 680, 170, 18);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.95)";
     ctx.font = "900 54px Inter, sans-serif";
-    ctx.fillText("RHGPO", 520, 330);
-    ctx.font = "700 24px Inter, sans-serif";
-    ctx.fillText("Park modu + motor modu, tek liman savaşı.", 390, 372);
+    ctx.fillText("RHGPO", 520, 320);
+    ctx.font = "700 22px Inter, sans-serif";
+    ctx.fillText("Park et • Halatları çek • Motorla çık", 400, 360);
+    ctx.fillStyle = "#ffd166";
+    ctx.font = "700 18px Inter, sans-serif";
+    ctx.fillText(`En iyi skor: ${state.highScore}`, 540, 396);
   } else if (state.phase === "boarding") {
     ctx.fillStyle = "rgba(255,255,255,0.9)";
     ctx.font = "900 46px Inter, sans-serif";
     ctx.fillText("Gemiye biniyor...", 430, 330);
     ctx.font = "700 22px Inter, sans-serif";
     ctx.fillText("Kaptan hazır. Görev başlıyor.", 440, 368);
+  } else if (state.phase === "transition") {
+    ctx.fillStyle = "rgba(150, 240, 111, 0.92)";
+    ctx.font = "900 36px Inter, sans-serif";
+    ctx.fillText("Tur tamam!", 530, 320);
   }
   ctx.restore();
 }

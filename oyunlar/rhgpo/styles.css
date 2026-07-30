@@ -69,10 +69,17 @@ h1 {
 .hero-panel p { color: var(--muted); line-height: 1.6; margin: 10px 0 0; }
 .hero-actions { display: grid; gap: 10px; align-content: start; }
 .hero-actions button:first-child { border-color: rgba(85, 214, 255, 0.25); background: rgba(85, 214, 255, 0.12); }
-.hero-actions button:last-child { border-color: rgba(150, 240, 111, 0.25); background: rgba(150, 240, 111, 0.12); }
+.hero-actions button:nth-child(2) { border-color: rgba(150, 240, 111, 0.25); background: rgba(150, 240, 111, 0.12); }
+.best-score {
+  margin: 0;
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-align: center;
+}
 .hud {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: 10px;
   padding: 14px;
 }

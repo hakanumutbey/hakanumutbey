@@ -100,7 +100,7 @@ const games = [
     mobileStatus: "Mobil hazır",
     mobileNote: "Liman sürüşü, park etme ve halat kontrolleri için kendi dokunmatik düğmeleri var.",
     achievements: ["İlk limana yanaş", "İlk motor turunu bitir", "Beş turu tamamla"],
-    updates: ["Park modu ve motor modu eklendi", "Halat sırası kuralı hazırlandı", "Çarpma bazlı başarısızlık kuruldu"],
+    updates: ["Oynanış düzeltildi ve rüzgar yumuşatıldı", "Park daha kolay hale getirildi", "Hasar bekleme süresi eklendi"],
     stockBase: 121,
   },
   {
