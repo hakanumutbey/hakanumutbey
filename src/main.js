@@ -650,7 +650,10 @@ let latestHealth = createFallbackHealth();
 let latestSocial = createFallbackSocial();
 let latestVoice = createFallbackVoice();
 let latestClickGame = createFallbackClickGame();
-let notificationPermission = "Notification" in window ? Notification.permission : "default";
+let notificationPermission =
+  typeof Notification !== "undefined" && Notification && typeof Notification.permission === "string"
+    ? Notification.permission
+    : "default";
 let selectedGame = games[0];
 let selectedPhotoFilter = "all";
 let selectedInviteGameSlug = localStorage.getItem("hakorocks-invite-game") || "robot-avcisi";
@@ -709,7 +712,24 @@ let authBusy = false;
 document.documentElement.dataset.theme = selectedTheme;
 document.documentElement.dataset.authGate = authGatePassed ? "open" : "locked";
 
-// Kapı içeriği sonra doldurulur (boot'ta renderAuthGate çağrısı beyaz ekran riski yaratmasın)
+function paintEmergencyScreen(message) {
+  const root = document.querySelector("#app");
+  if (!root) return;
+  root.innerHTML = `
+    <div class="auth-gate" data-auth-gate style="display:flex;align-items:center;justify-content:center;background:#0b0d10;color:#f7f4ea;min-height:100vh;padding:24px;text-align:center;">
+      <div>
+        <div style="width:96px;height:96px;margin:0 auto 16px;display:grid;place-items:center;border:3px solid #35d2ff;border-radius:20px;color:#35d2ff;font-size:3rem;font-weight:900;">H</div>
+        <p style="font-size:1.6rem;font-weight:900;color:#35d2ff;margin:0 0 12px;">Hakorocks Studio</p>
+        <p style="color:#ffd166;margin:0 0 18px;">${String(message || "Sayfa yüklenemedi.")}</p>
+        <button type="button" onclick="location.reload()" style="min-height:48px;padding:0 20px;border:0;border-radius:12px;background:#35d2ff;color:#071012;font-weight:800;cursor:pointer;">Yenile</button>
+        <button type="button" onclick="localStorage.removeItem('hakorocks-auth-gate');location.reload()" style="min-height:48px;padding:0 20px;margin-left:8px;border:1px solid rgba(255,255,255,.2);border-radius:12px;background:transparent;color:#f7f4ea;font-weight:800;cursor:pointer;">Kapıyı sıfırla</button>
+      </div>
+    </div>
+  `;
+}
+
+// Kapı içeriği sonra doldurulur
+try {
 document.querySelector("#app").innerHTML = `
   <div class="auth-gate" data-auth-gate ${authGatePassed ? "hidden" : ""} aria-hidden="${authGatePassed ? "true" : "false"}">
     <div class="auth-gate-bg" aria-hidden="true"></div>
@@ -1331,6 +1351,10 @@ document.querySelector("#app").innerHTML = `
   </div>
   </div>
 `;
+} catch (error) {
+  console.error("Site HTML kurulamadı:", error);
+  paintEmergencyScreen("Ana sayfa kurulurken hata oluştu. Yenile veya kapıyı sıfırla.");
+}
 
 function renderMillionHSection() {
   const text = millionHState.visible ? getMillionHText() : "";
@@ -5342,12 +5366,16 @@ function persistInviteGameSlug(value) {
 }
 
 async function requestNotificationPermission() {
-  if (!("Notification" in window)) {
+  if (typeof Notification === "undefined" || !Notification?.requestPermission) {
     const status = document.querySelector("[data-account-status]");
     if (status) status.textContent = "Bu tarayıcı bildirimleri desteklemiyor.";
     return;
   }
-  notificationPermission = await Notification.requestPermission();
+  try {
+    notificationPermission = await Notification.requestPermission();
+  } catch {
+    notificationPermission = "default";
+  }
   const status = document.querySelector("[data-account-status]");
   if (status) {
     status.textContent = notificationPermission === "granted"
@@ -5585,122 +5613,115 @@ try {
   setInterval(refreshPerformancePing, 15000);
 } catch (error) {
   console.error("Site boot hatası:", error);
-  const gateShell = document.querySelector("[data-auth-gate-shell]");
-  if (gateShell) {
-    gateShell.innerHTML = `
-      <div class="auth-gate-card auth-gate-home">
-        <div class="auth-brand is-large">
-          <div class="auth-logo-mark" role="img" aria-label="Hakorocks Studio logosu"><span class="auth-logo-h">H</span></div>
-          <p class="auth-studio-name">Hakorocks Studio</p>
-        </div>
-        <p class="auth-gate-status">Bir hata oluştu. Sayfayı yenile.</p>
-        <button class="button primary auth-gate-cta" type="button" onclick="location.reload()">Yenile</button>
-      </div>
-    `;
-  }
-  const gate = document.querySelector("[data-auth-gate]");
-  if (gate) {
-    gate.hidden = false;
-    gate.removeAttribute("hidden");
-  }
+  paintEmergencyScreen("Site açılırken hata oluştu. Yenile veya kapıyı sıfırla.");
 }
 
 function initHeroStars() {
-  const canvas = document.querySelector(".hero-stars");
-  const hero = document.querySelector(".hero");
-  if (!canvas || !hero) return;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const STAR_COUNT = 90;
-  let stars = [];
-  let width = 1;
-  let height = 1;
-  let heroVisible = true;
+  try {
+    const canvas = document.querySelector(".hero-stars");
+    const hero = document.querySelector(".hero");
+    if (!canvas || !hero || typeof canvas.getContext !== "function") return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
+    const STAR_COUNT = 90;
+    let stars = [];
+    let width = 1;
+    let height = 1;
+    let heroVisible = true;
 
-  function resize() {
-    const rect = hero.getBoundingClientRect();
-    const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
-    width = Math.max(1, Math.floor(rect.width));
-    height = Math.max(1, Math.floor(rect.height));
-    canvas.width = Math.floor(width * ratio);
-    canvas.height = Math.floor(height * ratio);
-    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-    stars = Array.from({ length: STAR_COUNT }, () => ({
-      x: Math.random() * width,
-      y: Math.random() * height,
-      r: 0.4 + Math.random() * 1.3,
-      speed: 3 + Math.random() * 9,
-      phase: Math.random() * Math.PI * 2,
-      hue: Math.random() < 0.75 ? "205, 235, 255" : "196, 160, 255",
-    }));
-  }
-
-  function draw(time) {
-    ctx.clearRect(0, 0, width, height);
-    for (const star of stars) {
-      const twinkle = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(time / 900 + star.phase));
-      ctx.fillStyle = `rgba(${star.hue}, ${twinkle})`;
-      ctx.beginPath();
-      ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
-      ctx.fill();
+    function resize() {
+      const rect = hero.getBoundingClientRect();
+      const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
+      width = Math.max(1, Math.floor(rect.width) || 1);
+      height = Math.max(1, Math.floor(rect.height) || 1);
+      canvas.width = Math.floor(width * ratio);
+      canvas.height = Math.floor(height * ratio);
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      stars = Array.from({ length: STAR_COUNT }, () => ({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        r: 0.4 + Math.random() * 1.3,
+        speed: 3 + Math.random() * 9,
+        phase: Math.random() * Math.PI * 2,
+        hue: Math.random() < 0.75 ? "205, 235, 255" : "196, 160, 255",
+      }));
     }
-  }
 
-  resize();
-  draw(0);
-  window.addEventListener("resize", () => {
-    resize();
-    if (reducedMotion) draw(0);
-  });
-  if (reducedMotion) return; // reduced motion: statik yıldızlar, animasyon yok
-
-  if ("IntersectionObserver" in window) {
-    new IntersectionObserver((entries) => {
-      heroVisible = entries[0]?.isIntersecting ?? true;
-    }).observe(hero);
-  }
-  let last = performance.now();
-  function frame(now) {
-    requestAnimationFrame(frame);
-    const dt = Math.min(0.05, (now - last) / 1000);
-    last = now;
-    if (!heroVisible) return; // hero ekranda değilken çizim yapma
-    for (const star of stars) {
-      star.x -= star.speed * dt;
-      if (star.x < -2) {
-        star.x = width + 2;
-        star.y = Math.random() * height;
+    function draw(time) {
+      ctx.clearRect(0, 0, width, height);
+      for (const star of stars) {
+        const twinkle = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(time / 900 + star.phase));
+        ctx.fillStyle = `rgba(${star.hue}, ${twinkle})`;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
-    draw(now);
+
+    resize();
+    draw(0);
+    window.addEventListener("resize", () => {
+      try {
+        resize();
+        if (reducedMotion) draw(0);
+      } catch {}
+    });
+    if (reducedMotion) return;
+
+    if ("IntersectionObserver" in window) {
+      new IntersectionObserver((entries) => {
+        heroVisible = entries[0]?.isIntersecting ?? true;
+      }).observe(hero);
+    }
+    let last = performance.now();
+    function frame(now) {
+      requestAnimationFrame(frame);
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      if (!heroVisible) return;
+      for (const star of stars) {
+        star.x -= star.speed * dt;
+        if (star.x < -2) {
+          star.x = width + 2;
+          star.y = Math.random() * height;
+        }
+      }
+      draw(now);
+    }
+    requestAnimationFrame(frame);
+  } catch (error) {
+    console.warn("hero-stars canvas atlandı:", error);
   }
-  requestAnimationFrame(frame);
 }
 
 function maybeNotifySocialChanges() {
-  if (!("Notification" in window) || notificationPermission !== "granted" || !latestSocial.account) return;
-  const seenRequests = new Set(JSON.parse(localStorage.getItem("hakorocks-seen-requests") || "[]"));
-  const seenInvites = new Set(JSON.parse(localStorage.getItem("hakorocks-seen-invites") || "[]"));
-  const unseenRequests = latestSocial.incomingRequests.filter((request) => !seenRequests.has(request.id));
-  const unseenInvites = latestSocial.invites.filter((invite) => !seenInvites.has(invite.id));
+  if (typeof Notification === "undefined" || notificationPermission !== "granted" || !latestSocial.account) return;
+  try {
+    const seenRequests = new Set(JSON.parse(localStorage.getItem("hakorocks-seen-requests") || "[]"));
+    const seenInvites = new Set(JSON.parse(localStorage.getItem("hakorocks-seen-invites") || "[]"));
+    const unseenRequests = (latestSocial.incomingRequests || []).filter((request) => !seenRequests.has(request.id));
+    const unseenInvites = (latestSocial.invites || []).filter((invite) => !seenInvites.has(invite.id));
 
-  for (const request of unseenRequests) {
-    new Notification("Yeni arkadaş isteği", {
-      body: `${request.from?.nickname || "Birisi"} sana arkadaşlık isteği gönderdi.`,
-    });
-    seenRequests.add(request.id);
+    for (const request of unseenRequests) {
+      new Notification("Yeni arkadaş isteği", {
+        body: `${request.from?.nickname || "Birisi"} sana arkadaşlık isteği gönderdi.`,
+      });
+      seenRequests.add(request.id);
+    }
+
+    for (const invite of unseenInvites) {
+      new Notification("Yeni oyun daveti", {
+        body: `${invite.from?.nickname || "Birisi"} seni ${invite.gameSlug} için davet etti.`,
+      });
+      seenInvites.add(invite.id);
+    }
+
+    localStorage.setItem("hakorocks-seen-requests", JSON.stringify([...seenRequests]));
+    localStorage.setItem("hakorocks-seen-invites", JSON.stringify([...seenInvites]));
+  } catch (error) {
+    console.warn("Bildirim atlandı:", error);
   }
-
-  for (const invite of unseenInvites) {
-    new Notification("Yeni oyun daveti", {
-      body: `${invite.from?.nickname || "Birisi"} seni ${invite.gameSlug} için davet etti.`,
-    });
-    seenInvites.add(invite.id);
-  }
-
-  localStorage.setItem("hakorocks-seen-requests", JSON.stringify([...seenRequests]));
-  localStorage.setItem("hakorocks-seen-invites", JSON.stringify([...seenInvites]));
 }
 
 function startPerformanceMonitor() {

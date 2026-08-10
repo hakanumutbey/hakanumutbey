@@ -16,6 +16,17 @@
     <meta property="og:url" content="https://hakorocks.akadal.tr" />
     <meta name="theme-color" content="#0b0d10" />
     <title>Hakorocks Studio</title>
+    <style>
+      html, body { margin: 0; min-height: 100%; background: #0b0d10; color: #f7f4ea; }
+      #app:empty::before {
+        content: "Hakorocks Studio yükleniyor…";
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+        font: 800 1.2rem/1.4 system-ui, sans-serif;
+        color: #35d2ff;
+      }
+    </style>
   </head>
   <body>
     <div id="app"></div>
