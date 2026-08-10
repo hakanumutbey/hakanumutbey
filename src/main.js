@@ -705,7 +705,11 @@ let selectedBanNickname = "";
 const AUTH_GATE_KEY = "hakorocks-auth-gate";
 const AUTH_TOKEN_KEY = "hakorocks-auth-token";
 const AUTH_PROFILE_KEY = "hakorocks-auth-profile";
-let authGatePassed = localStorage.getItem(AUTH_GATE_KEY) === "1" || Boolean(localStorage.getItem(AUTH_TOKEN_KEY));
+// Geçici: kapı beyaz ekran yaptığı için kapalı. Hesap API duruyor; site her zaman açılsın.
+const AUTH_GATE_ENABLED = false;
+let authGatePassed = !AUTH_GATE_ENABLED
+  || localStorage.getItem(AUTH_GATE_KEY) === "1"
+  || Boolean(localStorage.getItem(AUTH_TOKEN_KEY));
 let authGateView = "home"; // home | register | login | welcome | manage
 let authGateStatus = "";
 let authWelcomeName = "";
@@ -742,20 +746,28 @@ function clearAuthSession() {
   authGatePassed = false;
 }
 
-document.documentElement.dataset.theme = selectedTheme;
-document.documentElement.dataset.authGate = authGatePassed ? "open" : "locked";
+// Tema, HTML kurulduktan sonra uygulanır (erken light tema beyaz ekran gibi görünmesin)
+document.documentElement.dataset.authGate = AUTH_GATE_ENABLED && !authGatePassed ? "locked" : "open";
+
+function markSiteReady() {
+  document.documentElement.dataset.siteReady = "1";
+  document.body?.classList?.add("site-ready");
+  const boot = document.getElementById("boot-shell");
+  if (boot) boot.hidden = true;
+}
 
 function paintEmergencyScreen(message) {
   const root = document.querySelector("#app");
   if (!root) return;
+  markSiteReady();
   root.innerHTML = `
-    <div class="auth-gate" data-auth-gate style="display:flex;align-items:center;justify-content:center;background:#0b0d10;color:#f7f4ea;min-height:100vh;padding:24px;text-align:center;">
+    <div style="display:flex;align-items:center;justify-content:center;background:#0b0d10;color:#f7f4ea;min-height:100vh;padding:24px;text-align:center;">
       <div>
         <div style="width:96px;height:96px;margin:0 auto 16px;display:grid;place-items:center;border:3px solid #35d2ff;border-radius:20px;color:#35d2ff;font-size:3rem;font-weight:900;">H</div>
         <p style="font-size:1.6rem;font-weight:900;color:#35d2ff;margin:0 0 12px;">Hakorocks Studio</p>
         <p style="color:#ffd166;margin:0 0 18px;">${String(message || "Sayfa yüklenemedi.")}</p>
         <button type="button" onclick="location.reload()" style="min-height:48px;padding:0 20px;border:0;border-radius:12px;background:#35d2ff;color:#071012;font-weight:800;cursor:pointer;">Yenile</button>
-        <button type="button" onclick="localStorage.removeItem('hakorocks-auth-gate');location.reload()" style="min-height:48px;padding:0 20px;margin-left:8px;border:1px solid rgba(255,255,255,.2);border-radius:12px;background:transparent;color:#f7f4ea;font-weight:800;cursor:pointer;">Kapıyı sıfırla</button>
+        <button type="button" onclick="try{localStorage.clear()}catch(e){};location.reload()" style="min-height:48px;padding:0 20px;margin-left:8px;border:1px solid rgba(255,255,255,.2);border-radius:12px;background:transparent;color:#f7f4ea;font-weight:800;cursor:pointer;">Temizle ve yenile</button>
       </div>
     </div>
   `;
@@ -4196,10 +4208,35 @@ function bindAuthGate() {
 }
 
 async function ensureAuthGateOnBoot() {
+  // Kapı kapalıyken sadece oturumu arka planda bağla; asla ekranı kilitleme
+  if (!AUTH_GATE_ENABLED) {
+    closeAuthGateAndEnterSite();
+    const authToken = readStoredAuthToken();
+    if (authToken) {
+      try {
+        const response = await fetch("/api/auth/resume", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId, authToken }),
+        });
+        const data = await response.json();
+        if (response.ok && data?.account) {
+          latestSocial = data;
+          persistAuthSession({
+            authToken: data.authToken || authToken,
+            account: data.account,
+            welcomeName: data.welcomeName || data.account.name,
+          });
+          renderSocialDashboard();
+        }
+      } catch {}
+    }
+    return;
+  }
+
   const authToken = readStoredAuthToken();
   const profile = readStoredAuthProfile();
 
-  // 1) Kayıtlı token ile otomatik devam (kapı her seferinde çıkmasın)
   if (authToken) {
     try {
       const response = await fetch("/api/auth/resume", {
@@ -4220,12 +4257,10 @@ async function ensureAuthGateOnBoot() {
         return;
       }
     } catch {}
-    // Token geçersizse oturum aç ekranı
     openAuthGate("login", "Oturumun yenilenmeli. Ad/takma ad ve şifreni gir.", { clearSession: true });
     return;
   }
 
-  // 2) Eski yöntem: sadece sessionId ile hesap var mı?
   if (authGatePassed) {
     try {
       const response = await fetch(`/api/account?sessionId=${encodeURIComponent(sessionId)}`);
@@ -4239,7 +4274,6 @@ async function ensureAuthGateOnBoot() {
     } catch {}
   }
 
-  // 3) İlk ziyaret: giriş kapısı
   openAuthGate("home", profile?.name ? `Tekrar hoş geldin ${profile.name}. Oturum aç.` : "");
 }
 
@@ -5643,8 +5677,10 @@ async function refreshLiveData() {
   maybeNotifySocialChanges();
   refreshPublicState();
   refreshBanStatus();
-  if (!document.querySelector("[data-game-modal]").hidden) {
-    document.querySelector("[data-modal-content]").innerHTML = renderModal(selectedGame);
+  const gameModal = document.querySelector("[data-game-modal]");
+  const modalContent = document.querySelector("[data-modal-content]");
+  if (gameModal && modalContent && !gameModal.hidden) {
+    modalContent.innerHTML = renderModal(selectedGame);
     bindDynamicForms();
   }
 }
@@ -5683,10 +5719,9 @@ try {
   bindTrailer();
   bindAuthGate();
   refreshAuthGate();
-  // Kapıyı hemen kilitle; ensureAuthGateOnBoot oturumu doğrulayınca siteyi açar
-  if (authGatePassed || readStoredAuthToken()) {
-    closeAuthGateAndEnterSite();
-  } else {
+  // Site her zaman görünsün (kapı şu an kapalı / arka planda)
+  closeAuthGateAndEnterSite();
+  if (AUTH_GATE_ENABLED && !(authGatePassed || readStoredAuthToken())) {
     openAuthGate("home");
   }
   updateSoundButton();
@@ -5700,16 +5735,17 @@ try {
   renderStudioPulsePanel();
   renderClickGamePanel();
   void ensureAuthGateOnBoot();
-  refreshLiveData();
-  initAdminRoom();
+  void refreshLiveData();
+  void initAdminRoom();
   initHeroStars();
-  setInterval(refreshLiveData, 10000);
+  setInterval(() => { void refreshLiveData(); }, 10000);
   startPerformanceMonitor();
   startRevealAnimations();
-  setInterval(refreshPerformancePing, 15000);
+  setInterval(() => { void refreshPerformancePing(); }, 15000);
+  markSiteReady();
 } catch (error) {
   console.error("Site boot hatası:", error);
-  paintEmergencyScreen("Site açılırken hata oluştu. Yenile veya kapıyı sıfırla.");
+  paintEmergencyScreen(`Site açılırken hata: ${error?.message || "bilinmeyen"}`);
 }
 
 function initHeroStars() {
@@ -5858,46 +5894,53 @@ async function refreshPerformancePing() {
 }
 
 function startRevealAnimations() {
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  document.documentElement.classList.add("motion-ready");
-  const selector = [
-    ".section",
-    ".game-card",
-    ".launcher-game-card",
-    ".community-panel",
-    ".studio-panel",
-    ".badge-card",
-    ".photo-card",
-    ".pulse-feed article",
-    ".click-arena",
-    ".click-leaderboard",
-    ".click-leader",
-  ].join(",");
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach((entry) => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add("is-visible");
-        observer.unobserve(entry.target);
-      }
-    });
-  }, { rootMargin: "0px 0px -80px 0px", threshold: 0.08 });
-  const register = (root = document) => {
-    root.querySelectorAll(selector).forEach((element) => {
-      if (element.dataset.revealBound === "1") return;
-      element.dataset.revealBound = "1";
-      element.classList.add("reveal-item");
-      observer.observe(element);
-    });
-  };
-  register();
-  const mutationObserver = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      mutation.addedNodes.forEach((node) => {
-        if (node.nodeType === Node.ELEMENT_NODE) register(node);
+  try {
+    if (!("IntersectionObserver" in window) || !("MutationObserver" in window)) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return;
+    const appRoot = document.querySelector("#app");
+    if (!appRoot) return;
+    document.documentElement.classList.add("motion-ready");
+    const selector = [
+      ".section",
+      ".game-card",
+      ".launcher-game-card",
+      ".community-panel",
+      ".studio-panel",
+      ".badge-card",
+      ".photo-card",
+      ".pulse-feed article",
+      ".click-arena",
+      ".click-leaderboard",
+      ".click-leader",
+    ].join(",");
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("is-visible");
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { rootMargin: "0px 0px -80px 0px", threshold: 0.08 });
+    const register = (root = document) => {
+      root.querySelectorAll?.(selector)?.forEach((element) => {
+        if (element.dataset.revealBound === "1") return;
+        element.dataset.revealBound = "1";
+        element.classList.add("reveal-item");
+        observer.observe(element);
+      });
+    };
+    register();
+    const mutationObserver = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE) register(node);
+        });
       });
     });
-  });
-  mutationObserver.observe(document.querySelector("#app"), { childList: true, subtree: true });
+    mutationObserver.observe(appRoot, { childList: true, subtree: true });
+  } catch (error) {
+    console.warn("reveal animations atlandı:", error);
+  }
 }
 
 // ---- Yönetici Odası ----

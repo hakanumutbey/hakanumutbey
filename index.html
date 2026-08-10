@@ -17,19 +17,111 @@
     <meta name="theme-color" content="#0b0d10" />
     <title>Hakorocks Studio</title>
     <style>
-      html, body { margin: 0; min-height: 100%; background: #0b0d10; color: #f7f4ea; }
-      #app:empty::before {
-        content: "Hakorocks Studio yükleniyor…";
+      html, body {
+        margin: 0;
+        min-height: 100%;
+        background: #0b0d10 !important;
+        color: #f7f4ea;
+      }
+      #boot-shell {
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
         display: grid;
         place-items: center;
-        min-height: 100vh;
-        font: 800 1.2rem/1.4 system-ui, sans-serif;
+        gap: 14px;
+        padding: 24px;
+        text-align: center;
+        background: #0b0d10;
+        color: #f7f4ea;
+        font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+      }
+      #boot-shell[hidden] { display: none !important; }
+      #boot-shell .mark {
+        width: 96px;
+        height: 96px;
+        display: grid;
+        place-items: center;
+        border: 3px solid #35d2ff;
+        border-radius: 22px;
+        color: #35d2ff;
+        font-size: 3rem;
+        font-weight: 900;
+        background: rgba(53, 210, 255, 0.12);
+      }
+      #boot-shell .title {
+        margin: 0;
+        font-size: 1.7rem;
+        font-weight: 900;
         color: #35d2ff;
       }
+      #boot-shell .msg {
+        margin: 0;
+        color: #b8c2c0;
+        max-width: 28rem;
+        line-height: 1.45;
+      }
+      #boot-shell .err { color: #ffd166; }
+      #boot-shell button {
+        min-height: 48px;
+        padding: 0 18px;
+        border: 0;
+        border-radius: 12px;
+        background: #35d2ff;
+        color: #071012;
+        font-weight: 800;
+        cursor: pointer;
+      }
+      html[data-site-ready="1"] #boot-shell { display: none !important; }
     </style>
   </head>
   <body>
+    <div id="boot-shell" aria-live="polite">
+      <div class="mark" aria-hidden="true">H</div>
+      <p class="title">Hakorocks Studio</p>
+      <p class="msg" id="boot-msg">Yükleniyor…</p>
+      <button type="button" id="boot-reload" hidden>Yenile</button>
+    </div>
     <div id="app"></div>
+    <script>
+      (function () {
+        var boot = document.getElementById("boot-shell");
+        var msg = document.getElementById("boot-msg");
+        var reload = document.getElementById("boot-reload");
+        function fail(text) {
+          if (msg) {
+            msg.textContent = text || "Site yüklenemedi.";
+            msg.className = "msg err";
+          }
+          if (reload) reload.hidden = false;
+          if (boot) boot.hidden = false;
+          document.documentElement.removeAttribute("data-site-ready");
+        }
+        if (reload) {
+          reload.onclick = function () {
+            try {
+              localStorage.removeItem("hakorocks-auth-gate");
+              localStorage.removeItem("hakorocks-auth-token");
+              localStorage.removeItem("hakorocks-auth-profile");
+            } catch (e) {}
+            location.reload();
+          };
+        }
+        window.addEventListener("error", function (event) {
+          fail("JS hatası: " + (event && event.message ? event.message : "bilinmiyor"));
+        });
+        window.addEventListener("unhandledrejection", function (event) {
+          var reason = event && event.reason;
+          fail("Promise hatası: " + (reason && reason.message ? reason.message : String(reason || "bilinmiyor")));
+        });
+        // 12 sn içinde site hazır olmazsa uyar
+        setTimeout(function () {
+          if (document.documentElement.getAttribute("data-site-ready") !== "1") {
+            fail("Site uzun sürdü. Yenile'ye bas (önbellek / oturum temizlenir).");
+          }
+        }, 12000);
+      })();
+    </script>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
