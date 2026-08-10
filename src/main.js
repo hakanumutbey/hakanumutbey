@@ -3839,22 +3839,21 @@ function renderAuthGate() {
     `;
   }
 
-  // home / splash (video later)
+  // home / splash (video later) — tam ekran logo + yazı
   return `
     <div class="auth-gate-card auth-gate-home" data-auth-view="home">
-      <div class="auth-video-slot" data-auth-video-slot aria-hidden="true">
-        <div class="auth-video-placeholder">
-          <span>Video yakında</span>
+      <div class="auth-home-hero">
+        ${renderAuthBrand(true)}
+        <p class="auth-gate-tagline">Oyun stüdyosu · Portfolyo · Vitrin</p>
+      </div>
+      <div class="auth-home-footer">
+        <div class="auth-gate-actions auth-gate-home-actions">
+          <button class="button primary auth-gate-cta" type="button" data-auth-view-set="register">Hesap oluştur</button>
+          <button class="button secondary auth-gate-cta" type="button" data-auth-view-set="login">Oturum aç</button>
         </div>
+        <button class="auth-gate-manage-link" type="button" data-auth-view-set="manage">Hesap yeri</button>
+        ${status}
       </div>
-      ${renderAuthBrand(true)}
-      <p class="auth-gate-tagline">Oyun stüdyosu · Portfolyo · Vitrin</p>
-      <div class="auth-gate-actions auth-gate-home-actions">
-        <button class="button primary auth-gate-cta" type="button" data-auth-view-set="register">Hesap oluştur</button>
-        <button class="button secondary auth-gate-cta" type="button" data-auth-view-set="login">Oturum aç</button>
-      </div>
-      <button class="auth-gate-manage-link" type="button" data-auth-view-set="manage">Hesap yeri</button>
-      ${status}
     </div>
   `;
 }
@@ -3862,7 +3861,9 @@ function renderAuthGate() {
 function renderAuthBrand(large = false) {
   return `
     <div class="auth-brand ${large ? "is-large" : ""}">
-      <img class="auth-logo" src="/github_profile_header.png" alt="Hakorocks Studio logosu" />
+      <div class="auth-logo-mark" role="img" aria-label="Hakorocks Studio logosu">
+        <span class="auth-logo-h">H</span>
+      </div>
       <p class="auth-studio-name">Hakorocks Studio</p>
     </div>
   `;

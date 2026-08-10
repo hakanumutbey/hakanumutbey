@@ -4750,12 +4750,14 @@ html[data-auth-gate="locked"] body {
   z-index: 10000;
   display: flex;
   align-items: stretch;
-  justify-content: center;
+  justify-content: stretch;
+  width: 100%;
+  height: 100dvh;
+  height: 100vh;
   min-height: 100dvh;
   min-height: 100vh;
-  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  padding: 0;
+  overflow: hidden;
 }
 
 .auth-gate[hidden] {
@@ -4766,149 +4768,188 @@ html[data-auth-gate="locked"] body {
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(ellipse 120% 80% at 50% -10%, rgba(53, 210, 255, 0.22), transparent 55%),
-    radial-gradient(ellipse 90% 60% at 100% 100%, rgba(143, 255, 106, 0.12), transparent 50%),
-    radial-gradient(ellipse 70% 50% at 0% 80%, rgba(184, 146, 255, 0.14), transparent 45%),
-    linear-gradient(165deg, #07090c 0%, #0b0d10 40%, #10141a 100%);
+    radial-gradient(ellipse 120% 80% at 50% -10%, rgba(53, 210, 255, 0.28), transparent 55%),
+    radial-gradient(ellipse 90% 60% at 100% 100%, rgba(53, 210, 255, 0.1), transparent 50%),
+    radial-gradient(ellipse 70% 50% at 0% 80%, rgba(53, 210, 255, 0.08), transparent 45%),
+    linear-gradient(165deg, #05070a 0%, #0b0d10 42%, #0e141c 100%);
   pointer-events: none;
 }
 
 .auth-gate-shell {
   position: relative;
   z-index: 1;
-  width: min(100%, 440px);
-  margin: auto;
+  width: 100%;
+  height: 100%;
+  margin: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: min(100%, 100dvh);
+  align-items: stretch;
+  justify-content: stretch;
 }
 
 .auth-gate-card {
   width: 100%;
-  display: grid;
-  gap: 14px;
-  padding: 22px 18px 20px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 22px;
-  background: rgba(14, 17, 22, 0.88);
-  box-shadow:
-    0 24px 60px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(18px);
-}
-
-.auth-gate-home {
-  gap: 16px;
-  text-align: center;
-  padding-top: 18px;
-}
-
-.auth-video-slot {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  border-radius: 16px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.35);
-}
-
-.auth-video-placeholder {
-  width: 100%;
   height: 100%;
   display: grid;
+  gap: 16px;
+  padding:
+    max(20px, env(safe-area-inset-top))
+    max(18px, env(safe-area-inset-right))
+    max(20px, env(safe-area-inset-bottom))
+    max(18px, env(safe-area-inset-left));
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  align-content: center;
+  justify-items: center;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Ana açılış: tam ekran logo + yazı */
+.auth-gate-home {
+  grid-template-rows: 1fr auto;
+  gap: 0;
+  text-align: center;
+  align-content: stretch;
+  padding-top: max(12px, env(safe-area-inset-top));
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+.auth-home-hero {
+  display: grid;
+  place-content: center;
   place-items: center;
-  color: var(--muted);
-  font-size: 0.85rem;
-  letter-spacing: 0.04em;
-  background:
-    linear-gradient(135deg, rgba(53, 210, 255, 0.08), transparent 50%),
-    repeating-linear-gradient(
-      -12deg,
-      transparent,
-      transparent 10px,
-      rgba(255, 255, 255, 0.02) 10px,
-      rgba(255, 255, 255, 0.02) 11px
-    );
+  gap: clamp(18px, 4vh, 36px);
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  padding: clamp(12px, 3vw, 28px);
+}
+
+.auth-home-footer {
+  width: min(100%, 560px);
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  padding: 8px 4px 4px;
 }
 
 .auth-brand {
   display: grid;
-  gap: 10px;
+  gap: 16px;
   justify-items: center;
   text-align: center;
+  width: 100%;
 }
 
 .auth-brand.is-large {
-  gap: 12px;
+  gap: clamp(20px, 4vh, 40px);
 }
 
-.auth-logo {
-  width: min(100%, 320px);
-  max-height: 88px;
-  object-fit: contain;
-  border-radius: 12px;
-  display: block;
+/* Mavi kare + mavi H logosu */
+.auth-logo-mark {
+  display: grid;
+  place-items: center;
+  width: clamp(88px, 22vw, 140px);
+  height: clamp(88px, 22vw, 140px);
+  border-radius: clamp(16px, 4vw, 28px);
+  border: 3px solid rgba(53, 210, 255, 0.75);
+  color: #35d2ff;
+  background:
+    linear-gradient(145deg, rgba(53, 210, 255, 0.22), rgba(53, 210, 255, 0.08));
+  box-shadow:
+    0 0 0 1px rgba(53, 210, 255, 0.2),
+    0 18px 50px rgba(53, 210, 255, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
-.auth-brand.is-large .auth-logo {
-  max-height: 110px;
+.auth-brand.is-large .auth-logo-mark {
+  width: clamp(160px, 42vw, 320px);
+  height: clamp(160px, 42vw, 320px);
+  border-radius: clamp(28px, 7vw, 56px);
+  border-width: 4px;
+}
+
+.auth-logo-h {
+  font-weight: 900;
+  font-size: clamp(3rem, 12vw, 5rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: #35d2ff;
+  text-shadow: 0 0 28px rgba(53, 210, 255, 0.45);
+  user-select: none;
+}
+
+.auth-brand.is-large .auth-logo-h {
+  font-size: clamp(6rem, 28vw, 12rem);
 }
 
 .auth-studio-name {
   margin: 0;
-  font-size: clamp(1.35rem, 5.5vw, 1.85rem);
-  font-weight: 800;
+  width: 100%;
+  max-width: 100%;
+  font-size: clamp(1.5rem, 5.5vw, 2.4rem);
+  font-weight: 900;
+  letter-spacing: 0.01em;
+  line-height: 1.1;
+  color: #35d2ff;
+  text-shadow: 0 0 40px rgba(53, 210, 255, 0.25);
+  word-break: break-word;
+}
+
+.auth-brand.is-large .auth-studio-name {
+  font-size: clamp(2.4rem, 10vw, 5.2rem);
   letter-spacing: 0.02em;
-  background: linear-gradient(105deg, #f7f4ea 0%, #35d2ff 55%, #8fff6a 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
 }
 
 .auth-gate-tagline {
   margin: 0;
-  color: var(--muted);
-  font-size: 0.92rem;
+  color: rgba(184, 194, 192, 0.95);
+  font-size: clamp(0.95rem, 3.2vw, 1.25rem);
+  letter-spacing: 0.04em;
 }
 
 .auth-gate-title {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: clamp(1.35rem, 4.5vw, 1.7rem);
   text-align: center;
 }
 
 .auth-gate-note {
   margin: 0;
   color: var(--muted);
-  font-size: 0.92rem;
+  font-size: 0.98rem;
   line-height: 1.45;
   text-align: center;
+  max-width: 420px;
 }
 
 .auth-gate-form {
   display: grid;
   gap: 12px;
+  width: min(100%, 420px);
 }
 
 .auth-gate-form label {
   display: grid;
   gap: 6px;
   text-align: left;
-  font-size: 0.88rem;
+  font-size: 0.92rem;
   color: var(--muted);
 }
 
 .auth-gate-form input {
   width: 100%;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 14px 14px;
-  min-height: 48px;
+  min-height: 52px;
   font: inherit;
   font-size: 1rem;
   color: var(--text);
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.4);
   -webkit-appearance: none;
   appearance: none;
 }
@@ -4923,24 +4964,22 @@ html[data-auth-gate="locked"] body {
 .auth-gate-links,
 .auth-gate-home-actions {
   display: grid;
-  gap: 10px;
-}
-
-.auth-gate-home-actions {
-  margin-top: 4px;
+  gap: 12px;
+  width: 100%;
 }
 
 .auth-gate-cta {
   width: 100%;
-  min-height: 50px;
-  font-size: 1.02rem;
+  min-height: 54px;
+  font-size: 1.08rem;
   justify-content: center;
+  border-radius: 14px;
 }
 
 .auth-gate-links .button,
 .auth-gate-actions .button {
   width: 100%;
-  min-height: 48px;
+  min-height: 52px;
   justify-content: center;
 }
 
@@ -4950,11 +4989,11 @@ html[data-auth-gate="locked"] body {
   background: transparent;
   color: var(--muted);
   font: inherit;
-  font-size: 0.88rem;
+  font-size: 0.95rem;
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
-  padding: 10px;
+  padding: 12px;
   min-height: 44px;
 }
 
@@ -4968,32 +5007,32 @@ html[data-auth-gate="locked"] body {
   min-height: 1.2em;
   text-align: center;
   color: var(--gold);
-  font-size: 0.9rem;
+  font-size: 0.95rem;
 }
 
 .auth-gate-welcome {
   text-align: center;
-  gap: 18px;
-  padding-block: 28px 24px;
+  gap: 22px;
+  place-content: center;
 }
 
 .auth-welcome-copy {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   padding: 8px 4px 4px;
 }
 
 .auth-welcome-line {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: clamp(1.2rem, 4vw, 1.5rem);
   color: var(--muted);
 }
 
 .auth-welcome-name {
   margin: 0;
-  font-size: clamp(1.6rem, 7vw, 2.1rem);
-  font-weight: 800;
-  color: var(--text);
+  font-size: clamp(2rem, 9vw, 3.2rem);
+  font-weight: 900;
+  color: #35d2ff;
   word-break: break-word;
 }
 
@@ -5022,50 +5061,40 @@ html[data-auth-gate="locked"] body {
   justify-content: center;
 }
 
-/* Telefon / dar ekran: tam mobil arayüz */
+/* Form ekranları: ortada kart hissi (kayıt/giriş) */
+.auth-gate-card:not(.auth-gate-home) {
+  max-width: 520px;
+  width: min(100%, 520px);
+  height: auto;
+  min-height: min(100%, 100dvh);
+  margin: auto;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 22px;
+  background: rgba(10, 13, 18, 0.82);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(16px);
+  padding: 28px 22px 24px;
+  align-content: start;
+}
+
+/* Telefon / dar ekran */
 @media (max-width: 720px) {
-  .auth-gate {
-    padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
-    align-items: flex-end;
-  }
-
-  .auth-gate-shell {
-    width: 100%;
-    max-width: none;
-    margin: 0;
-    min-height: 100%;
-    align-items: stretch;
-  }
-
-  .auth-gate-card {
-    border-radius: 22px 22px 18px 18px;
-    padding: 18px 16px max(18px, env(safe-area-inset-bottom));
-    gap: 12px;
-    min-height: min(100%, calc(100dvh - 16px));
-    align-content: start;
-    box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.4);
-  }
-
   .auth-gate-home {
-    align-content: space-between;
-    min-height: min(100%, calc(100dvh - 16px));
+    grid-template-rows: 1fr auto;
   }
 
-  .auth-video-slot {
-    aspect-ratio: 16 / 10;
-    max-height: 28vh;
+  .auth-brand.is-large .auth-logo-mark {
+    width: min(72vw, 280px);
+    height: min(72vw, 280px);
   }
 
-  .auth-logo {
-    max-height: 72px;
+  .auth-brand.is-large .auth-logo-h {
+    font-size: min(42vw, 10rem);
   }
 
-  .auth-brand.is-large .auth-logo {
-    max-height: 84px;
-  }
-
-  .auth-studio-name {
-    font-size: clamp(1.45rem, 7vw, 1.75rem);
+  .auth-brand.is-large .auth-studio-name {
+    font-size: clamp(2.2rem, 11vw, 3.4rem);
+    padding-inline: 4px;
   }
 
   .auth-gate-form input {
@@ -5073,22 +5102,20 @@ html[data-auth-gate="locked"] body {
     padding: 15px 14px;
   }
 
-  .auth-gate-home-actions {
-    gap: 12px;
-    margin-top: auto;
-    padding-top: 8px;
-  }
-
   .auth-gate-cta,
   .auth-gate-links .button,
   .auth-gate-actions .button {
-    min-height: 52px;
-    border-radius: 14px;
-    font-size: 1.05rem;
+    min-height: 54px;
+    font-size: 1.08rem;
   }
 
-  .auth-welcome-name {
-    font-size: clamp(1.7rem, 8vw, 2.2rem);
+  .auth-gate-card:not(.auth-gate-home) {
+    width: 100%;
+    max-width: none;
+    min-height: 100%;
+    border-radius: 0;
+    border: 0;
+    margin: 0;
   }
 
   .account-action-row {
@@ -5096,80 +5123,61 @@ html[data-auth-gate="locked"] body {
   }
 }
 
-/* Çok küçük telefon */
-@media (max-width: 380px) {
-  .auth-gate-card {
-    padding: 14px 12px max(14px, env(safe-area-inset-bottom));
-  }
-
-  .auth-video-slot {
-    max-height: 22vh;
-  }
-
-  .auth-studio-name {
-    font-size: 1.3rem;
-  }
-}
-
 /* Yatay telefon */
 @media (max-height: 480px) and (orientation: landscape) {
-  .auth-gate {
-    align-items: stretch;
+  .auth-gate-home {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+  }
+
+  .auth-home-hero {
     padding: 8px;
-  }
-
-  .auth-gate-shell {
-    width: min(100%, 560px);
-  }
-
-  .auth-gate-card {
-    min-height: auto;
-    padding: 12px 16px;
     gap: 10px;
   }
 
-  .auth-gate-home {
-    min-height: auto;
+  .auth-brand.is-large .auth-logo-mark {
+    width: min(28vh, 140px);
+    height: min(28vh, 140px);
   }
 
-  .auth-video-slot {
-    display: none;
+  .auth-brand.is-large .auth-logo-h {
+    font-size: min(16vh, 5rem);
   }
 
-  .auth-logo {
-    max-height: 48px;
+  .auth-brand.is-large .auth-studio-name {
+    font-size: clamp(1.4rem, 5vw, 2rem);
   }
 
-  .auth-studio-name {
-    font-size: 1.2rem;
+  .auth-gate-tagline {
+    font-size: 0.85rem;
+  }
+
+  .auth-home-footer {
+    width: 100%;
+  }
+
+  .auth-gate-home-actions {
+    grid-template-columns: 1fr 1fr;
   }
 
   .auth-gate-form {
     grid-template-columns: 1fr 1fr;
     gap: 8px 10px;
+    width: 100%;
   }
 
   .auth-gate-form label:last-of-type {
     grid-column: 1 / -1;
   }
-
-  .auth-gate-home-actions {
-    grid-template-columns: 1fr 1fr;
-    margin-top: 0;
-    padding-top: 0;
-  }
 }
 
-/* Geniş ekran: ortalanmış kart */
+/* Geniş ekran */
 @media (min-width: 721px) {
-  .auth-gate {
-    align-items: center;
-    padding: 28px;
-  }
-
-  .auth-gate-card {
-    padding: 28px 26px 24px;
-    gap: 16px;
+  .auth-home-footer {
+    width: min(100%, 640px);
   }
 
   .auth-gate-home-actions {
@@ -5178,5 +5186,10 @@ html[data-auth-gate="locked"] body {
 
   .auth-gate-links {
     grid-template-columns: 1fr 1fr;
+    width: min(100%, 420px);
+  }
+
+  .auth-gate-actions {
+    width: min(100%, 420px);
   }
 }
