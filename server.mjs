@@ -577,6 +577,7 @@ async function handleApi(request, response) {
     sendJson(response, {
       ...accountSnapshot(result.sessionId),
       welcomeName: result.account.name,
+      authToken: result.account.authToken,
       created: true,
     });
     return;
@@ -597,7 +598,28 @@ async function handleApi(request, response) {
     sendJson(response, {
       ...accountSnapshot(result.sessionId),
       welcomeName: result.account.name,
+      authToken: result.account.authToken,
       created: false,
+    });
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/auth/resume") {
+    const body = await readBody(request, 64_000);
+    const result = resumeAccount({
+      sessionId: safeText(body.sessionId, 120),
+      authToken: safeText(body.authToken, 128),
+    });
+    if (result.error) {
+      response.writeHead(result.status, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: result.error, message: result.message || "" }));
+      return;
+    }
+    await writeJson("accounts.json", accounts);
+    sendJson(response, {
+      ...accountSnapshot(result.sessionId),
+      welcomeName: result.account.name,
+      authToken: result.account.authToken,
+      resumed: true,
     });
     return;
   }
@@ -705,6 +727,7 @@ async function handleApi(request, response) {
         nickname,
         avatarUrl: avatarUrl || taken.avatarUrl || "",
         passwordHash: nextPasswordHash,
+        authToken: taken.authToken || createAuthToken(),
         voiceRoomId: taken.voiceRoomId || "",
         updatedAt: now,
       })
@@ -714,6 +737,7 @@ async function handleApi(request, response) {
           nickname,
           avatarUrl: avatarUrl || existing.avatarUrl || "",
           passwordHash: nextPasswordHash,
+          authToken: existing.authToken || createAuthToken(),
           voiceRoomId: existing.voiceRoomId || "",
           updatedAt: now,
         })
@@ -724,6 +748,7 @@ async function handleApi(request, response) {
           nickname,
           avatarUrl,
           passwordHash: nextPasswordHash,
+          authToken: createAuthToken(),
           voiceRoomId: "",
           createdAt: now,
           updatedAt: now,
@@ -734,8 +759,12 @@ async function handleApi(request, response) {
       accounts = accounts.filter((item) => item.id !== existing.id);
     }
     if (!existing && !restored) accounts = [account, ...accounts];
+    ensureAccountAuthToken(account);
     await writeJson("accounts.json", accounts);
-    sendJson(response, accountSnapshot(sessionId));
+    sendJson(response, {
+      ...accountSnapshot(sessionId),
+      authToken: account.authToken,
+    });
     return;
   }
   if (request.method === "POST" && url.pathname === "/api/friends/request") {
@@ -1880,7 +1909,13 @@ function passwordHash(value) {
 
 // Kopyala-yapıştır sırasında araya giren boşluk/satır sonları şifreyi bozmasın.
 function normalizePassword(value) {
-  return safeText(value, 500).replace(/\s+/g, "");
+  if (typeof value === "number") return String(value);
+  if (typeof value !== "string") return "";
+  return value.trim().replace(/\s+/g, "").slice(0, 500);
+}
+
+function createAuthToken() {
+  return randomBytes(24).toString("hex");
 }
 
 function normalizeAccounts(value) {
@@ -1894,12 +1929,13 @@ function normalizeAccounts(value) {
       nickname: safeText(item.nickname, 24) || "hakan",
       avatarUrl: safeAvatar(item.avatarUrl),
       passwordHash: safeText(item.passwordHash, 128),
+      authToken: safeText(item.authToken, 128),
       voiceRoomId: safeText(item.voiceRoomId, 40),
       createdAt: safeText(item.createdAt, 40) || new Date().toISOString(),
       updatedAt: safeText(item.updatedAt, 40) || new Date().toISOString(),
       friends: Array.isArray(item.friends) ? item.friends.map((friendId) => safeText(friendId, 80)).filter(Boolean) : [],
     }))
-    .filter((item) => item.id && (item.sessionId || item.passwordHash || item.nickname));
+    .filter((item) => item.id && (item.sessionId || item.passwordHash || item.nickname || item.authToken));
 }
 
 function clearSessionBindings(sessionId) {
@@ -1909,6 +1945,13 @@ function clearSessionBindings(sessionId) {
       ? { ...account, sessionId: "", updatedAt: new Date().toISOString() }
       : account
   ));
+}
+
+function ensureAccountAuthToken(account) {
+  if (!account.authToken) {
+    account.authToken = createAuthToken();
+  }
+  return account.authToken;
 }
 
 function registerAccount({ sessionId, name, nickname, password }) {
@@ -1922,7 +1965,7 @@ function registerAccount({ sessionId, name, nickname, password }) {
   const normalizedNickname = normalizeNickname(nickname);
   const nicknameTaken = accounts.find((account) => normalizeNickname(account.nickname) === normalizedNickname);
   if (nicknameTaken) {
-    return { error: "nickname-taken", status: 409, message: "Bu takma ad alınmış." };
+    return { error: "nickname-taken", status: 409, message: "Bu takma ad alınmış. Oturum açmayı dene." };
   }
   clearSessionBindings(sessionId);
   const now = new Date().toISOString();
@@ -1933,6 +1976,7 @@ function registerAccount({ sessionId, name, nickname, password }) {
     nickname,
     avatarUrl: "",
     passwordHash: passwordHash(normalizedPass),
+    authToken: createAuthToken(),
     voiceRoomId: "",
     createdAt: now,
     updatedAt: now,
@@ -1943,23 +1987,43 @@ function registerAccount({ sessionId, name, nickname, password }) {
 }
 
 function loginAccount({ sessionId, name, password }) {
-  if (!sessionId || name.length < 2) {
-    return { error: "invalid-login", status: 400, message: "Ad ve şifre gerekli." };
+  if (!sessionId || name.length < 1) {
+    return { error: "invalid-login", status: 400, message: "Ad/takma ad ve şifre gerekli." };
   }
   const normalizedPass = normalizePassword(password);
-  if (!normalizedPass) {
-    return { error: "invalid-login", status: 400, message: "Ad ve şifre gerekli." };
+  if (normalizedPass.length < 1) {
+    return { error: "invalid-login", status: 400, message: "Ad/takma ad ve şifre gerekli." };
   }
   const hash = passwordHash(normalizedPass);
-  const nameKey = name.toLocaleLowerCase("tr-TR");
-  const account = accounts.find((item) => {
+  const nameKey = name.toLocaleLowerCase("tr-TR").trim();
+  const nickKey = normalizeNickname(name);
+  const candidates = accounts.filter((item) => {
     if (!item.passwordHash) return false;
     const sameName = item.name.toLocaleLowerCase("tr-TR") === nameKey;
-    const sameNick = normalizeNickname(item.nickname) === normalizeNickname(name);
-    return (sameName || sameNick) && item.passwordHash === hash;
+    const sameNick = normalizeNickname(item.nickname) === nickKey;
+    return sameName || sameNick;
   });
+  if (candidates.length === 0) {
+    return { error: "wrong-credentials", status: 401, message: "Bu ad/takma ad ile hesap bulunamadı." };
+  }
+  const account = candidates.find((item) => item.passwordHash === hash);
   if (!account) {
-    return { error: "wrong-credentials", status: 401, message: "Ad veya şifre yanlış." };
+    return { error: "wrong-credentials", status: 401, message: "Şifre yanlış." };
+  }
+  clearSessionBindings(sessionId);
+  account.sessionId = sessionId;
+  ensureAccountAuthToken(account);
+  account.updatedAt = new Date().toISOString();
+  return { account, sessionId };
+}
+
+function resumeAccount({ sessionId, authToken }) {
+  if (!sessionId || !authToken) {
+    return { error: "invalid-resume", status: 400, message: "Oturum anahtarı eksik." };
+  }
+  const account = accounts.find((item) => item.authToken && item.authToken === authToken);
+  if (!account) {
+    return { error: "invalid-resume", status: 401, message: "Kayıtlı oturum bulunamadı." };
   }
   clearSessionBindings(sessionId);
   account.sessionId = sessionId;
@@ -1990,6 +2054,7 @@ async function ensureDefaultBotAccounts(existingAccounts) {
       nickname: bot.nickname,
       avatarUrl: "",
       passwordHash: "",
+      authToken: "",
       voiceRoomId: "",
       createdAt: now,
       updatedAt: now,

@@ -703,11 +703,44 @@ let banAccountsQuery = "";
 let banAccounts = [];
 let selectedBanNickname = "";
 const AUTH_GATE_KEY = "hakorocks-auth-gate";
-let authGatePassed = localStorage.getItem(AUTH_GATE_KEY) === "1";
+const AUTH_TOKEN_KEY = "hakorocks-auth-token";
+const AUTH_PROFILE_KEY = "hakorocks-auth-profile";
+let authGatePassed = localStorage.getItem(AUTH_GATE_KEY) === "1" || Boolean(localStorage.getItem(AUTH_TOKEN_KEY));
 let authGateView = "home"; // home | register | login | welcome | manage
 let authGateStatus = "";
 let authWelcomeName = "";
 let authBusy = false;
+
+function readStoredAuthToken() {
+  return localStorage.getItem(AUTH_TOKEN_KEY) || "";
+}
+
+function readStoredAuthProfile() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(AUTH_PROFILE_KEY) || "null");
+    if (raw && typeof raw === "object") return raw;
+  } catch {}
+  return null;
+}
+
+function persistAuthSession({ authToken, account, welcomeName } = {}) {
+  if (authToken) localStorage.setItem(AUTH_TOKEN_KEY, authToken);
+  const profile = {
+    id: account?.id || readStoredAuthProfile()?.id || "",
+    name: welcomeName || account?.name || readStoredAuthProfile()?.name || "",
+    nickname: account?.nickname || readStoredAuthProfile()?.nickname || "",
+  };
+  localStorage.setItem(AUTH_PROFILE_KEY, JSON.stringify(profile));
+  localStorage.setItem(AUTH_GATE_KEY, "1");
+  authGatePassed = true;
+}
+
+function clearAuthSession() {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(AUTH_PROFILE_KEY);
+  localStorage.removeItem(AUTH_GATE_KEY);
+  authGatePassed = false;
+}
 
 document.documentElement.dataset.theme = selectedTheme;
 document.documentElement.dataset.authGate = authGatePassed ? "open" : "locked";
@@ -3818,15 +3851,15 @@ function renderAuthGate() {
       <div class="auth-gate-card" data-auth-view="login">
         ${renderAuthBrand()}
         <h2 class="auth-gate-title">Oturum aç</h2>
-        <p class="auth-gate-note">Adını (veya takma adını) ve şifreni gir.</p>
+        <p class="auth-gate-note">Kayıt olurken yazdığın <strong>isim</strong> veya <strong>takma ad</strong> + şifreyi gir.</p>
         <form class="auth-gate-form" data-auth-login-form>
           <label>
-            Ad
-            <input name="name" maxlength="40" placeholder="Ad veya takma ad" autocomplete="username" required />
+            Ad veya takma ad
+            <input name="name" maxlength="40" placeholder="Örn: Hakan veya hakorocks" autocomplete="username" required />
           </label>
           <label>
             Şifre
-            <input name="password" type="password" maxlength="64" placeholder="Şifren" autocomplete="current-password" required />
+            <input name="password" type="password" maxlength="64" minlength="3" placeholder="En az 3 karakter" autocomplete="current-password" required />
           </label>
           <button class="button primary auth-gate-cta" type="submit" ${authBusy ? "disabled" : ""}>Giriş yap</button>
         </form>
@@ -3904,9 +3937,9 @@ function setAuthGateView(view, status = "") {
   refreshAuthGate();
 }
 
-function openAuthGate(view = "home", status = "") {
+function openAuthGate(view = "home", status = "", { clearSession = false } = {}) {
+  if (clearSession) clearAuthSession();
   authGatePassed = false;
-  localStorage.removeItem(AUTH_GATE_KEY);
   document.documentElement.dataset.authGate = "locked";
   const gate = document.querySelector("[data-auth-gate]");
   const site = document.querySelector("[data-site-shell]");
@@ -3951,16 +3984,20 @@ function showAuthWelcome(name) {
   setAuthGateView("welcome");
 }
 
-function authErrorMessage(error, fallback) {
+function authErrorMessage(error, fallback, serverMessage = "") {
+  if (serverMessage && typeof serverMessage === "string" && serverMessage.trim()) {
+    return serverMessage.trim();
+  }
   const map = {
     "invalid-account": "İsim ve takma ad gerekli.",
-    "invalid-login": "Ad ve şifre gerekli.",
+    "invalid-login": "Ad/takma ad ve şifre gerekli.",
     "weak-password": "Şifre en az 3 karakter olmalı.",
-    "nickname-taken": "Bu takma ad alınmış.",
-    "wrong-credentials": "Ad veya şifre yanlış.",
+    "nickname-taken": "Bu takma ad alınmış. Oturum açmayı dene.",
+    "wrong-credentials": "Ad/takma ad veya şifre yanlış.",
     "wrong-password": "Şifre yanlış.",
     "account-missing": "Aktif hesap yok.",
     "confirm-required": "Onay için 'hepsini sil' yaz.",
+    "invalid-resume": "Kayıtlı oturum bulunamadı. Tekrar giriş yap.",
   };
   return map[error] || fallback;
 }
@@ -3986,6 +4023,10 @@ async function submitAuthRegister(event) {
   const name = String(formData.get("name") || "").trim();
   const nickname = String(formData.get("nickname") || "").trim();
   const password = String(formData.get("password") || "");
+  if (password.trim().length < 3) {
+    setAuthGateStatusText("Şifre en az 3 karakter olmalı.");
+    return;
+  }
   authBusy = true;
   form.querySelectorAll("button, input").forEach((el) => { el.disabled = true; });
   setAuthGateStatusText("Hesap oluşturuluyor...");
@@ -3996,15 +4037,24 @@ async function submitAuthRegister(event) {
       body: JSON.stringify({ sessionId, name, nickname, password }),
     });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "register-failed");
+    if (!response.ok) {
+      const err = new Error(data.error || "register-failed");
+      err.serverMessage = data.message || "";
+      throw err;
+    }
     latestSocial = data;
+    persistAuthSession({
+      authToken: data.authToken,
+      account: data.account,
+      welcomeName: data.welcomeName || name,
+    });
     authBusy = false;
     showAuthWelcome(data.welcomeName || data.account?.name || name);
     renderSocialDashboard();
   } catch (error) {
     authBusy = false;
     form.querySelectorAll("button, input").forEach((el) => { el.disabled = false; });
-    setAuthGateStatusText(authErrorMessage(error?.message, "Hesap oluşturulamadı."));
+    setAuthGateStatusText(authErrorMessage(error?.message, "Hesap oluşturulamadı.", error?.serverMessage));
   }
 }
 
@@ -4015,6 +4065,10 @@ async function submitAuthLogin(event) {
   const formData = new FormData(form);
   const name = String(formData.get("name") || "").trim();
   const password = String(formData.get("password") || "");
+  if (!name || !password) {
+    setAuthGateStatusText("Ad/takma ad ve şifre gerekli.");
+    return;
+  }
   authBusy = true;
   form.querySelectorAll("button, input").forEach((el) => { el.disabled = true; });
   setAuthGateStatusText("Giriş yapılıyor...");
@@ -4025,15 +4079,24 @@ async function submitAuthLogin(event) {
       body: JSON.stringify({ sessionId, name, password }),
     });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "login-failed");
+    if (!response.ok) {
+      const err = new Error(data.error || "login-failed");
+      err.serverMessage = data.message || "";
+      throw err;
+    }
     latestSocial = data;
+    persistAuthSession({
+      authToken: data.authToken,
+      account: data.account,
+      welcomeName: data.welcomeName || name,
+    });
     authBusy = false;
     showAuthWelcome(data.welcomeName || data.account?.name || name);
     renderSocialDashboard();
   } catch (error) {
     authBusy = false;
     form.querySelectorAll("button, input").forEach((el) => { el.disabled = false; });
-    setAuthGateStatusText(authErrorMessage(error?.message, "Giriş yapılamadı."));
+    setAuthGateStatusText(authErrorMessage(error?.message, "Giriş yapılamadı.", error?.serverMessage));
   }
 }
 
@@ -4054,13 +4117,12 @@ async function deleteCurrentAccountFromGate() {
     if (!response.ok) throw new Error(data.error || "delete-failed");
     latestSocial = data;
     authBusy = false;
-    localStorage.removeItem(AUTH_GATE_KEY);
-    authGatePassed = false;
+    clearAuthSession();
     setAuthGateView("home", "Hesap silindi.");
     renderSocialDashboard();
   } catch (error) {
     authBusy = false;
-    authGateStatus = authErrorMessage(error?.message, "Hesap silinemedi.");
+    authGateStatus = authErrorMessage(error?.message, "Hesap silinemedi.", error?.serverMessage);
     refreshAuthGate();
   }
 }
@@ -4082,13 +4144,12 @@ async function deleteAllAccountsFromGate() {
     if (!response.ok) throw new Error(data.error || "delete-all-failed");
     latestSocial = data;
     authBusy = false;
-    localStorage.removeItem(AUTH_GATE_KEY);
-    authGatePassed = false;
+    clearAuthSession();
     setAuthGateView("home", "Bütün hesaplar silindi.");
     renderSocialDashboard();
   } catch (error) {
     authBusy = false;
-    authGateStatus = authErrorMessage(error?.message, "Hesaplar silinemedi.");
+    authGateStatus = authErrorMessage(error?.message, "Hesaplar silinemedi.", error?.serverMessage);
     refreshAuthGate();
   }
 }
@@ -4101,6 +4162,7 @@ async function logoutAccountSession() {
       body: JSON.stringify({ sessionId }),
     });
   } catch {}
+  clearAuthSession();
   latestSocial = createFallbackSocial();
   renderSocialDashboard();
 }
@@ -4134,21 +4196,51 @@ function bindAuthGate() {
 }
 
 async function ensureAuthGateOnBoot() {
-  if (!authGatePassed) {
-    openAuthGate("home");
+  const authToken = readStoredAuthToken();
+  const profile = readStoredAuthProfile();
+
+  // 1) Kayıtlı token ile otomatik devam (kapı her seferinde çıkmasın)
+  if (authToken) {
+    try {
+      const response = await fetch("/api/auth/resume", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, authToken }),
+      });
+      const data = await response.json();
+      if (response.ok && data?.account) {
+        latestSocial = data;
+        persistAuthSession({
+          authToken: data.authToken || authToken,
+          account: data.account,
+          welcomeName: data.welcomeName || data.account.name,
+        });
+        closeAuthGateAndEnterSite();
+        renderSocialDashboard();
+        return;
+      }
+    } catch {}
+    // Token geçersizse oturum aç ekranı
+    openAuthGate("login", "Oturumun yenilenmeli. Ad/takma ad ve şifreni gir.", { clearSession: true });
     return;
   }
-  try {
-    const response = await fetch(`/api/account?sessionId=${encodeURIComponent(sessionId)}`);
-    const data = await response.json();
-    if (data?.account) {
-      latestSocial = data;
-      closeAuthGateAndEnterSite();
-      renderSocialDashboard();
-      return;
-    }
-  } catch {}
-  openAuthGate("home", "Oturum bulunamadı. Tekrar giriş yap.");
+
+  // 2) Eski yöntem: sadece sessionId ile hesap var mı?
+  if (authGatePassed) {
+    try {
+      const response = await fetch(`/api/account?sessionId=${encodeURIComponent(sessionId)}`);
+      const data = await response.json();
+      if (data?.account) {
+        latestSocial = data;
+        closeAuthGateAndEnterSite();
+        renderSocialDashboard();
+        return;
+      }
+    } catch {}
+  }
+
+  // 3) İlk ziyaret: giriş kapısı
+  openAuthGate("home", profile?.name ? `Tekrar hoş geldin ${profile.name}. Oturum aç.` : "");
 }
 
 function deviceType() {
@@ -4937,8 +5029,11 @@ async function submitAccount(event) {
     latestSocial = data;
     form.reset();
     status.textContent = "Hesap oluşturuldu.";
-    localStorage.setItem(AUTH_GATE_KEY, "1");
-    authGatePassed = true;
+    persistAuthSession({
+      authToken: data.authToken,
+      account: data.account,
+      welcomeName: data.account?.name,
+    });
     renderSocialDashboard();
     maybeNotifySocialChanges();
   } catch (error) {
@@ -4957,12 +5052,12 @@ async function submitAccount(event) {
 async function handleSiteAccountToolbar(event) {
   const target = event.target;
   if (target.closest?.("[data-account-new]")) {
-    openAuthGate("register");
+    openAuthGate("register", "", { clearSession: false });
     return;
   }
   if (target.closest?.("[data-account-switch]")) {
     await logoutAccountSession();
-    openAuthGate("login", "Hesap değiştir: ad ve şifre gir.");
+    openAuthGate("login", "Hesap değiştir: ad/takma ad ve şifre gir.", { clearSession: true });
     return;
   }
   if (target.closest?.("[data-account-delete]")) {
@@ -5588,10 +5683,11 @@ try {
   bindTrailer();
   bindAuthGate();
   refreshAuthGate();
-  if (!authGatePassed) {
-    openAuthGate("home");
-  } else {
+  // Kapıyı hemen kilitle; ensureAuthGateOnBoot oturumu doğrulayınca siteyi açar
+  if (authGatePassed || readStoredAuthToken()) {
     closeAuthGateAndEnterSite();
+  } else {
+    openAuthGate("home");
   }
   updateSoundButton();
   renderBadgeGrid();
@@ -5603,7 +5699,7 @@ try {
   renderSocialDashboard();
   renderStudioPulsePanel();
   renderClickGamePanel();
-  ensureAuthGateOnBoot();
+  void ensureAuthGateOnBoot();
   refreshLiveData();
   initAdminRoom();
   initHeroStars();
