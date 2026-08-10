@@ -709,15 +709,14 @@ let authBusy = false;
 document.documentElement.dataset.theme = selectedTheme;
 document.documentElement.dataset.authGate = authGatePassed ? "open" : "locked";
 
+// Kapı içeriği sonra doldurulur (boot'ta renderAuthGate çağrısı beyaz ekran riski yaratmasın)
 document.querySelector("#app").innerHTML = `
   <div class="auth-gate" data-auth-gate ${authGatePassed ? "hidden" : ""} aria-hidden="${authGatePassed ? "true" : "false"}">
     <div class="auth-gate-bg" aria-hidden="true"></div>
-    <div class="auth-gate-shell" data-auth-gate-shell>
-      ${renderAuthGate()}
-    </div>
+    <div class="auth-gate-shell" data-auth-gate-shell></div>
   </div>
 
-  <div class="site-shell" data-site-shell ${authGatePassed ? "" : "inert"}>
+  <div class="site-shell" data-site-shell>
   <header class="site-header" data-header>
     <a class="brand" href="#top" aria-label="Hakorocks Studio ana sayfa">
       <span class="brand-mark">H</span>
@@ -3889,11 +3888,17 @@ function openAuthGate(view = "home", status = "") {
   const site = document.querySelector("[data-site-shell]");
   if (gate) {
     gate.hidden = false;
+    gate.removeAttribute("hidden");
     gate.setAttribute("aria-hidden", "false");
   }
-  if (site) site.inert = true;
+  if (site) {
+    site.setAttribute("inert", "");
+    site.setAttribute("aria-hidden", "true");
+  }
   setAuthGateView(view, status);
-  window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
+  try {
+    window.scrollTo(0, 0);
+  } catch {}
 }
 
 function closeAuthGateAndEnterSite() {
@@ -3904,11 +3909,17 @@ function closeAuthGateAndEnterSite() {
   const site = document.querySelector("[data-site-shell]");
   if (gate) {
     gate.hidden = true;
+    gate.setAttribute("hidden", "");
     gate.setAttribute("aria-hidden", "true");
   }
-  if (site) site.inert = false;
+  if (site) {
+    site.removeAttribute("inert");
+    site.removeAttribute("aria-hidden");
+  }
   authGateStatus = "";
   authGateView = "home";
+  document.body.style.overflow = "";
+  document.documentElement.style.overflow = "";
 }
 
 function showAuthWelcome(name) {
@@ -5516,11 +5527,16 @@ async function refreshLiveData() {
 }
 
 function renderLiveData() {
-  document.querySelector("[data-site-open]").textContent = latestStats.siteOpen ?? 1;
-  document.querySelector("[data-playing-now]").textContent = latestStats.playing ?? 0;
-  document.querySelector("[data-mobile-now]").textContent = (latestStats.devices?.mobile ?? 0) + (latestStats.devices?.tablet ?? 0);
-  document.querySelector("[data-market-value]").textContent = Math.round(latestStats.marketValue ?? 0);
-  document.querySelector("[data-market-chart]").innerHTML = renderSparkline(latestStats.marketHistory ?? createHistory(100));
+  const siteOpen = document.querySelector("[data-site-open]");
+  const playingNow = document.querySelector("[data-playing-now]");
+  const mobileNow = document.querySelector("[data-mobile-now]");
+  const marketValue = document.querySelector("[data-market-value]");
+  const marketChart = document.querySelector("[data-market-chart]");
+  if (siteOpen) siteOpen.textContent = latestStats.siteOpen ?? 1;
+  if (playingNow) playingNow.textContent = latestStats.playing ?? 0;
+  if (mobileNow) mobileNow.textContent = (latestStats.devices?.mobile ?? 0) + (latestStats.devices?.tablet ?? 0);
+  if (marketValue) marketValue.textContent = Math.round(latestStats.marketValue ?? 0);
+  if (marketChart) marketChart.innerHTML = renderSparkline(latestStats.marketHistory ?? createHistory(100));
 
   renderPhotoGrid();
   renderWeeklyPhotoPanel();
@@ -5536,30 +5552,58 @@ function renderLiveData() {
 
 const header = document.querySelector("[data-header]");
 window.addEventListener("scroll", () => {
-  header.classList.toggle("is-scrolled", window.scrollY > 12);
+  header?.classList.toggle("is-scrolled", window.scrollY > 12);
 });
 
-bindGameCards();
-bindTrailer();
-bindAuthGate();
-updateSoundButton();
-renderBadgeGrid();
-renderTournamentPanel();
-renderFeedbackFeed();
-renderAnnouncementFeed();
-renderCommunityPanel();
-renderStudioPanel();
-renderSocialDashboard();
-renderStudioPulsePanel();
-renderClickGamePanel();
-ensureAuthGateOnBoot();
-refreshLiveData();
-initAdminRoom();
-initHeroStars();
-setInterval(refreshLiveData, 10000);
-startPerformanceMonitor();
-startRevealAnimations();
-setInterval(refreshPerformancePing, 15000);
+try {
+  bindGameCards();
+  bindTrailer();
+  bindAuthGate();
+  refreshAuthGate();
+  if (!authGatePassed) {
+    openAuthGate("home");
+  } else {
+    closeAuthGateAndEnterSite();
+  }
+  updateSoundButton();
+  renderBadgeGrid();
+  renderTournamentPanel();
+  renderFeedbackFeed();
+  renderAnnouncementFeed();
+  renderCommunityPanel();
+  renderStudioPanel();
+  renderSocialDashboard();
+  renderStudioPulsePanel();
+  renderClickGamePanel();
+  ensureAuthGateOnBoot();
+  refreshLiveData();
+  initAdminRoom();
+  initHeroStars();
+  setInterval(refreshLiveData, 10000);
+  startPerformanceMonitor();
+  startRevealAnimations();
+  setInterval(refreshPerformancePing, 15000);
+} catch (error) {
+  console.error("Site boot hatası:", error);
+  const gateShell = document.querySelector("[data-auth-gate-shell]");
+  if (gateShell) {
+    gateShell.innerHTML = `
+      <div class="auth-gate-card auth-gate-home">
+        <div class="auth-brand is-large">
+          <div class="auth-logo-mark" role="img" aria-label="Hakorocks Studio logosu"><span class="auth-logo-h">H</span></div>
+          <p class="auth-studio-name">Hakorocks Studio</p>
+        </div>
+        <p class="auth-gate-status">Bir hata oluştu. Sayfayı yenile.</p>
+        <button class="button primary auth-gate-cta" type="button" onclick="location.reload()">Yenile</button>
+      </div>
+    `;
+  }
+  const gate = document.querySelector("[data-auth-gate]");
+  if (gate) {
+    gate.hidden = false;
+    gate.removeAttribute("hidden");
+  }
+}
 
 function initHeroStars() {
   const canvas = document.querySelector(".hero-stars");

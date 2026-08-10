@@ -99,6 +99,35 @@ let accounts = normalizeAccounts(await readJson("accounts.json", []));
 accounts = await ensureDefaultBotAccounts(accounts);
 let friendRequests = normalizeFriendRequests(await readJson("friend-requests.json", []));
 let invites = normalizeInvites(await readJson("invites.json", []));
+// İstenen hesap temizliği: hakorocks / hakorock takma adları
+{
+  const purgeNicks = new Set(["hakorocks", "hakorock"]);
+  const removedIds = new Set();
+  const kept = [];
+  for (const account of accounts) {
+    if (purgeNicks.has(normalizeNickname(account.nickname))) {
+      removedIds.add(account.id);
+      continue;
+    }
+    kept.push(account);
+  }
+  if (removedIds.size > 0) {
+    accounts = kept.map((account) => ({
+      ...account,
+      friends: (account.friends || []).filter((id) => !removedIds.has(id)),
+    }));
+    friendRequests = friendRequests.filter(
+      (item) => !removedIds.has(item.fromAccountId) && !removedIds.has(item.toAccountId),
+    );
+    invites = invites.filter(
+      (item) => !removedIds.has(item.fromAccountId) && !removedIds.has(item.toAccountId),
+    );
+    await writeJson("accounts.json", accounts);
+    await writeJson("friend-requests.json", friendRequests);
+    await writeJson("invites.json", invites);
+    console.log(`[accounts] purged nicknames: ${[...purgeNicks].join(", ")} (${removedIds.size} hesap)`);
+  }
+}
 let adminState = normalizeAdminState(await readJson("admin.json", {}));
 const adminTokens = new Map();
 const adminAuthSessions = new Map();

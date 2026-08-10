@@ -4758,6 +4758,8 @@ html[data-auth-gate="locked"] body {
   min-height: 100vh;
   padding: 0;
   overflow: hidden;
+  background: #0b0d10;
+  color: #f7f4ea;
 }
 
 .auth-gate[hidden] {
