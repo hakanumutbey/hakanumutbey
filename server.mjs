@@ -531,15 +531,129 @@ async function handleApi(request, response) {
     sendJson(response, clickGameSnapshot(sessionId));
     return;
   }
+  if (request.method === "POST" && url.pathname === "/api/auth/register") {
+    const body = await readBody(request, 64_000);
+    const result = registerAccount({
+      sessionId: safeText(body.sessionId, 120),
+      name: safeText(body.name, 40),
+      nickname: safeText(body.nickname, 24),
+      password: body.password,
+    });
+    if (result.error) {
+      response.writeHead(result.status, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: result.error, message: result.message || "" }));
+      return;
+    }
+    await writeJson("accounts.json", accounts);
+    sendJson(response, {
+      ...accountSnapshot(result.sessionId),
+      welcomeName: result.account.name,
+      created: true,
+    });
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/auth/login") {
+    const body = await readBody(request, 64_000);
+    const result = loginAccount({
+      sessionId: safeText(body.sessionId, 120),
+      name: safeText(body.name, 40),
+      password: body.password,
+    });
+    if (result.error) {
+      response.writeHead(result.status, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: result.error, message: result.message || "" }));
+      return;
+    }
+    await writeJson("accounts.json", accounts);
+    sendJson(response, {
+      ...accountSnapshot(result.sessionId),
+      welcomeName: result.account.name,
+      created: false,
+    });
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/auth/delete") {
+    const body = await readBody(request, 64_000);
+    const sessionId = safeText(body.sessionId, 120);
+    const password = body.password;
+    const account = accountBySessionId(sessionId);
+    if (!account) {
+      response.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "account-missing", message: "Aktif hesap yok." }));
+      return;
+    }
+    if (account.passwordHash) {
+      const hash = passwordHash(normalizePassword(password));
+      if (hash !== account.passwordHash) {
+        response.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
+        response.end(JSON.stringify({ error: "wrong-password", message: "Şifre yanlış." }));
+        return;
+      }
+    }
+    const deletedId = account.id;
+    accounts = accounts.filter((item) => item.id !== deletedId);
+    friendRequests = friendRequests.filter((item) => item.fromAccountId !== deletedId && item.toAccountId !== deletedId);
+    invites = invites.filter((item) => item.fromAccountId !== deletedId && item.toAccountId !== deletedId);
+    accounts = accounts.map((item) => ({
+      ...item,
+      friends: (item.friends || []).filter((friendId) => friendId !== deletedId),
+    }));
+    await writeJson("accounts.json", accounts);
+    await writeJson("friend-requests.json", friendRequests);
+    await writeJson("invites.json", invites);
+    sendJson(response, { ok: true, ...accountSnapshot(sessionId) });
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/auth/delete-all") {
+    const body = await readBody(request, 64_000);
+    const confirm = safeText(body.confirm, 40).toLocaleLowerCase("tr-TR");
+    if (confirm !== "hepsini sil" && confirm !== "delete-all") {
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({
+        error: "confirm-required",
+        message: "Onay için 'hepsini sil' yazılmalı.",
+      }));
+      return;
+    }
+    accounts = [];
+    friendRequests = [];
+    invites = [];
+    await writeJson("accounts.json", accounts);
+    await writeJson("friend-requests.json", friendRequests);
+    await writeJson("invites.json", invites);
+    sendJson(response, { ok: true, cleared: true, account: null, people: [], friends: [], incomingRequests: [], outgoingRequests: [], invites: [] });
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/auth/logout") {
+    const body = await readBody(request, 64_000);
+    const sessionId = safeText(body.sessionId, 120);
+    if (sessionId) {
+      accounts = accounts.map((account) => (
+        account.sessionId === sessionId
+          ? { ...account, sessionId: "", updatedAt: new Date().toISOString() }
+          : account
+      ));
+      await writeJson("accounts.json", accounts);
+    }
+    sendJson(response, { ok: true, ...accountSnapshot("") });
+    return;
+  }
   if (request.method === "POST" && url.pathname === "/api/account") {
     const body = await readBody(request, 250_000);
     const sessionId = safeText(body.sessionId, 120);
     const name = safeText(body.name, 40);
     const nickname = safeText(body.nickname, 24);
     const avatarUrl = safeAvatar(body.avatarUrl);
+    const rawPassword = body.password;
+    const hasPassword = typeof rawPassword === "string" && normalizePassword(rawPassword).length > 0;
     if (!sessionId || name.length < 2 || nickname.length < 2) {
       response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
       response.end(JSON.stringify({ error: "invalid-account" }));
+      return;
+    }
+    if (hasPassword && normalizePassword(rawPassword).length < 3) {
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "weak-password", message: "Şifre en az 3 karakter olmalı." }));
       return;
     }
     const normalizedNickname = normalizeNickname(nickname);
@@ -552,12 +666,16 @@ async function handleApi(request, response) {
     const now = new Date().toISOString();
     const existing = accounts.find((account) => account.sessionId === sessionId);
     const restored = taken && normalizeNickname(taken.name) === normalizeNickname(name);
+    const nextPasswordHash = hasPassword
+      ? passwordHash(normalizePassword(rawPassword))
+      : (restored ? taken.passwordHash : existing?.passwordHash) || "";
     const account = restored
       ? Object.assign(taken, {
         sessionId,
         name,
         nickname,
-        avatarUrl,
+        avatarUrl: avatarUrl || taken.avatarUrl || "",
+        passwordHash: nextPasswordHash,
         voiceRoomId: taken.voiceRoomId || "",
         updatedAt: now,
       })
@@ -565,7 +683,8 @@ async function handleApi(request, response) {
         ? Object.assign(existing, {
           name,
           nickname,
-          avatarUrl,
+          avatarUrl: avatarUrl || existing.avatarUrl || "",
+          passwordHash: nextPasswordHash,
           voiceRoomId: existing.voiceRoomId || "",
           updatedAt: now,
         })
@@ -575,11 +694,12 @@ async function handleApi(request, response) {
           name,
           nickname,
           avatarUrl,
+          passwordHash: nextPasswordHash,
           voiceRoomId: "",
           createdAt: now,
           updatedAt: now,
-        friends: [],
-      };
+          friends: [],
+        };
     if (restored && existing && existing.id !== taken.id) {
       transferAccountReferences(existing.id, taken.id);
       accounts = accounts.filter((item) => item.id !== existing.id);
@@ -1744,12 +1864,78 @@ function normalizeAccounts(value) {
       name: safeText(item.name, 40) || "Hakan",
       nickname: safeText(item.nickname, 24) || "hakan",
       avatarUrl: safeAvatar(item.avatarUrl),
+      passwordHash: safeText(item.passwordHash, 128),
       voiceRoomId: safeText(item.voiceRoomId, 40),
       createdAt: safeText(item.createdAt, 40) || new Date().toISOString(),
       updatedAt: safeText(item.updatedAt, 40) || new Date().toISOString(),
       friends: Array.isArray(item.friends) ? item.friends.map((friendId) => safeText(friendId, 80)).filter(Boolean) : [],
     }))
-    .filter((item) => item.sessionId);
+    .filter((item) => item.id && (item.sessionId || item.passwordHash || item.nickname));
+}
+
+function clearSessionBindings(sessionId) {
+  if (!sessionId) return;
+  accounts = accounts.map((account) => (
+    account.sessionId === sessionId
+      ? { ...account, sessionId: "", updatedAt: new Date().toISOString() }
+      : account
+  ));
+}
+
+function registerAccount({ sessionId, name, nickname, password }) {
+  if (!sessionId || name.length < 2 || nickname.length < 2) {
+    return { error: "invalid-account", status: 400, message: "İsim ve takma ad gerekli." };
+  }
+  const normalizedPass = normalizePassword(password);
+  if (normalizedPass.length < 3) {
+    return { error: "weak-password", status: 400, message: "Şifre en az 3 karakter olmalı." };
+  }
+  const normalizedNickname = normalizeNickname(nickname);
+  const nicknameTaken = accounts.find((account) => normalizeNickname(account.nickname) === normalizedNickname);
+  if (nicknameTaken) {
+    return { error: "nickname-taken", status: 409, message: "Bu takma ad alınmış." };
+  }
+  clearSessionBindings(sessionId);
+  const now = new Date().toISOString();
+  const account = {
+    id: createRecordId("acct"),
+    sessionId,
+    name,
+    nickname,
+    avatarUrl: "",
+    passwordHash: passwordHash(normalizedPass),
+    voiceRoomId: "",
+    createdAt: now,
+    updatedAt: now,
+    friends: [],
+  };
+  accounts = [account, ...accounts];
+  return { account, sessionId };
+}
+
+function loginAccount({ sessionId, name, password }) {
+  if (!sessionId || name.length < 2) {
+    return { error: "invalid-login", status: 400, message: "Ad ve şifre gerekli." };
+  }
+  const normalizedPass = normalizePassword(password);
+  if (!normalizedPass) {
+    return { error: "invalid-login", status: 400, message: "Ad ve şifre gerekli." };
+  }
+  const hash = passwordHash(normalizedPass);
+  const nameKey = name.toLocaleLowerCase("tr-TR");
+  const account = accounts.find((item) => {
+    if (!item.passwordHash) return false;
+    const sameName = item.name.toLocaleLowerCase("tr-TR") === nameKey;
+    const sameNick = normalizeNickname(item.nickname) === normalizeNickname(name);
+    return (sameName || sameNick) && item.passwordHash === hash;
+  });
+  if (!account) {
+    return { error: "wrong-credentials", status: 401, message: "Ad veya şifre yanlış." };
+  }
+  clearSessionBindings(sessionId);
+  account.sessionId = sessionId;
+  account.updatedAt = new Date().toISOString();
+  return { account, sessionId };
 }
 
 async function ensureDefaultBotAccounts(existingAccounts) {
@@ -1774,6 +1960,7 @@ async function ensureDefaultBotAccounts(existingAccounts) {
       name: bot.name,
       nickname: bot.nickname,
       avatarUrl: "",
+      passwordHash: "",
       voiceRoomId: "",
       createdAt: now,
       updatedAt: now,

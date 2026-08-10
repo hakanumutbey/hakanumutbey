@@ -699,10 +699,25 @@ let adminAccounts = [];
 let banAccountsQuery = "";
 let banAccounts = [];
 let selectedBanNickname = "";
+const AUTH_GATE_KEY = "hakorocks-auth-gate";
+let authGatePassed = localStorage.getItem(AUTH_GATE_KEY) === "1";
+let authGateView = "home"; // home | register | login | welcome | manage
+let authGateStatus = "";
+let authWelcomeName = "";
+let authBusy = false;
 
 document.documentElement.dataset.theme = selectedTheme;
+document.documentElement.dataset.authGate = authGatePassed ? "open" : "locked";
 
 document.querySelector("#app").innerHTML = `
+  <div class="auth-gate" data-auth-gate ${authGatePassed ? "hidden" : ""} aria-hidden="${authGatePassed ? "true" : "false"}">
+    <div class="auth-gate-bg" aria-hidden="true"></div>
+    <div class="auth-gate-shell" data-auth-gate-shell>
+      ${renderAuthGate()}
+    </div>
+  </div>
+
+  <div class="site-shell" data-site-shell ${authGatePassed ? "" : "inert"}>
   <header class="site-header" data-header>
     <a class="brand" href="#top" aria-label="Hakorocks Studio ana sayfa">
       <span class="brand-mark">H</span>
@@ -993,18 +1008,24 @@ document.querySelector("#app").innerHTML = `
 
     <section class="section social-section" id="hesap" aria-labelledby="social-title">
       <div class="section-heading">
-        <p class="eyebrow">Siyah Adam hesabı</p>
-        <h2 id="social-title">Arkadaş, davet ve profil sistemi burada hazırlanıyor.</h2>
-        <p class="section-note">İlk girişte hesap oluştur; isim, takma ad ve profil fotoğrafı ister. Fotoğraf eklersen görünür, eklemezsen adının baş harfi kullanılır.</p>
+        <p class="eyebrow">Hesap merkezi</p>
+        <h2 id="social-title">Profil, arkadaş, davet ve hesap yönetimi.</h2>
+        <p class="section-note">İsim, takma ad ve şifre ile hesap oluştur. Profil resmi eklersen görünür; eklemezsen adının baş harfi kullanılır.</p>
       </div>
       <div class="account-layout">
         <article class="account-panel">
           <div class="account-panel-head">
             <div>
-              <span>Hesap oluştur</span>
-              <strong>Yeni profil</strong>
+              <span>Hesap işlemleri</span>
+              <strong>Profil ve oturum</strong>
             </div>
             <button class="button secondary" type="button" data-notification-permission>Bildirimleri aç</button>
+          </div>
+          <div class="account-action-row" data-account-action-row>
+            <button class="button secondary" type="button" data-account-new>Yeni hesap</button>
+            <button class="button secondary" type="button" data-account-switch>Hesap değiştir</button>
+            <button class="button secondary" type="button" data-account-delete>Hesabı sil</button>
+            <button class="button secondary danger" type="button" data-account-delete-all>Bütün hesapları sil</button>
           </div>
           <form class="account-form" data-account-form>
             <label>
@@ -1016,10 +1037,14 @@ document.querySelector("#app").innerHTML = `
               <input name="nickname" maxlength="24" placeholder="Oyunda görünecek ad" autocomplete="nickname" required />
             </label>
             <label>
+              Şifre
+              <input name="password" type="password" maxlength="64" placeholder="En az 3 karakter" autocomplete="new-password" required />
+            </label>
+            <label>
               Profil resmi
               <input name="avatar" type="file" accept="image/*" />
             </label>
-            <button class="button primary" type="submit">Hesap oluştur</button>
+            <button class="button primary" type="submit">Hesap oluştur / güncelle</button>
             <p class="form-status" data-account-status aria-live="polite"></p>
           </form>
         </article>
@@ -1304,6 +1329,7 @@ document.querySelector("#app").innerHTML = `
     </div>
     <p class="anim-text" data-anim-text hidden>🎉 Hoş geldiniz Hakan Umut. Yönetici doğrulaması başarıyla tamamlandı.</p>
     <button class="button secondary anim-skip" type="button" data-anim-skip>Atla</button>
+  </div>
   </div>
 `;
 
@@ -3714,6 +3740,381 @@ function getSessionId() {
   return next;
 }
 
+function renderAuthGate() {
+  const status = authGateStatus
+    ? `<p class="auth-gate-status" data-auth-status aria-live="polite">${escapeHtml(authGateStatus)}</p>`
+    : `<p class="auth-gate-status" data-auth-status aria-live="polite" hidden></p>`;
+
+  if (authGateView === "welcome") {
+    return `
+      <div class="auth-gate-card auth-gate-welcome" data-auth-view="welcome">
+        ${renderAuthBrand()}
+        <div class="auth-welcome-copy">
+          <p class="auth-welcome-line">Hoş geldiniz</p>
+          <p class="auth-welcome-name">${escapeHtml(authWelcomeName || "Oyuncu")}</p>
+          <p class="auth-welcome-line">İyi oyunlar dilerim</p>
+        </div>
+        <button class="button primary auth-gate-cta" type="button" data-auth-enter>Siteye gir</button>
+        ${status}
+      </div>
+    `;
+  }
+
+  if (authGateView === "register") {
+    return `
+      <div class="auth-gate-card" data-auth-view="register">
+        ${renderAuthBrand()}
+        <h2 class="auth-gate-title">Hesap oluştur</h2>
+        <p class="auth-gate-note">İsim, takma ad ve şifre gir. Sonra siteye gireceksin.</p>
+        <form class="auth-gate-form" data-auth-register-form>
+          <label>
+            İsim
+            <input name="name" maxlength="40" placeholder="Adın" autocomplete="name" required />
+          </label>
+          <label>
+            Takma ad
+            <input name="nickname" maxlength="24" placeholder="Oyunda görünecek ad" autocomplete="nickname" required />
+          </label>
+          <label>
+            Parola
+            <input name="password" type="password" maxlength="64" placeholder="En az 3 karakter" autocomplete="new-password" required />
+          </label>
+          <button class="button primary auth-gate-cta" type="submit" ${authBusy ? "disabled" : ""}>Hesabı oluştur</button>
+        </form>
+        <div class="auth-gate-links">
+          <button class="button secondary" type="button" data-auth-view-set="login">Oturum aç</button>
+          <button class="button secondary" type="button" data-auth-view-set="home">Geri</button>
+        </div>
+        ${status}
+      </div>
+    `;
+  }
+
+  if (authGateView === "login") {
+    return `
+      <div class="auth-gate-card" data-auth-view="login">
+        ${renderAuthBrand()}
+        <h2 class="auth-gate-title">Oturum aç</h2>
+        <p class="auth-gate-note">Adını (veya takma adını) ve şifreni gir.</p>
+        <form class="auth-gate-form" data-auth-login-form>
+          <label>
+            Ad
+            <input name="name" maxlength="40" placeholder="Ad veya takma ad" autocomplete="username" required />
+          </label>
+          <label>
+            Şifre
+            <input name="password" type="password" maxlength="64" placeholder="Şifren" autocomplete="current-password" required />
+          </label>
+          <button class="button primary auth-gate-cta" type="submit" ${authBusy ? "disabled" : ""}>Giriş yap</button>
+        </form>
+        <div class="auth-gate-links">
+          <button class="button secondary" type="button" data-auth-view-set="register">Hesap oluştur</button>
+          <button class="button secondary" type="button" data-auth-view-set="home">Geri</button>
+        </div>
+        ${status}
+      </div>
+    `;
+  }
+
+  if (authGateView === "manage") {
+    const account = latestSocial.account;
+    return `
+      <div class="auth-gate-card" data-auth-view="manage">
+        ${renderAuthBrand()}
+        <h2 class="auth-gate-title">Hesap yeri</h2>
+        <p class="auth-gate-note">
+          ${account
+    ? `Şu an: <strong>${escapeHtml(account.name)}</strong> (@${escapeHtml(account.nickname)})`
+    : "Aktif hesap yok. Yeni hesap oluştur veya oturum aç."}
+        </p>
+        <div class="auth-gate-actions">
+          <button class="button primary" type="button" data-auth-view-set="register">Yeni hesap</button>
+          <button class="button secondary" type="button" data-auth-view-set="login">Hesap değiştir / Oturum aç</button>
+          <button class="button secondary" type="button" data-auth-delete-current ${account ? "" : "disabled"}>Hesabı sil</button>
+          <button class="button secondary danger" type="button" data-auth-delete-all>Bütün hesapları sil</button>
+          ${account ? `<button class="button primary auth-gate-cta" type="button" data-auth-enter>Siteye gir</button>` : ""}
+        </div>
+        ${status}
+      </div>
+    `;
+  }
+
+  // home / splash (video later)
+  return `
+    <div class="auth-gate-card auth-gate-home" data-auth-view="home">
+      <div class="auth-video-slot" data-auth-video-slot aria-hidden="true">
+        <div class="auth-video-placeholder">
+          <span>Video yakında</span>
+        </div>
+      </div>
+      ${renderAuthBrand(true)}
+      <p class="auth-gate-tagline">Oyun stüdyosu · Portfolyo · Vitrin</p>
+      <div class="auth-gate-actions auth-gate-home-actions">
+        <button class="button primary auth-gate-cta" type="button" data-auth-view-set="register">Hesap oluştur</button>
+        <button class="button secondary auth-gate-cta" type="button" data-auth-view-set="login">Oturum aç</button>
+      </div>
+      <button class="auth-gate-manage-link" type="button" data-auth-view-set="manage">Hesap yeri</button>
+      ${status}
+    </div>
+  `;
+}
+
+function renderAuthBrand(large = false) {
+  return `
+    <div class="auth-brand ${large ? "is-large" : ""}">
+      <img class="auth-logo" src="/github_profile_header.png" alt="Hakorocks Studio logosu" />
+      <p class="auth-studio-name">Hakorocks Studio</p>
+    </div>
+  `;
+}
+
+function refreshAuthGate() {
+  const shell = document.querySelector("[data-auth-gate-shell]");
+  if (shell) shell.innerHTML = renderAuthGate();
+  bindAuthGateForms();
+}
+
+function setAuthGateView(view, status = "") {
+  authGateView = view;
+  authGateStatus = status;
+  refreshAuthGate();
+}
+
+function openAuthGate(view = "home", status = "") {
+  authGatePassed = false;
+  localStorage.removeItem(AUTH_GATE_KEY);
+  document.documentElement.dataset.authGate = "locked";
+  const gate = document.querySelector("[data-auth-gate]");
+  const site = document.querySelector("[data-site-shell]");
+  if (gate) {
+    gate.hidden = false;
+    gate.setAttribute("aria-hidden", "false");
+  }
+  if (site) site.inert = true;
+  setAuthGateView(view, status);
+  window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
+}
+
+function closeAuthGateAndEnterSite() {
+  authGatePassed = true;
+  localStorage.setItem(AUTH_GATE_KEY, "1");
+  document.documentElement.dataset.authGate = "open";
+  const gate = document.querySelector("[data-auth-gate]");
+  const site = document.querySelector("[data-site-shell]");
+  if (gate) {
+    gate.hidden = true;
+    gate.setAttribute("aria-hidden", "true");
+  }
+  if (site) site.inert = false;
+  authGateStatus = "";
+  authGateView = "home";
+}
+
+function showAuthWelcome(name) {
+  authWelcomeName = name || "Oyuncu";
+  setAuthGateView("welcome");
+}
+
+function authErrorMessage(error, fallback) {
+  const map = {
+    "invalid-account": "İsim ve takma ad gerekli.",
+    "invalid-login": "Ad ve şifre gerekli.",
+    "weak-password": "Şifre en az 3 karakter olmalı.",
+    "nickname-taken": "Bu takma ad alınmış.",
+    "wrong-credentials": "Ad veya şifre yanlış.",
+    "wrong-password": "Şifre yanlış.",
+    "account-missing": "Aktif hesap yok.",
+    "confirm-required": "Onay için 'hepsini sil' yaz.",
+  };
+  return map[error] || fallback;
+}
+
+function setAuthGateStatusText(message) {
+  authGateStatus = message || "";
+  const status = document.querySelector("[data-auth-status]");
+  if (!status) return;
+  if (!message) {
+    status.hidden = true;
+    status.textContent = "";
+    return;
+  }
+  status.hidden = false;
+  status.textContent = message;
+}
+
+async function submitAuthRegister(event) {
+  event.preventDefault();
+  if (authBusy) return;
+  const form = event.currentTarget;
+  const formData = new FormData(form);
+  const name = String(formData.get("name") || "").trim();
+  const nickname = String(formData.get("nickname") || "").trim();
+  const password = String(formData.get("password") || "");
+  authBusy = true;
+  form.querySelectorAll("button, input").forEach((el) => { el.disabled = true; });
+  setAuthGateStatusText("Hesap oluşturuluyor...");
+  try {
+    const response = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId, name, nickname, password }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "register-failed");
+    latestSocial = data;
+    authBusy = false;
+    showAuthWelcome(data.welcomeName || data.account?.name || name);
+    renderSocialDashboard();
+  } catch (error) {
+    authBusy = false;
+    form.querySelectorAll("button, input").forEach((el) => { el.disabled = false; });
+    setAuthGateStatusText(authErrorMessage(error?.message, "Hesap oluşturulamadı."));
+  }
+}
+
+async function submitAuthLogin(event) {
+  event.preventDefault();
+  if (authBusy) return;
+  const form = event.currentTarget;
+  const formData = new FormData(form);
+  const name = String(formData.get("name") || "").trim();
+  const password = String(formData.get("password") || "");
+  authBusy = true;
+  form.querySelectorAll("button, input").forEach((el) => { el.disabled = true; });
+  setAuthGateStatusText("Giriş yapılıyor...");
+  try {
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId, name, password }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "login-failed");
+    latestSocial = data;
+    authBusy = false;
+    showAuthWelcome(data.welcomeName || data.account?.name || name);
+    renderSocialDashboard();
+  } catch (error) {
+    authBusy = false;
+    form.querySelectorAll("button, input").forEach((el) => { el.disabled = false; });
+    setAuthGateStatusText(authErrorMessage(error?.message, "Giriş yapılamadı."));
+  }
+}
+
+async function deleteCurrentAccountFromGate() {
+  if (authBusy) return;
+  const password = window.prompt("Hesabı silmek için şifreni yaz:");
+  if (password === null) return;
+  authBusy = true;
+  authGateStatus = "Hesap siliniyor...";
+  refreshAuthGate();
+  try {
+    const response = await fetch("/api/auth/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId, password }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "delete-failed");
+    latestSocial = data;
+    authBusy = false;
+    localStorage.removeItem(AUTH_GATE_KEY);
+    authGatePassed = false;
+    setAuthGateView("home", "Hesap silindi.");
+    renderSocialDashboard();
+  } catch (error) {
+    authBusy = false;
+    authGateStatus = authErrorMessage(error?.message, "Hesap silinemedi.");
+    refreshAuthGate();
+  }
+}
+
+async function deleteAllAccountsFromGate() {
+  if (authBusy) return;
+  const confirmText = window.prompt("Bütün hesapları silmek için 'hepsini sil' yaz:");
+  if (confirmText === null) return;
+  authBusy = true;
+  authGateStatus = "Tüm hesaplar siliniyor...";
+  refreshAuthGate();
+  try {
+    const response = await fetch("/api/auth/delete-all", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirm: confirmText }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "delete-all-failed");
+    latestSocial = data;
+    authBusy = false;
+    localStorage.removeItem(AUTH_GATE_KEY);
+    authGatePassed = false;
+    setAuthGateView("home", "Bütün hesaplar silindi.");
+    renderSocialDashboard();
+  } catch (error) {
+    authBusy = false;
+    authGateStatus = authErrorMessage(error?.message, "Hesaplar silinemedi.");
+    refreshAuthGate();
+  }
+}
+
+async function logoutAccountSession() {
+  try {
+    await fetch("/api/auth/logout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId }),
+    });
+  } catch {}
+  latestSocial = createFallbackSocial();
+  renderSocialDashboard();
+}
+
+function bindAuthGateForms() {
+  bindOnce(document.querySelector("[data-auth-register-form]"), "submit", submitAuthRegister);
+  bindOnce(document.querySelector("[data-auth-login-form]"), "submit", submitAuthLogin);
+}
+
+function bindAuthGate() {
+  bindAuthGateForms();
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    const viewButton = target.closest?.("[data-auth-view-set]");
+    if (viewButton) {
+      setAuthGateView(viewButton.dataset.authViewSet, "");
+      return;
+    }
+    if (target.closest?.("[data-auth-enter]")) {
+      closeAuthGateAndEnterSite();
+      return;
+    }
+    if (target.closest?.("[data-auth-delete-current]")) {
+      deleteCurrentAccountFromGate();
+      return;
+    }
+    if (target.closest?.("[data-auth-delete-all]")) {
+      deleteAllAccountsFromGate();
+    }
+  });
+}
+
+async function ensureAuthGateOnBoot() {
+  if (!authGatePassed) {
+    openAuthGate("home");
+    return;
+  }
+  try {
+    const response = await fetch(`/api/account?sessionId=${encodeURIComponent(sessionId)}`);
+    const data = await response.json();
+    if (data?.account) {
+      latestSocial = data;
+      closeAuthGateAndEnterSite();
+      renderSocialDashboard();
+      return;
+    }
+  } catch {}
+  openAuthGate("home", "Oturum bulunamadı. Tekrar giriş yap.");
+}
+
 function deviceType() {
   const width = window.innerWidth;
   if (width < 720) return "mobile";
@@ -4080,6 +4481,7 @@ function bindGameCards() {
   document.querySelector("[data-notification-permission]")?.addEventListener("click", requestNotificationPermission);
   document.querySelector("[data-music-select]")?.addEventListener("change", handleMusicSelect);
   document.addEventListener("click", handleAccountActions);
+  document.addEventListener("click", handleSiteAccountToolbar);
   bindDynamicForms();
 }
 
@@ -4481,6 +4883,7 @@ async function submitAccount(event) {
     sessionId,
     name: formData.get("name"),
     nickname: formData.get("nickname"),
+    password: formData.get("password"),
   };
   status.textContent = "Kontrol ediliyor...";
   try {
@@ -4498,6 +4901,8 @@ async function submitAccount(event) {
     latestSocial = data;
     form.reset();
     status.textContent = "Hesap oluşturuldu.";
+    localStorage.setItem(AUTH_GATE_KEY, "1");
+    authGatePassed = true;
     renderSocialDashboard();
     maybeNotifySocialChanges();
   } catch (error) {
@@ -4505,9 +4910,33 @@ async function submitAccount(event) {
       ? "Bu takma ad alınmış."
       : error?.message === "invalid-account"
         ? "İsim ve takma ad gerekli."
-        : error?.message === "avatar-too-large"
-          ? "Profil resmi fazla büyük."
-          : "Hesap oluşturulamadı.";
+        : error?.message === "weak-password"
+          ? "Şifre en az 3 karakter olmalı."
+          : error?.message === "avatar-too-large"
+            ? "Profil resmi fazla büyük."
+            : "Hesap oluşturulamadı.";
+  }
+}
+
+async function handleSiteAccountToolbar(event) {
+  const target = event.target;
+  if (target.closest?.("[data-account-new]")) {
+    openAuthGate("register");
+    return;
+  }
+  if (target.closest?.("[data-account-switch]")) {
+    await logoutAccountSession();
+    openAuthGate("login", "Hesap değiştir: ad ve şifre gir.");
+    return;
+  }
+  if (target.closest?.("[data-account-delete]")) {
+    openAuthGate("manage");
+    deleteCurrentAccountFromGate();
+    return;
+  }
+  if (target.closest?.("[data-account-delete-all]")) {
+    openAuthGate("manage");
+    deleteAllAccountsFromGate();
   }
 }
 
@@ -5111,6 +5540,7 @@ window.addEventListener("scroll", () => {
 
 bindGameCards();
 bindTrailer();
+bindAuthGate();
 updateSoundButton();
 renderBadgeGrid();
 renderTournamentPanel();
@@ -5121,6 +5551,7 @@ renderStudioPanel();
 renderSocialDashboard();
 renderStudioPulsePanel();
 renderClickGamePanel();
+ensureAuthGateOnBoot();
 refreshLiveData();
 initAdminRoom();
 initHeroStars();
