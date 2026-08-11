@@ -1050,9 +1050,11 @@ h3 {
   font-weight: 900;
 }
 
+/* NOT: opacity:0 ile gizlemek beyaz/boş ekran yapıyordu (IntersectionObserver
+   bazen is-visible eklemiyordu). Reveal artık sadece hafif kayma. */
 .motion-ready .reveal-item {
-  opacity: 0;
-  transform: translateY(18px);
+  opacity: 1;
+  transform: translateY(10px);
   transition:
     opacity 520ms ease,
     transform 520ms ease,

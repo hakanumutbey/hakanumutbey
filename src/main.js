@@ -776,10 +776,12 @@ function paintEmergencyScreen(message) {
 // Kapı içeriği sonra doldurulur
 try {
 document.querySelector("#app").innerHTML = `
+  ${AUTH_GATE_ENABLED ? `
   <div class="auth-gate" data-auth-gate ${authGatePassed ? "hidden" : ""} aria-hidden="${authGatePassed ? "true" : "false"}">
     <div class="auth-gate-bg" aria-hidden="true"></div>
     <div class="auth-gate-shell" data-auth-gate-shell></div>
   </div>
+  ` : ""}
 
   <div class="site-shell" data-site-shell>
   <header class="site-header" data-header>
@@ -5742,6 +5744,7 @@ try {
   startPerformanceMonitor();
   startRevealAnimations();
   setInterval(() => { void refreshPerformancePing(); }, 15000);
+  document.documentElement.dataset.theme = selectedTheme || "dark";
   markSiteReady();
 } catch (error) {
   console.error("Site boot hatası:", error);
@@ -5894,53 +5897,16 @@ async function refreshPerformancePing() {
 }
 
 function startRevealAnimations() {
+  // Geçici kapalı: opacity:0 + IntersectionObserver boş/beyaz ekran yapıyordu.
+  // İçerik her zaman görünür kalsın.
   try {
-    if (!("IntersectionObserver" in window) || !("MutationObserver" in window)) return;
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return;
-    const appRoot = document.querySelector("#app");
-    if (!appRoot) return;
-    document.documentElement.classList.add("motion-ready");
-    const selector = [
-      ".section",
-      ".game-card",
-      ".launcher-game-card",
-      ".community-panel",
-      ".studio-panel",
-      ".badge-card",
-      ".photo-card",
-      ".pulse-feed article",
-      ".click-arena",
-      ".click-leaderboard",
-      ".click-leader",
-    ].join(",");
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add("is-visible");
-          observer.unobserve(entry.target);
-        }
-      });
-    }, { rootMargin: "0px 0px -80px 0px", threshold: 0.08 });
-    const register = (root = document) => {
-      root.querySelectorAll?.(selector)?.forEach((element) => {
-        if (element.dataset.revealBound === "1") return;
-        element.dataset.revealBound = "1";
-        element.classList.add("reveal-item");
-        observer.observe(element);
-      });
-    };
-    register();
-    const mutationObserver = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        mutation.addedNodes.forEach((node) => {
-          if (node.nodeType === Node.ELEMENT_NODE) register(node);
-        });
-      });
+    document.documentElement.classList.remove("motion-ready");
+    document.querySelectorAll(".reveal-item").forEach((el) => {
+      el.classList.add("is-visible");
+      el.style.opacity = "1";
+      el.style.transform = "none";
     });
-    mutationObserver.observe(appRoot, { childList: true, subtree: true });
-  } catch (error) {
-    console.warn("reveal animations atlandı:", error);
-  }
+  } catch {}
 }
 
 // ---- Yönetici Odası ----
