@@ -396,7 +396,7 @@ function startLevel() {
   hideOverlay();
   mode = "draw";
   if ((level().noZones || []).length > 0) {
-    hint.textContent = "Mor bölgeye çizgi çizemezsin, arabayı da çarptırma!";
+    hint.textContent = "Mor bölgeye çizgi çizemezsin — çizgiyi çevresinden geçir!";
   } else if (level().lineLimit) {
     hint.textContent = `Dikkat: bu bölümde mürekkep sınırlı (${level().lineLimit} birim)!`;
   } else {
@@ -657,18 +657,7 @@ function stepCar() {
     }
   }
 
-  // cizilmez bolgeye carpma
-  for (const z of level().noZones || []) {
-    if (
-      car.x > z.x + 2 &&
-      car.x < z.x + z.w - 2 &&
-      car.bottom > z.y + 6 &&
-      car.bottom - 24 < z.y + z.h
-    ) {
-      retryLevel("Araba çizilmez bölgeye çarptı! Bölgenin altından (ya da çevresinden) geç.");
-      return;
-    }
-  }
+  // cizilmez bolgeler arabayi engellemez; sadece icine cizgi cizilemez
 
   // kasanin sag duvarina (kabine) carpma: kasa icinde degilken kasa yuksekliginde saga dayanirsa
   const t = level().truck;
