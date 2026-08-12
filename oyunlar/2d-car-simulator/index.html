@@ -12,7 +12,7 @@
       <header class="game-top">
         <h1>2D Car Simulator</h1>
         <div class="hud">
-          <span id="hud-level">Bölüm 1</span>
+          <span id="hud-level">Bölüm 1/100</span>
           <span id="hud-tries">Deneme 1</span>
         </div>
       </header>
@@ -20,18 +20,17 @@
       <div class="stage">
         <canvas id="game" width="800" height="480"></canvas>
         <div class="overlay" id="overlay">
-          <h2 id="overlay-title">2D Car Simulator</h2>
-          <p id="overlay-text">
-            Basılı tutup çizgi çiz, bırak — araba kendisi gider.
-            Arabayı kamyonetin açık arkasına sok!
-          </p>
-          <button id="overlay-button" type="button">Başla</button>
+          <div class="overlay-content" id="overlay-content"></div>
         </div>
       </div>
 
       <div class="actions">
         <p class="hint" id="hint">Basılı tut, çizgiyi çiz, bırak. Araba dümdüz gider!</p>
-        <button id="reset" type="button">↺ Baştan</button>
+        <div class="action-buttons">
+          <button id="music-toggle" type="button" aria-label="Müzik aç/kapat">🎵</button>
+          <button id="menu-button" type="button">☰ Menü</button>
+          <button id="reset" type="button">↺ Baştan</button>
+        </div>
       </div>
     </main>
     <script src="game.js"></script>
