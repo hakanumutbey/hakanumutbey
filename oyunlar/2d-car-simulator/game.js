@@ -100,15 +100,15 @@ function mulberry32(seed) {
   };
 }
 
-const NAME_PRE = ["Sessiz", "Çılgın", "Dar", "Uzun", "Kıvrımlı", "Yüksek", "Gece", "Turbo", "Riskli", "Kolay Görünümlü", "Sinsi", "Hızlı"];
-const NAME_SUF = ["Yokuş", "Geçit", "Köprü", "Tırmanış", "Vadi", "Duvar", "Atlama", "Parkur", "Rampa", "Viraj", "Zıplama", "İniş"];
+const NAME_PRE = ["Sessiz", "Çılgın", "Dar", "Uzun", "Kıvrımlı", "Yüksek", "Gece", "Turbo", "Riskli", "Kolay Görünümlü", "Sinsi", "Hızlı", "Buzlu", "Tozlu", "Elektrikli", "Gölge", "Alev", "Kırık"];
+const NAME_SUF = ["Yokuş", "Geçit", "Köprü", "Tırmanış", "Vadi", "Duvar", "Atlama", "Parkur", "Rampa", "Viraj", "Zıplama", "İniş", "Koridor", "Sıçrama", "Dönemeç", "Uçurum", "Kayalık", "Çıkmaz"];
 
 // 7-100 arasi bolumler: giderek zorlasan prosedürel uretim.
 // Kurallar: baslangictan kasaya her zaman gecerli bir cizgi var (duvarlarin
 // ustunden, cizilmez bolgelerin altindan); cizilmez bolge rampayi kapatir ama
 // alttan en az 40px'lik koridor birakir; test bunu dogrular.
-function generateLevel(num) {
-  const rng = mulberry32(num * 7919);
+function generateLevel(num, attempt = 0) {
+  const rng = mulberry32(num * 7919 + attempt * 104729);
   const t = (num - 7) / 93; // 0..1 zorluk
 
   const carStart = { x: 60 + Math.floor(rng() * 30), y: 400 };
@@ -203,8 +203,41 @@ function generateLevel(num) {
   return { name, carStart, grounds, walls, noZones, lineLimit, truck };
 }
 
+// Bolum "imzasi": yukseklik, duvar, bolge, bosluk karakteri.
+// Ard arda ayni karakterde bolum gelmesin diye karsilastirmada kullanilir.
+function levelSignature(L) {
+  const lift = 352 - L.truck.bedY;
+  const liftBucket = lift < 25 ? 0 : lift < 80 ? 1 : 2;
+  const zone = (L.noZones || [])[0];
+  const zoneKind = !zone ? 0 : zone.y === 0 ? 1 : 2;
+  const sorted = [...L.grounds].sort((a, b) => a.x - b.x);
+  let gap = 0;
+  for (let i = 0; i < sorted.length - 1; i++) {
+    gap += Math.max(0, sorted[i + 1].x - (sorted[i].x + sorted[i].w));
+  }
+  const gapBucket = gap === 0 ? 0 : gap < 120 ? 1 : 2;
+  return [liftBucket, L.walls.length, zoneKind, gapBucket];
+}
+
+function tooSimilar(a, b) {
+  let same = 0;
+  for (let i = 0; i < a.length; i++) if (a[i] === b[i]) same++;
+  return same >= 3; // 4 ozellikten 3'u ayniysa tekrar say
+}
+
 const LEVELS = [...HANDMADE_LEVELS];
-for (let num = 7; num <= 100; num++) LEVELS.push(generateLevel(num));
+for (let num = 7; num <= 100; num++) {
+  let candidate = generateLevel(num);
+  const prevSig = levelSignature(LEVELS[LEVELS.length - 1]);
+  for (let attempt = 1; attempt <= 8 && tooSimilar(levelSignature(candidate), prevSig); attempt++) {
+    candidate = generateLevel(num, attempt);
+  }
+  // ard arda ayni isim gelmesin
+  if (candidate.name === LEVELS[LEVELS.length - 1].name) {
+    candidate = { ...candidate, name: candidate.name + " II" };
+  }
+  LEVELS.push(candidate);
+}
 
 // ---------- Durum ----------
 let progress = Math.min(Number(localStorage.getItem(SAVE_KEY)) || 0, LEVELS.length);
