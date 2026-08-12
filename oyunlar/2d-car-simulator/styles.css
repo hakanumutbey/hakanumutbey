@@ -1,0 +1,133 @@
+:root {
+  --bg: #0b0d10;
+  --text: #f7f4ea;
+  --cyan: #35d2ff;
+  --gold: #ffd166;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  overscroll-behavior: none;
+}
+
+.game-wrap {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.game-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.game-top h1 {
+  margin: 0;
+  font-size: 1.4rem;
+  color: var(--cyan);
+}
+
+.hud {
+  display: flex;
+  gap: 14px;
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+
+.stage {
+  position: relative;
+  border: 2px solid rgba(53, 210, 255, 0.35);
+  border-radius: 14px;
+  overflow: hidden;
+  background: #0d1622;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 12px;
+  text-align: center;
+  padding: 24px;
+  background: rgba(7, 10, 14, 0.86);
+}
+
+.overlay[hidden] {
+  display: none;
+}
+
+.overlay h2 {
+  margin: 0;
+  font-size: 2rem;
+  color: var(--cyan);
+}
+
+.overlay p {
+  margin: 0 auto;
+  max-width: 30rem;
+  line-height: 1.5;
+}
+
+.overlay button {
+  justify-self: center;
+  min-height: 48px;
+  padding: 0 26px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--cyan);
+  color: #071012;
+  font-weight: 900;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hint {
+  margin: 0;
+  color: #b8c2c0;
+  font-size: 0.95rem;
+}
+
+#reset {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 2px solid rgba(53, 210, 255, 0.5);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--cyan);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+#reset:active {
+  background: rgba(53, 210, 255, 0.15);
+}

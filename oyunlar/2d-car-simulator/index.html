@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#0b0d10" />
+    <title>2D Car Simulator — Hakorocks Studio</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="game-wrap">
+      <header class="game-top">
+        <h1>2D Car Simulator</h1>
+        <div class="hud">
+          <span id="hud-level">Bölüm 1</span>
+          <span id="hud-tries">Deneme 1</span>
+        </div>
+      </header>
+
+      <div class="stage">
+        <canvas id="game" width="800" height="480"></canvas>
+        <div class="overlay" id="overlay">
+          <h2 id="overlay-title">2D Car Simulator</h2>
+          <p id="overlay-text">
+            Basılı tutup çizgi çiz, bırak — araba kendisi gider.
+            Arabayı kamyonetin açık arkasına sok!
+          </p>
+          <button id="overlay-button" type="button">Başla</button>
+        </div>
+      </div>
+
+      <div class="actions">
+        <p class="hint" id="hint">Basılı tut, çizgiyi çiz, bırak. Araba dümdüz gider!</p>
+        <button id="reset" type="button">↺ Baştan</button>
+      </div>
+    </main>
+    <script src="game.js"></script>
+  </body>
+</html>

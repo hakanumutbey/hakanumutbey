@@ -26,6 +26,7 @@ await copyStaticGame("hentw3", ["package.json"]);
 await copyStaticGame("hentw-premium", ["package.json"]);
 await copyStaticGame("siber-polis", ["package.json", "js/gameLogic.test.js"]);
 await copyStaticGame("space-arena");
+await copyStaticGame("2d-car-simulator");
 await copyRobotAvcisi();
 console.log("[build-games] all games ready");
 

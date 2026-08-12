@@ -238,6 +238,22 @@ const games = [
     stockBase: 140,
   },
   {
+    slug: "2d-car-simulator",
+    title: "2D Car Simulator",
+    path: "/oyunlar/2d-car-simulator/",
+    type: "Çizgi Bulmaca",
+    status: "Oynanabilir",
+    description: "Basılı tut, çizgiyi çiz, bırak — araba kendisi gider. Arabayı kamyonetin açık arkasına sok!",
+    longDescription: "Arabayı sen sürmüyorsun; sen yolu çiziyorsun. Basılı tutup rampa ve köprüler çiz, bıraktığında araba dümdüz ilerler. Boşlukları aş, duvarların üstünden geç ve arabayı kamyonetin açık kasasına sok. 5 bölüm, kaldığın yerden devam.",
+    accent: "amber",
+    controls: "Fare veya parmak (basılı tut + çiz)",
+    mobileStatus: "Mobil uyumlu",
+    mobileNote: "Dokunmatik ekranda parmakla çizgi çizilir.",
+    achievements: ["İlk bölümü geç", "Duvarın üstünden çizgi çiz", "5 bölümü de bitir"],
+    updates: ["Çizgi çizme + araba fiziği", "5 levelli kamyonet bulmacası", "Kaldığın bölümden devam"],
+    stockBase: 99,
+  },
+  {
     slug: "space-arena",
     title: "Space Arena",
     path: "/oyunlar/space-arena/",
@@ -256,7 +272,7 @@ const games = [
 ];
 
 const FUSION_GAME_PATH = "/oyunlar/birlesim-arenasi/";
-const NEW_GAME_SLUGS = new Set(["hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis"]);
+const NEW_GAME_SLUGS = new Set(["hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "2d-car-simulator"]);
 /** Only games the Birleşim Arenası client actually implements. */
 const FUSION_GAME_SLUGS = new Set([
   "annenden-kac",
@@ -823,7 +839,7 @@ document.querySelector("#app").innerHTML = `
         </div>
       </div>
       <aside class="hero-panel" aria-label="Stüdyo özeti">
-        <strong>13 oyun</strong>
+        <strong>14 oyun</strong>
         <span>Tek domain altında yayında</span>
       </aside>
     </section>
