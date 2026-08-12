@@ -8,6 +8,9 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const gamesRoot = join(root, "oyunlar");
 const distGamesRoot = join(root, "dist", "oyunlar");
 const inDocker = process.env.DOCKER_BUILD === "1" || existsSync("/.dockerenv");
+// Her build'de degisir: statik oyunlarin js/css URL'lerine ?v= eklenip
+// 30 gunluk tarayici onbellegi asilir (sunucu query'yi yok sayar).
+const buildId = Date.now().toString(36);
 
 console.log(`[build-games] start (docker=${inDocker})`);
 await mkdir(distGamesRoot, { recursive: true });
@@ -149,6 +152,12 @@ async function injectGameToolsInTree(directory) {
 
 async function injectGameTools(filePath) {
   let html = await readFile(filePath, "utf8");
+  // Goreceli js/css referanslarina ?v= ekle (30 gunluk onbellegi as).
+  // Mutlak (/...), dis (http) ve data URL'lere dokunma.
+  html = html.replace(
+    /((?:src|href)=")(?!https?:|\/|data:|#)([^"?]+\.(?:js|css))(?:\?[^"]*)?(")/g,
+    `$1$2?v=${buildId}$3`
+  );
   if (html.includes("/site-game-tools.js")) return;
   html = html.replace("</body>", '  <script type="module" src="/site-game-tools.js"></script>\n  </body>');
   await writeFile(filePath, html, "utf8");
