@@ -751,6 +751,9 @@ document.documentElement.dataset.authGate = AUTH_GATE_ENABLED && !authGatePassed
 
 function markSiteReady() {
   document.documentElement.dataset.siteReady = "1";
+  // Guvenlik: <html> uzerinde hidden/aria-hidden kalirsa tum sayfa bos gorunur.
+  document.documentElement.removeAttribute("hidden");
+  document.documentElement.removeAttribute("aria-hidden");
   document.body?.classList?.add("site-ready");
   const boot = document.getElementById("boot-shell");
   if (boot) boot.hidden = true;
@@ -3955,7 +3958,9 @@ function openAuthGate(view = "home", status = "", { clearSession = false } = {})
   if (clearSession) clearAuthSession();
   authGatePassed = false;
   document.documentElement.dataset.authGate = "locked";
-  const gate = document.querySelector("[data-auth-gate]");
+  // NOT: "[data-auth-gate]" secicisi <html> ile eslesiyor (dataset.authGate orada da var),
+  // bu yuzden tum sayfa gizleniyordu. Sadece kapi div'ini hedefle.
+  const gate = document.querySelector(".auth-gate[data-auth-gate]");
   const site = document.querySelector("[data-site-shell]");
   if (gate) {
     gate.hidden = false;
@@ -3976,7 +3981,7 @@ function closeAuthGateAndEnterSite() {
   authGatePassed = true;
   localStorage.setItem(AUTH_GATE_KEY, "1");
   document.documentElement.dataset.authGate = "open";
-  const gate = document.querySelector("[data-auth-gate]");
+  const gate = document.querySelector(".auth-gate[data-auth-gate]");
   const site = document.querySelector("[data-site-shell]");
   if (gate) {
     gate.hidden = true;
