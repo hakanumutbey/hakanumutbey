@@ -66,32 +66,10 @@ vm.runInContext(src, sandbox, { filename: "game.js" });
 const sim = sandbox.window.__carSim;
 if (!sim) throw new Error("__carSim test kancasi bulunamadi");
 
-// ---------- Cozucu: duz rampa + duvar ustunden / bolge altindan gecis ----------
+// ---------- Cozucu: oyunun referans yolu (duz rampa + engel sapmalari) ----------
+// Boylece test, oynanabilirlik ve 3-yildiz sinirlari ayni kaynaktan beslenir.
 function solveLine(L) {
-  const pts = [{ x: L.carStart.x, y: L.carStart.y }];
-  const bedCX = L.truck.bedX + L.truck.bedW / 2;
-  const rampY = (x) =>
-    L.carStart.y + ((L.truck.bedY - L.carStart.y) * (x - L.carStart.x)) / (bedCX - L.carStart.x);
-  const obstacles = [];
-  for (const w of [...L.walls].sort((a, b) => a.x - b.x)) {
-    // rampa duvarin icinden geciyorsa duvarin ustunden plato yap
-    if (rampY(w.x + w.w / 2) > w.y - 30) {
-      obstacles.push({ x: w.x, w: w.w, y: w.y - 35 });
-    }
-  }
-  for (const z of L.noZones || []) {
-    if (z.y + z.h >= 400) {
-      obstacles.push({ x: z.x, w: z.w, y: z.y - 35 }); // yerden yukselen blok: ustunden
-    } else {
-      obstacles.push({ x: z.x, w: z.w, y: z.y + z.h + 35 }); // tavan blogu: altindan
-    }
-  }
-  obstacles.sort((a, b) => a.x - b.x);
-  for (const o of obstacles) {
-    pts.push({ x: o.x - 15, y: o.y }, { x: o.x + o.w + 15, y: o.y });
-  }
-  pts.push({ x: bedCX, y: L.truck.bedY });
-  return pts;
+  return sim.referencePath(L);
 }
 
 // Cozum cizgisi cizilmez bolgeyi ihlal ediyor mu? (4px aralikla ornekle)
@@ -152,6 +130,9 @@ for (let i = 0; i < sim.LEVELS.length; i++) {
       `#${i + 1} (${L.name}): ${steps} adimda "${sim.mode}" — ${sim.lastOverlay.title}: ${sim.lastOverlay.text} ` +
         `(araba x=${Math.round(car.x)}, yukseklik=${Math.round(car.bottom)})`
     );
+  } else if ((sim.starMap[i] || 0) !== 3) {
+    // referans cizgi tam "par" uzunlugunda: 3 yildiz verilmeli
+    failures.push(`#${i + 1} (${L.name}): referans cozum 3 yildiz alamadi (${sim.starMap[i] || 0})`);
   }
 }
 

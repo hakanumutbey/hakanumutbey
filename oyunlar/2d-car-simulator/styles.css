@@ -68,7 +68,8 @@ canvas {
   position: absolute;
   inset: 0;
   display: grid;
-  place-content: center;
+  /* safe: icerik tasmazsa ortala, tasarsa (bolum secimi) bastan baslat ki ust kisim kesilmesin */
+  place-content: safe center;
   padding: 20px;
   background: rgba(7, 10, 14, 0.88);
   overflow-y: auto;
@@ -166,6 +167,41 @@ canvas {
   border-color: rgba(255, 255, 255, 0.12);
   color: #5a6a6d;
   cursor: not-allowed;
+}
+
+.level-grid button small {
+  display: block;
+  font-size: 0.55rem;
+  line-height: 1;
+  color: var(--gold);
+  letter-spacing: -1px;
+}
+
+.select-wrap {
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+  width: 100%;
+}
+
+.badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  max-width: 520px;
+}
+
+.badge-box {
+  font-size: 0.85rem;
+  padding: 8px 14px;
+}
+
+.badge-box small {
+  display: block;
+  font-weight: 400;
+  opacity: 0.75;
+  font-size: 0.72rem;
 }
 
 .actions {

@@ -20,6 +20,8 @@ const CAR_SPEED = 2.4;
 const MAX_LINE = 1300; // cizgi uzunluk limiti (px)
 const SAVE_KEY = "car-sim2d-level"; // bitirilen bolum sayisi (0..100)
 const MUSIC_KEY = "car-sim2d-music";
+const STAR_KEY = "car-sim2d-stars"; // {bolumIndex: 1..3}
+const BADGE_KEY = "car-sim2d-badges"; // [rozetId]
 
 // ---------- Bolumler ----------
 // grounds: arabanin ustunde gidebildigi zemin bloklari (y = ust yuzey)
@@ -239,6 +241,37 @@ for (let num = 7; num <= 100; num++) {
   LEVELS.push(candidate);
 }
 
+// Referans cozum cizgisi: duz rampa + duvar ustunden / bolge kenarindan
+// sapmalar. Yildiz hesabinda "par" olarak kullanilir; otomatik test de ayni
+// yolu oynadigi icin her bolumde 3 yildizin mumkun oldugu kanatlidir.
+function referencePath(L) {
+  const pts = [{ x: L.carStart.x, y: L.carStart.y }];
+  const bedCX = L.truck.bedX + L.truck.bedW / 2;
+  const rampY = (x) =>
+    L.carStart.y + ((L.truck.bedY - L.carStart.y) * (x - L.carStart.x)) / (bedCX - L.carStart.x);
+  const obstacles = [];
+  for (const w of [...L.walls].sort((a, b) => a.x - b.x)) {
+    if (rampY(w.x + w.w / 2) > w.y - 30) obstacles.push({ x: w.x, w: w.w, y: w.y - 35 });
+  }
+  for (const z of L.noZones || []) {
+    if (z.y + z.h >= 400) obstacles.push({ x: z.x, w: z.w, y: z.y - 35 });
+    else obstacles.push({ x: z.x, w: z.w, y: z.y + z.h + 35 });
+  }
+  obstacles.sort((a, b) => a.x - b.x);
+  for (const o of obstacles) pts.push({ x: o.x - 15, y: o.y }, { x: o.x + o.w + 15, y: o.y });
+  pts.push({ x: bedCX, y: L.truck.bedY });
+  return pts;
+}
+
+function referenceLength(L) {
+  const pts = referencePath(L);
+  let len = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    len += Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y);
+  }
+  return len;
+}
+
 // ---------- Durum ----------
 let progress = Math.min(Number(localStorage.getItem(SAVE_KEY)) || 0, LEVELS.length);
 let levelIndex = Math.min(progress, LEVELS.length - 1);
@@ -253,6 +286,42 @@ let drawing = false;
 let penLifted = false; // cizilmez bolgede kalem kalkti mi
 let car = null;
 let confetti = [];
+let lastWinStars = 0;
+let lastNewBadges = [];
+
+// ---------- Yildizlar ve rozetler ----------
+let starMap = {};
+try { starMap = JSON.parse(localStorage.getItem(STAR_KEY)) || {}; } catch {}
+let badges = [];
+try { badges = JSON.parse(localStorage.getItem(BADGE_KEY)) || []; } catch {}
+
+function totalStars() {
+  return Object.values(starMap).reduce((sum, s) => sum + s, 0);
+}
+
+const BADGES = [
+  { id: "first", icon: "🏁", name: "İlk Galibiyet", desc: "İlk bölümü bitir", test: () => progress >= 1 },
+  { id: "ten", icon: "🔟", name: "Onluk", desc: "10 bölüm bitir", test: () => progress >= 10 },
+  { id: "quarter", icon: "🌓", name: "Çeyrek Yol", desc: "25 bölüm bitir", test: () => progress >= 25 },
+  { id: "half", icon: "🌗", name: "Yarı Yol", desc: "50 bölüm bitir", test: () => progress >= 50 },
+  { id: "hundred", icon: "🏆", name: "Efsane", desc: "100 bölümün hepsini bitir", test: () => progress >= 100 },
+  { id: "firsttry", icon: "⚡", name: "Tek Atış", desc: "Bir bölümü ilk denemede geç", test: () => tries === 1 },
+  { id: "stars30", icon: "⭐", name: "Yıldız Avcısı", desc: "30 yıldız topla", test: () => totalStars() >= 30 },
+  { id: "perfect10", icon: "🌟", name: "Kusursuz Sürücü", desc: "10 bölümü 3 yıldızla bitir", test: () => Object.values(starMap).filter((s) => s >= 3).length >= 10 },
+];
+
+// Kazanma sonrasi cagrilir; yeni kazanilan rozetleri dondurur
+function checkBadges() {
+  const fresh = [];
+  for (const b of BADGES) {
+    if (!badges.includes(b.id) && b.test()) {
+      badges.push(b.id);
+      fresh.push(b);
+    }
+  }
+  if (fresh.length) localStorage.setItem(BADGE_KEY, JSON.stringify(badges));
+  return fresh;
+}
 
 function level() {
   return LEVELS[levelIndex];
@@ -319,11 +388,15 @@ function showIntro() {
 
 function showWin() {
   const last = levelIndex === LEVELS.length - 1;
+  const starText = "★".repeat(lastWinStars) + "☆".repeat(3 - lastWinStars);
+  const badgeText = lastNewBadges.length
+    ? ` Yeni rozet: ${lastNewBadges.map((b) => `${b.icon} ${b.name}`).join(", ")}!`
+    : "";
   renderOverlay({
     title: last ? "Tebrikler! 🏆" : "Başardın!",
     text: last
-      ? "100 bölümün hepsini bitirdin! Arabayı her kasaya soktun. Efsanesin!"
-      : `${level().name} bölümü bitti. Sıradaki bölüm seni bekliyor!`,
+      ? `100 bölümün hepsini bitirdin! Arabayı her kasaya soktun. Efsanesin! ${starText}${badgeText}`
+      : `${level().name} bölümü bitti — ${starText} Sıradaki bölüm seni bekliyor!${badgeText}`,
     buttons: [
       {
         label: last ? "Baştan Oyna" : "Sonraki Bölüm",
@@ -354,12 +427,14 @@ function showLevelSelect() {
     pausedFrom = mode;
     mode = "paused";
   }
+  stopEngine();
   const grid = document.createElement("div");
   grid.className = "level-grid";
   for (let i = 0; i < LEVELS.length; i++) {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.textContent = String(i + 1);
+    const s = starMap[i] || 0;
+    btn.innerHTML = s > 0 ? `${i + 1}<small>${"★".repeat(s)}</small>` : String(i + 1);
     if (i < progress) btn.classList.add("done");
     if (i > progress) {
       btn.disabled = true;
@@ -372,6 +447,18 @@ function showLevelSelect() {
     }
     grid.appendChild(btn);
   }
+  const badgeRow = document.createElement("div");
+  badgeRow.className = "badge-row";
+  for (const b of BADGES) {
+    const box = document.createElement("div");
+    box.className = "badge-box" + (badges.includes(b.id) ? "" : " locked");
+    box.innerHTML = `<span class="badge-icon">${b.icon}</span><span>${b.name}<small>${b.desc}</small></span>`;
+    badgeRow.appendChild(box);
+  }
+  const wrap = document.createElement("div");
+  wrap.className = "select-wrap";
+  wrap.appendChild(grid);
+  wrap.appendChild(badgeRow);
   let resetArmed = false;
   const resetProgress = (event) => {
     if (!resetArmed) {
@@ -382,7 +469,11 @@ function showLevelSelect() {
     progress = 0;
     levelIndex = 0;
     tries = 1;
+    starMap = {};
+    badges = [];
     localStorage.setItem(SAVE_KEY, "0");
+    localStorage.setItem(STAR_KEY, "{}");
+    localStorage.setItem(BADGE_KEY, "[]");
     updateHud();
     showLevelSelect();
   };
@@ -390,9 +481,9 @@ function showLevelSelect() {
     title: "Bölüm Seç",
     text:
       progress >= LEVELS.length
-        ? "Bütün bölümler açık! İstediğini tekrar oyna."
-        : `${progress}/${LEVELS.length} bölüm bitti. Yeşiller biten, maviler açık bölümler.`,
-    extra: grid,
+        ? `Bütün bölümler açık! Toplam ${totalStars()} yıldızın var.`
+        : `${progress}/${LEVELS.length} bölüm bitti, ${totalStars()} yıldız topladın.`,
+    extra: wrap,
     buttons: [
       { label: "← Geri", secondary: true, onClick: renderForMode },
       { label: "İlerlemeyi Sıfırla", secondary: true, onClick: resetProgress },
@@ -424,7 +515,9 @@ function startLevel() {
   penLifted = false;
   confetti = [];
   pausedFrom = null;
+  stopEngine();
   resetCar();
+  applyTheme();
   updateHud();
   hideOverlay();
   mode = "draw";
@@ -439,6 +532,7 @@ function startLevel() {
 
 function retryLevel(reason) {
   mode = "lost";
+  stopEngine();
   lastFailReason = reason;
   tone(160, 0.25);
   showLost();
@@ -446,11 +540,20 @@ function retryLevel(reason) {
 
 function winLevel() {
   mode = "won";
+  stopEngine();
   tone(660, 0.12);
   setTimeout(() => tone(880, 0.2), 130);
   spawnConfetti();
+  // yildiz: referans cizgiye yakinlik (3 yildiz her zaman mumkun, test dogrular)
+  const ref = referenceLength(level());
+  lastWinStars = lineLength <= ref * 1.08 ? 3 : lineLength <= ref * 1.3 ? 2 : 1;
+  if ((starMap[levelIndex] || 0) < lastWinStars) {
+    starMap[levelIndex] = lastWinStars;
+    localStorage.setItem(STAR_KEY, JSON.stringify(starMap));
+  }
   progress = Math.max(progress, levelIndex + 1);
   localStorage.setItem(SAVE_KEY, String(progress));
+  lastNewBadges = checkBadges();
   showWin();
 }
 
@@ -478,6 +581,33 @@ function tone(freq, seconds) {
     osc.start();
     osc.stop(ac.currentTime + seconds);
   } catch {}
+}
+
+// ---------- Motor sesi (surus sirasinda) ----------
+let engineOsc = null;
+let engineGain = null;
+
+function startEngine() {
+  if (!musicOn || engineOsc) return;
+  const ac = ensureAudio();
+  if (!ac) return;
+  try {
+    engineOsc = ac.createOscillator();
+    engineGain = ac.createGain();
+    engineOsc.type = "sawtooth";
+    engineOsc.frequency.value = 68;
+    engineGain.gain.value = 0.018;
+    engineOsc.connect(engineGain).connect(ac.destination);
+    engineOsc.start();
+  } catch {}
+}
+
+function stopEngine() {
+  try {
+    if (engineOsc) engineOsc.stop();
+  } catch {}
+  engineOsc = null;
+  engineGain = null;
 }
 
 // ---------- Muzik (WebAudio chiptune dongusu) ----------
@@ -543,7 +673,10 @@ musicToggle.addEventListener("click", () => {
   localStorage.setItem(MUSIC_KEY, musicOn ? "on" : "off");
   updateMusicButton();
   if (musicOn) startMusic();
-  else stopMusic();
+  else {
+    stopMusic();
+    stopEngine();
+  }
 });
 
 // Tarayici autoplay engeli: ses ancak ilk kullanici hareketinde acilir
@@ -615,6 +748,7 @@ function finishDrawing() {
   }
   mode = "drive";
   tone(440, 0.08);
+  startEngine();
   hint.textContent = "Araba gidiyor...";
 }
 
@@ -716,15 +850,40 @@ function stepCar() {
   }
 }
 
+// ---------- Temalar (her 10 bolumde bir palet) ----------
+const THEMES = [
+  { bg1: "#0d1622", bg2: "#0b0d10", ground: "#1c2733", edge: "#35d2ff", star: "rgba(53, 210, 255, 0.5)" }, // 1-10 neon gece
+  { bg1: "#1a1026", bg2: "#0d0a12", ground: "#251a33", edge: "#b892ff", star: "rgba(184, 146, 255, 0.5)" }, // 11-20 mor sis
+  { bg1: "#0d1f16", bg2: "#0a120d", ground: "#16301f", edge: "#8fff6a", star: "rgba(143, 255, 106, 0.45)" }, // 21-30 orman
+  { bg1: "#241a08", bg2: "#120d06", ground: "#33270f", edge: "#ffd166", star: "rgba(255, 209, 102, 0.5)" }, // 31-40 col
+  { bg1: "#260d0d", bg2: "#120909", ground: "#331616", edge: "#ff6a5c", star: "rgba(255, 106, 92, 0.5)" }, // 41-50 lav
+  { bg1: "#0a1a24", bg2: "#081014", ground: "#122a38", edge: "#5cd6ff", star: "rgba(92, 214, 255, 0.5)" }, // 51-60 okyanus
+  { bg1: "#1c0f1e", bg2: "#0e0910", ground: "#2b1730", edge: "#ff8fd0", star: "rgba(255, 143, 208, 0.5)" }, // 61-70 kozmik
+  { bg1: "#101d0d", bg2: "#0a1008", ground: "#1b3013", edge: "#c0ff5c", star: "rgba(192, 255, 92, 0.5)" }, // 71-80 zehir
+  { bg1: "#0d1a26", bg2: "#090d12", ground: "#14283c", edge: "#8fb8ff", star: "rgba(143, 184, 255, 0.5)" }, // 81-90 buz
+  { bg1: "#1f1d0a", bg2: "#100f06", ground: "#302c10", edge: "#ffe45c", star: "rgba(255, 228, 92, 0.5)" }, // 91-100 altin
+];
+
+function theme() {
+  return THEMES[Math.min(THEMES.length - 1, Math.floor(levelIndex / 10))];
+}
+
+function applyTheme() {
+  try {
+    document.documentElement.style.setProperty("--cyan", theme().edge);
+  } catch {}
+}
+
 // ---------- Cizim ----------
 function drawBackground() {
+  const th = theme();
   const grad = ctx.createLinearGradient(0, 0, 0, H);
-  grad.addColorStop(0, "#0d1622");
-  grad.addColorStop(1, "#0b0d10");
+  grad.addColorStop(0, th.bg1);
+  grad.addColorStop(1, th.bg2);
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, H);
 
-  ctx.fillStyle = "rgba(53, 210, 255, 0.5)";
+  ctx.fillStyle = th.star;
   for (const star of STARS) ctx.fillRect(star.x, star.y, 2, 2);
 }
 
@@ -734,10 +893,11 @@ const STARS = Array.from({ length: 60 }, () => ({
 }));
 
 function drawGrounds() {
+  const th = theme();
   for (const g of level().grounds) {
-    ctx.fillStyle = "#1c2733";
+    ctx.fillStyle = th.ground;
     ctx.fillRect(g.x, g.y, g.w, g.h);
-    ctx.fillStyle = "#35d2ff";
+    ctx.fillStyle = th.edge;
     ctx.fillRect(g.x, g.y, g.w, 4);
   }
   for (const wall of level().walls) {
@@ -916,6 +1076,7 @@ function loop() {
 updateMusicButton();
 updateHud();
 resetCar();
+applyTheme();
 showIntro();
 loop();
 
@@ -924,10 +1085,14 @@ if (typeof window !== "undefined") {
   window.__carSim = {
     LEVELS,
     MAX_LINE,
+    referencePath,
+    referenceLength,
     get mode() { return mode; },
     get levelIndex() { return levelIndex; },
     get car() { return car; },
     get lastOverlay() { return lastOverlay; },
+    get starMap() { return starMap; },
+    get badges() { return badges; },
     selectLevel(i) {
       levelIndex = Math.max(0, Math.min(i, LEVELS.length - 1));
       tries = 1;
