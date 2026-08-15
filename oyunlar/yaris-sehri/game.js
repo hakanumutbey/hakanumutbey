@@ -255,6 +255,7 @@ const state = {
   lowQuality: false,
   pointerLocked: false,
   camYawOffset: 0,
+  camYawTarget: 0,
 };
 
 const car = {
@@ -335,6 +336,10 @@ const touchControls = document.querySelector("#touchControls");
 const menuError = document.querySelector("#menuError");
 const minimap = document.querySelector("#minimap");
 const minimapCtx = minimap.getContext("2d");
+const chatBtn = document.querySelector("#chatBtn");
+const chatPanel = document.querySelector("#chatPanel");
+const chatGrid = document.querySelector("#chatGrid");
+const chatHistory = document.querySelector("#chatHistory");
 
 const screens = {
   splash: document.querySelector("#splash"),
@@ -357,6 +362,7 @@ function showScreen(name) {
     }
   } else {
     touchControls.hidden = true;
+    chatPanel.hidden = true;
   }
 }
 
@@ -1212,27 +1218,60 @@ function removeBotMeshes() {
 
 const camPos = new THREE.Vector3(3000, 60, 2900);
 const camTarget = new THREE.Vector3(3000, 0, 3000);
+// Yumuşatılmış kamera durumu: yaw ve yükseklik arabayı gecikmeli takip eder
+// (ani dönüş/inişlerde sarsıntıyı önler).
+const camState = { yaw: -Math.PI / 2, h: 0 };
+
+function snapCamera() {
+  // Mod başı/respawn: sarsıntısız başlangıç için kamera anında yerine oturur.
+  state.camYawTarget = 0;
+  state.camYawOffset = 0;
+  camState.yaw = car.angle;
+  camState.h = Math.max(0, car.h);
+  const fx = Math.cos(camState.yaw);
+  const fz = Math.sin(camState.yaw);
+  camPos.set(car.x - fx * 26, camState.h + 13, car.z - fz * 26);
+  camTarget.set(car.x + fx * 16, camState.h + 3, car.z + fz * 16);
+  camera.position.copy(camPos);
+  camera.lookAt(camTarget);
+}
 
 function updateCamera3D(dt) {
-  // Kilit yoksa kamera yumuşakça arabanın arkasına döner
-  if (!state.pointerLocked && state.camYawOffset !== 0) {
-    state.camYawOffset *= Math.max(0, 1 - 4 * dt);
-    if (Math.abs(state.camYawOffset) < 0.01) state.camYawOffset = 0;
+  // Mouse-look: ham hedef (camYawTarget) -> yumuşatılmış ofset (camYawOffset).
+  // Kilit yoksa hedef yumuşakça sıfıra döner.
+  if (!state.pointerLocked && state.camYawTarget !== 0) {
+    state.camYawTarget *= Math.max(0, 1 - 4 * dt);
+    if (Math.abs(state.camYawTarget) < 0.01) state.camYawTarget = 0;
   }
-  const viewAngle = car.angle + state.camYawOffset;
-  const fx = Math.cos(viewAngle);
-  const fz = Math.sin(viewAngle);
+  state.camYawOffset += (state.camYawTarget - state.camYawOffset) * (1 - Math.exp(-12 * dt));
+
+  // Kamera yönü arabanın yaw'unu düşük geçişli filtreyle takip eder (~3.5/s)
+  const desiredYaw = car.angle + state.camYawOffset;
+  let yawDiff = desiredYaw - camState.yaw;
+  while (yawDiff > Math.PI) yawDiff -= Math.PI * 2;
+  while (yawDiff < -Math.PI) yawDiff += Math.PI * 2;
+  camState.yaw += yawDiff * (1 - Math.exp(-3.5 * dt));
+
+  // Dikey: rampa/inişlerde yükseklik yumuşak takip (~5/s)
+  camState.h += (Math.max(0, car.h) - camState.h) * (1 - Math.exp(-5 * dt));
+
+  const fx = Math.cos(camState.yaw);
+  const fz = Math.sin(camState.yaw);
   const dist = 26 + Math.abs(car.speed) * 0.014;
-  const height = 13 + Math.max(0, car.h) * 0.5;
   const wantX = car.x - fx * dist;
   const wantZ = car.z - fz * dist;
-  const wantY = Math.max(0, car.h) + height;
+  const wantY = camState.h + 13;
   const t = 1 - Math.exp(-6 * dt);
   camPos.x += (wantX - camPos.x) * t;
   camPos.y += (wantY - camPos.y) * t;
   camPos.z += (wantZ - camPos.z) * t;
   camera.position.copy(camPos);
-  camTarget.set(car.x + fx * 16, Math.max(0, car.h) + 3, car.z + fz * 16);
+
+  // Bakış hedefi de yumuşatılır (~8/s) — ani dönüşlerde görüntü sarsılmaz
+  const targetT = 1 - Math.exp(-8 * dt);
+  camTarget.x += (car.x + fx * 16 - camTarget.x) * targetT;
+  camTarget.y += (camState.h + 3 - camTarget.y) * targetT;
+  camTarget.z += (car.z + fz * 16 - camTarget.z) * targetT;
   camera.lookAt(camTarget);
 }
 
@@ -1611,9 +1650,10 @@ function startGame(mode, opts = {}) {
   car.angle = spawn.angle;
   car.speed = 0;
   car.airDist = 0;
-  camPos.set(car.x - Math.cos(car.angle) * 26, 40, car.z - Math.sin(car.angle) * 26);
+  snapCamera();
   resetRace();
   tt.running = false;
+  clearChat();
   tutorialPanel.hidden = true;
   stuntPanel.hidden = true;
   icePanel.hidden = true;
@@ -1688,6 +1728,7 @@ function exitToModes(note = "") {
   state.bots = [];
   resetRace();
   tt.running = false;
+  clearChat();
   tutorialPanel.hidden = true;
   stuntPanel.hidden = true;
   icePanel.hidden = true;
@@ -1847,6 +1888,7 @@ function handleServerMessage(message) {
         car.z = spawn.z;
         car.h = 0;
         car.speed = 0;
+        snapCamera();
         rebuildSelfCar();
         setActiveMap("city");
         showScreen("game");
@@ -1922,6 +1964,9 @@ function handleServerMessage(message) {
       break;
     case "tt-reward":
       applyTtReward(message);
+      break;
+    case "chat":
+      handleChatMessage(message);
       break;
     case "yaris-error":
       showBanner(message.message || "Bir hata oluştu.");
@@ -2030,6 +2075,7 @@ function teleportToRaceGrid() {
   car.speed = 0;
   car.h = 0;
   car.vh = 0;
+  snapCamera(); // grid'e ışınlanınca kamera da sarsılmadan otursun
 }
 
 function updateRacePanel() {
@@ -2250,6 +2296,22 @@ function renderTtScores() {
 // Öğretici
 // ---------------------------------------------------------------------------
 
+// Hazır mesaj sohbeti whitelist'i (server.mjs'deki YARIS_CHAT_MESSAGES ile aynı sıra)
+const CHAT_MESSAGES = [
+  "Merhaba! 👋",
+  "Yarışalım mı? 🏁",
+  "Beni takip et! 🚗",
+  "Partiye gel! 🎉",
+  "Kazandım! 😄",
+  "Çok hızlısın! ⚡",
+  "Buzda görüşürüz 🧊",
+  "Afiyet olsun altınlar 🪙",
+  "Dur bekle! ✋",
+  "Geliyorum! 💨",
+  "Görüşürüz! 👋",
+  "GG! 🏆",
+];
+
 const TUTORIAL_STEPS = [
   "Adım 1/4: ▲ (W) ile gaz ver, ◀ ▶ (A/D) ile dön. Biraz hızlan!",
   "Adım 2/4: Parlayan checkpoint halkasından geç!",
@@ -2404,6 +2466,113 @@ function updateBots(dt) {
 }
 
 // ---------------------------------------------------------------------------
+// Hazır mesaj sohbeti (whitelist — serbest yazı yok)
+// ---------------------------------------------------------------------------
+
+const chatBubbles = new Map(); // playerId -> { sprite, until }
+
+function bindChatUI() {
+  chatGrid.innerHTML = "";
+  CHAT_MESSAGES.forEach((text, msgId) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = text;
+    btn.addEventListener("click", () => {
+      sendWs({ type: "chat", msgId });
+      chatPanel.hidden = true;
+    });
+    chatGrid.appendChild(btn);
+  });
+  chatBtn.addEventListener("click", toggleChatPanel);
+}
+
+function toggleChatPanel() {
+  // Sohbet yalnızca çevrimiçi sürüş ekranında (açık dünya/dereceli) açılır
+  if (state.screen !== "game" || !state.online || !state.joined) return;
+  chatPanel.hidden = !chatPanel.hidden;
+}
+
+function handleChatMessage(message) {
+  const text = CHAT_MESSAGES[message.msgId];
+  if (!text) return;
+  showChatBubble(message.playerId, text);
+  addChatHistoryEntry(message.nickname, message.color, text);
+}
+
+function makeChatBubbleSprite(text) {
+  const c = document.createElement("canvas");
+  c.width = 512;
+  c.height = 112;
+  const g = c.getContext("2d");
+  g.fillStyle = "rgba(247, 244, 234, 0.95)";
+  g.beginPath();
+  g.roundRect(4, 4, 504, 104, 26);
+  g.fill();
+  g.font = "bold 40px system-ui, sans-serif";
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.fillStyle = "#11161f";
+  g.fillText(text, 256, 58);
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false }),
+  );
+  sprite.scale.set(30, 6.6, 1);
+  return sprite;
+}
+
+function showChatBubble(playerId, text) {
+  if (!active) return;
+  const old = chatBubbles.get(playerId);
+  if (old) old.sprite.parent?.remove(old.sprite);
+  const sprite = makeChatBubbleSprite(text);
+  active.scene.add(sprite);
+  chatBubbles.set(playerId, { sprite, until: performance.now() + 3000 });
+}
+
+function updateChatBubbles(nowMs) {
+  for (const [playerId, bubble] of chatBubbles) {
+    if (nowMs > bubble.until) {
+      bubble.sprite.parent?.remove(bubble.sprite);
+      chatBubbles.delete(playerId);
+      continue;
+    }
+    let x;
+    let z;
+    let h;
+    if (playerId === state.selfId) {
+      x = car.x;
+      z = car.z;
+      h = Math.max(0, car.h);
+    } else {
+      const remote = state.remotes.get(playerId);
+      if (!remote) continue;
+      x = remote.x;
+      z = remote.z;
+      h = remote.h;
+    }
+    bubble.sprite.position.set(x, h + 12, z);
+  }
+}
+
+function addChatHistoryEntry(nickname, color, text) {
+  const entry = document.createElement("div");
+  entry.className = "chat-entry";
+  const safeColor = /^#[0-9a-fA-F]{6}$/.test(color || "") ? color : "#f7f4ea";
+  entry.innerHTML = `<strong style="color:${safeColor}">${escapeHtml(nickname)}:</strong> ${escapeHtml(text)}`;
+  chatHistory.appendChild(entry);
+  while (chatHistory.children.length > 4) chatHistory.firstChild.remove();
+  setTimeout(() => entry.classList.add("fading"), 5000);
+  setTimeout(() => entry.remove(), 6200);
+}
+
+function clearChat() {
+  chatPanel.hidden = true;
+  chatHistory.innerHTML = "";
+  for (const [, bubble] of chatBubbles) bubble.sprite.parent?.remove(bubble.sprite);
+  chatBubbles.clear();
+}
+
+// ---------------------------------------------------------------------------
 // Girdi: klavye + dokunmatik
 // ---------------------------------------------------------------------------
 
@@ -2443,6 +2612,11 @@ window.addEventListener("keydown", (event) => {
     tryStartTimeTrial();
     return;
   }
+  // T: hazır mesaj paneli
+  if (event.code === "KeyT" && state.screen === "game") {
+    toggleChatPanel();
+    return;
+  }
   const key = KEYMAP[event.code];
   if (!key) return;
   input[key] = true;
@@ -2453,10 +2627,11 @@ window.addEventListener("keyup", (event) => {
   if (key) input[key] = false;
 });
 
-// Fare kilidi aktifken yatay fare hareketi kamerayı çevirir (mouse-look) — tüm modlarda
+// Fare kilidi aktifken yatay fare hareketi kamerayı çevirir (mouse-look) — tüm modlarda.
+// Ham hareket camYawTarget'a yazılır; uygulanan ofset updateCamera3D'de yumuşatılır.
 document.addEventListener("mousemove", (event) => {
   if (!state.pointerLocked || state.screen !== "game") return;
-  state.camYawOffset = clamp(state.camYawOffset + (event.movementX || 0) * 0.004, -Math.PI, Math.PI);
+  state.camYawTarget = clamp(state.camYawTarget + (event.movementX || 0) * 0.0025, -Math.PI, Math.PI);
 });
 
 // Kilit reddedildiyse/koptuysa: oyun ekranına tıklayınca tekrar kilitlenir
@@ -2639,6 +2814,7 @@ function iceDeath() {
   car.speed = 0;
   car.falling = false;
   car.angle = 0;
+  snapCamera(); // respawn'da kamera ışınlanır, sarsılmaz
 }
 
 function iceScore() {
@@ -2861,6 +3037,7 @@ function frame(nowMs) {
     stuntTick(nowMs);
     iceTick(nowMs, dt);
     syncSelfCar();
+    updateChatBubbles(nowMs);
     updateRingVisibility(nowMs);
     updateCamera3D(dt);
     updateHud(nowMs);
@@ -2883,6 +3060,7 @@ async function init() {
   bindTouchButton("#touchBrake", "brake");
   bindTouchButton("#touchLeft", "left");
   bindTouchButton("#touchRight", "right");
+  bindChatUI();
   updateStatusDot();
   document.querySelector("#retryResumeBtn").addEventListener("click", () => resumeAndEnter());
   requestAnimationFrame(frame);

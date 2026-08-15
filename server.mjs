@@ -284,6 +284,10 @@ yarisSehriSocketServer.on("connection", (socket) => {
       yarisTimeTrialFinish(socket, message);
       return;
     }
+    if (message?.type === "chat") {
+      handleYarisChat(socket, message);
+      return;
+    }
     if (message?.type === "leave") {
       leaveYarisWorld(socket);
       return;
@@ -3522,6 +3526,42 @@ function joinYarisWorld(socket, message) {
   if (world.race.state === "lobby") {
     broadcastYarisWorld(world, { type: "race-lobby", race: publicYarisRace(world) });
   }
+}
+
+// Hazır mesaj sohbeti: whitelist (serbest yazı yok — çocuk güvenliği)
+const YARIS_CHAT_MESSAGES = [
+  "Merhaba! 👋",
+  "Yarışalım mı? 🏁",
+  "Beni takip et! 🚗",
+  "Partiye gel! 🎉",
+  "Kazandım! 😄",
+  "Çok hızlısın! ⚡",
+  "Buzda görüşürüz 🧊",
+  "Afiyet olsun altınlar 🪙",
+  "Dur bekle! ✋",
+  "Geliyorum! 💨",
+  "Görüşürüz! 👋",
+  "GG! 🏆",
+];
+const YARIS_CHAT_COOLDOWN_MS = 3000;
+
+function handleYarisChat(socket, message) {
+  const { world, player } = yarisPlayerOf(socket);
+  if (!world || !player) return;
+  const msgId = Number(message.msgId);
+  if (!Number.isInteger(msgId) || msgId < 0 || msgId >= YARIS_CHAT_MESSAGES.length) return; // sessiz drop
+  const now = Date.now();
+  if (player.lastChatAt && now - player.lastChatAt < YARIS_CHAT_COOLDOWN_MS) return; // rate limit
+  player.lastChatAt = now;
+  // Sadece aynı dünyaya yayın
+  broadcastYarisWorld(world, {
+    type: "chat",
+    playerId: player.id,
+    nickname: player.nickname,
+    color: player.color,
+    msgId,
+    text: YARIS_CHAT_MESSAGES[msgId],
+  });
 }
 
 function yarisPlayerOf(socket) {

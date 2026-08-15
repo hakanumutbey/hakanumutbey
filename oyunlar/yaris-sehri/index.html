@@ -13,6 +13,7 @@
     <div class="hud" id="hud" hidden>
       <div class="hud-left">
         <button id="menuExitBtn" type="button" class="hud-btn">☰ Menü</button>
+        <button id="chatBtn" type="button" class="hud-btn" title="Hazır mesajlar (T)">💬</button>
         <span class="hud-title">Hakorocks Şehri</span>
         <span id="hud-status" class="status-dot offline" title="Bağlantı"></span>
         <span id="hud-players"></span>
@@ -67,6 +68,14 @@
 
     <div class="countdown" id="countdown" hidden></div>
     <div class="score-pop" id="scorePop" hidden></div>
+
+    <div class="chat-history" id="chatHistory"></div>
+
+    <section class="chat-panel" id="chatPanel" hidden>
+      <h2>Hazır Mesajlar</h2>
+      <div class="chat-grid" id="chatGrid"></div>
+      <p class="hint-line">Sadece güvenli hazır cümleler gönderilebilir.</p>
+    </section>
 
     <div class="touch-controls" id="touchControls" hidden>
       <div class="touch-left">
