@@ -58,6 +58,13 @@
       <p class="hint-line">Rampalardan uç, halkalardan geç! (skor/100 altın kazanırsın)</p>
     </section>
 
+    <section class="panel ice-panel" id="icePanel" hidden>
+      <h2>Buzlu Zemin 🧊</h2>
+      <p>Skor: <strong id="iceScore">0</strong> · En iyi: <strong id="iceBest">0</strong></p>
+      <p>Süre: <strong id="iceTime">0 sn</strong> · Kırılan buz: <strong id="iceBroken">0</strong> · Düşüş: <strong id="iceDeaths">0</strong></p>
+      <p class="hint-line">Karoların 3 canı var — ilk bastığın karoda 1 sn güvendesin. Buz kaygan, dikkat! (skor/150 altın)</p>
+    </section>
+
     <div class="countdown" id="countdown" hidden></div>
     <div class="score-pop" id="scorePop" hidden></div>
 
@@ -74,10 +81,11 @@
 
     <!-- Açılış: hesap denemesi -->
     <div class="menu" id="splash">
-      <div class="menu-card splash-card">
+        <div class="menu-card splash-card">
         <h1>Hakorocks Şehri</h1>
-        <p class="splash-text">Hakorocks Studios hesabı ile giriş yapılıyor...</p>
-        <div class="spinner"></div>
+        <p class="splash-text" id="splashText">Hakorocks Studios hesabı ile giriş yapılıyor...</p>
+        <div class="spinner" id="splashSpinner"></div>
+        <button id="retryResumeBtn" type="button" class="primary" hidden>Tekrar Dene</button>
       </div>
     </div>
 
@@ -114,6 +122,7 @@
           <button id="showGuestBtn" type="button" class="link-btn">Misafir olarak devam et</button>
         </div>
 
+        <p class="consent-text">Herhangi bir oyuna başlayarak <a href="gizlilik.html" target="_blank" rel="noopener">Gizlilik ve Şartlar Politikamızı</a> kabul etmiş olursunuz.</p>
         <a class="privacy-link" href="gizlilik.html" target="_blank" rel="noopener">Gizlilik ve Haklar Politikası</a>
         <p class="controls-help">Klavye: WASD veya ok tuşları · Telefon: ekran düğmeleri</p>
       </div>
@@ -147,11 +156,13 @@
             <button id="rankedCancelBtn" type="button">Vazgeç</button>
           </div>
           <button id="modeStuntBtn" type="button" class="primary">🚀 Tek Mod (Akrobasi)</button>
+          <button id="modeIceBtn" type="button" class="primary">🧊 Buzlu Zemin</button>
           <button id="galleryBtn" type="button">🚗 Araba Galerisi</button>
           <button id="tutorialReplayBtn" type="button">🎓 Öğreticiyi Tekrar Oyna</button>
           <p id="menuError" class="auth-error"></p>
         </div>
 
+        <p class="consent-text">Herhangi bir oyuna başlayarak <a href="gizlilik.html" target="_blank" rel="noopener">Gizlilik ve Şartlar Politikamızı</a> kabul etmiş olursunuz.</p>
         <a class="privacy-link" href="gizlilik.html" target="_blank" rel="noopener">Gizlilik ve Haklar Politikası</a>
       </div>
     </div>
@@ -176,6 +187,26 @@
       </div>
     </div>
 
-    <script src="game.js"></script>
+    <canvas id="minimap" width="150" height="150" hidden></canvas>
+
+    <script type="importmap">
+      { "imports": { "three": "./lib/three.module.min.js" } }
+    </script>
+    <script type="module" src="game.js"></script>
+    <script>
+      // file:// ile açılırsa ES modülleri tarayıcı tarafından engellenir; nazik uyarı göster.
+      setTimeout(function () {
+        if (!window.__yarisBooted && location.protocol === "file:") {
+          var splash = document.querySelector("#splash");
+          if (splash) {
+            splash.hidden = false;
+            splash.querySelector(".splash-text").textContent =
+              "Bu oyun file:// ile açılamıyor (3D motoru modül gerektiriyor). Site üzerinden oyna: /oyunlar/yaris-sehri/";
+            var sp = splash.querySelector(".spinner");
+            if (sp) sp.style.display = "none";
+          }
+        }
+      }, 2500);
+    </script>
   </body>
 </html>

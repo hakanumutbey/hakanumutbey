@@ -805,6 +805,33 @@ async function handleApi(request, response) {
     sendJson(response, { ok: true, profile, goldEarned });
     return;
   }
+  if (request.method === "POST" && url.pathname === "/api/yaris-sehri/ice-score") {
+    const body = await readBody(request, 16_000);
+    const account = yarisAccountFromAuth(safeText(body.sessionId, 120), safeText(body.authToken, 128));
+    if (!account) {
+      response.writeHead(401, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "invalid-auth", message: "Oturum doğrulanamadı." }));
+      return;
+    }
+    const score = Math.floor(Number(body.score));
+    const deaths = Math.floor(Number(body.deaths));
+    if (!Number.isFinite(score) || score < 0 || score > 500000 || !Number.isFinite(deaths) || deaths < 0 || deaths > 500) {
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "invalid-score", message: "Skor geçersiz." }));
+      return;
+    }
+    const profile = yarisProfileOf(account);
+    let goldEarned = 0;
+    if (score > profile.iceBest) {
+      // Buzlu Zemin: skor/150 altın, sadece yeni rekor farkı kadar.
+      goldEarned = Math.floor(score / 150) - Math.floor(profile.iceBest / 150);
+      profile.iceBest = score;
+      profile.gold += goldEarned;
+      await writeJson("accounts.json", accounts);
+    }
+    sendJson(response, { ok: true, profile, goldEarned });
+    return;
+  }
   if (request.method === "POST" && url.pathname === "/api/auth/delete") {
     const body = await readBody(request, 64_000);
     const sessionId = safeText(body.sessionId, 120);
@@ -2123,11 +2150,15 @@ function normalizeAccounts(value) {
 
 function clearSessionBindings(sessionId) {
   if (!sessionId) return;
-  accounts = accounts.map((account) => (
-    account.sessionId === sessionId
-      ? { ...account, sessionId: "", updatedAt: new Date().toISOString() }
-      : account
-  ));
+  // Yerinde (in-place) temizle: map+yayma ile yeni nesne üretmek, az önce bulunan
+  // hesap referansını diziden koparıyordu ve ilk resume'da account:null dönüyordu
+  // ("hesabınız yok" hatasının kök nedeni).
+  for (const account of accounts) {
+    if (account.sessionId === sessionId) {
+      account.sessionId = "";
+      account.updatedAt = new Date().toISOString();
+    }
+  }
 }
 
 function ensureAccountAuthToken(account) {
@@ -3256,13 +3287,13 @@ function broadcastBlackRoom(roomId) {
 
 const YARIS_LIMITS = {
   maxPlayers: 20,
-  mapSize: 3000,
+  mapSize: 6000,
   posMinIntervalMs: 50,
   raceMinPlayers: 2,
   raceMaxPlayers: 5,
   raceLobbyMs: 15000,
   raceCountdownMs: 3000,
-  raceMaxMs: 90000,
+  raceMaxMs: 120000,
   raceResultsMs: 12000,
   ttMaxScores: 5,
   ttMinMs: 5000,
@@ -3272,30 +3303,31 @@ const YARIS_LIMITS = {
 const YARIS_COLORS = ["#ff5b6e", "#4ea3ff", "#69d18b", "#ffd166", "#b67dff", "#ff9f43", "#34d1bf", "#ff8fd6", "#e8eef6"];
 
 // Yarış rotası: şehir çevre yolunda saat yönünde tur; start/bitiş route[0].
+// Not: y burada zemin düzleminin 2. koordinatı (istemcide 3D z ekseni).
 const YARIS_RACE_ROUTE = [
-  { x: 300, y: 300 },
-  { x: 1500, y: 300 },
-  { x: 2700, y: 300 },
-  { x: 2700, y: 1500 },
-  { x: 2700, y: 2700 },
-  { x: 1500, y: 2700 },
-  { x: 300, y: 2700 },
-  { x: 300, y: 1500 },
+  { x: 600, y: 600 },
+  { x: 3000, y: 600 },
+  { x: 5400, y: 600 },
+  { x: 5400, y: 3000 },
+  { x: 5400, y: 5400 },
+  { x: 3000, y: 5400 },
+  { x: 600, y: 5400 },
+  { x: 600, y: 3000 },
 ];
 
 // Zamana karşı rotası: güneyde küçük tur; start/bitiş route[0].
 const YARIS_TT_ROUTE = [
-  { x: 1500, y: 2700 },
-  { x: 2100, y: 2700 },
-  { x: 2700, y: 2700 },
-  { x: 2700, y: 2100 },
-  { x: 2100, y: 2100 },
-  { x: 1500, y: 2100 },
+  { x: 3000, y: 5400 },
+  { x: 4200, y: 5400 },
+  { x: 5400, y: 5400 },
+  { x: 5400, y: 4200 },
+  { x: 4200, y: 4200 },
+  { x: 3000, y: 4200 },
 ];
 
 const YARIS_ZONES = {
-  race: { x: 120, y: 120, w: 360, h: 360 },
-  tt: { x: 1320, y: 2520, w: 360, h: 360 },
+  race: { x: 240, y: 240, w: 720, h: 720 },
+  tt: { x: 2640, y: 5040, w: 720, h: 720 },
 };
 
 let yarisPlayerCounter = 0;
@@ -3338,6 +3370,7 @@ function publicYarisPlayer(player) {
     color: player.color,
     x: Math.round(player.x),
     y: Math.round(player.y),
+    h: Math.round((player.h || 0) * 10) / 10,
     a: Number(player.angle.toFixed(3)),
     s: Math.round(player.speed),
   };
@@ -3460,8 +3493,9 @@ function joinYarisWorld(socket, message) {
     color,
     accountId: account?.id || "",
     isBot: false,
-    x: 1500 + (Math.random() * 120 - 60),
-    y: 1500 + (Math.random() * 120 - 60),
+    h: 0,
+    x: 3000 + (Math.random() * 120 - 60),
+    y: 3000 + (Math.random() * 120 - 60),
     angle: 0,
     speed: 0,
     socket,
@@ -3506,12 +3540,15 @@ function setYarisPos(socket, message) {
   const y = Number(message.y);
   const angle = Number(message.a);
   const speed = Number(message.s);
+  const height = Number(message.h);
   if (!Number.isFinite(x) || !Number.isFinite(y)) return;
   const bound = YARIS_LIMITS.mapSize + 200;
   player.x = clamp(x, -200, bound);
   player.y = clamp(y, -200, bound);
+  // Yükseklik (3D): geriye uyumlu, yoksa 0.
+  player.h = Number.isFinite(height) ? clamp(height, 0, 400) : 0;
   player.angle = Number.isFinite(angle) ? angle : player.angle;
-  player.speed = Number.isFinite(speed) ? clamp(speed, 0, 1000) : 0;
+  player.speed = Number.isFinite(speed) ? clamp(speed, 0, 2000) : 0;
 }
 
 function yarisRaceJoin(socket) {
@@ -3762,12 +3799,12 @@ function tickYarisWorlds() {
 // ---------------------------------------------------------------------------
 
 const YARIS_CARS = [
-  { id: "minik", name: "Minik", price: 0, maxSpeed: 400, accel: 280, grip: 2.4, color: "#4ea3ff" },
-  { id: "serit", name: "Şerit", price: 80, maxSpeed: 440, accel: 310, grip: 2.55, color: "#69d18b" },
-  { id: "pars", name: "Pars", price: 160, maxSpeed: 480, accel: 340, grip: 2.7, color: "#ff9f43" },
-  { id: "seytan", name: "Şeytan", price: 280, maxSpeed: 520, accel: 375, grip: 2.85, color: "#ff5b6e" },
-  { id: "firtina", name: "Fırtına", price: 430, maxSpeed: 565, accel: 415, grip: 3.0, color: "#b67dff" },
-  { id: "efsane", name: "Efsane", price: 650, maxSpeed: 610, accel: 455, grip: 3.2, color: "#ffd166" },
+  { id: "minik", name: "Minik", price: 0, maxSpeed: 560, accel: 390, grip: 2.4, color: "#4ea3ff" },
+  { id: "serit", name: "Şerit", price: 80, maxSpeed: 620, accel: 435, grip: 2.55, color: "#69d18b" },
+  { id: "pars", name: "Pars", price: 160, maxSpeed: 680, accel: 480, grip: 2.7, color: "#ff9f43" },
+  { id: "seytan", name: "Şeytan", price: 280, maxSpeed: 740, accel: 530, grip: 2.85, color: "#ff5b6e" },
+  { id: "firtina", name: "Fırtına", price: 430, maxSpeed: 800, accel: 585, grip: 3.0, color: "#b67dff" },
+  { id: "efsane", name: "Efsane", price: 650, maxSpeed: 860, accel: 640, grip: 3.2, color: "#ffd166" },
 ];
 
 // Yarış ödülleri: sıraya göre altın ve puan (4.-5. ve bitiremeyen 0 puan; katılım altını 10).
@@ -3784,6 +3821,7 @@ function createYarisProfile() {
     tutorialDone: false,
     ttBestMs: 0,
     stuntBest: 0,
+    iceBest: 0,
   };
 }
 
@@ -3803,6 +3841,7 @@ function normalizeYarisProfile(value) {
     tutorialDone: Boolean(value.tutorialDone),
     ttBestMs: clamp(Math.floor(Number(value.ttBestMs) || 0), 0, YARIS_LIMITS.ttMaxMs),
     stuntBest: clamp(Math.floor(Number(value.stuntBest) || 0), 0, 500000),
+    iceBest: clamp(Math.floor(Number(value.iceBest) || 0), 0, 500000),
   };
 }
 
@@ -3940,7 +3979,8 @@ function startYarisRankedMatch(entries) {
       angle: 0,
       speed: 0,
       dist: 0,
-      botSpeed: 225 + Math.random() * 70,
+      botSpeed: 300 + Math.random() * 90,
+      h: 0,
       socket: null,
       joinedAt: Date.now(),
     });
