@@ -1,0 +1,524 @@
+:root {
+  --bg: #0b0d10;
+  --text: #f7f4ea;
+  --cyan: #35d2ff;
+  --gold: #ffd166;
+  --pink: #ff5b6e;
+  --panel: rgba(13, 18, 26, 0.92);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  overscroll-behavior: none;
+  overflow: hidden;
+}
+
+#game {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  touch-action: none;
+}
+
+.hud {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: linear-gradient(rgba(7, 10, 14, 0.85), transparent);
+  font-weight: 700;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.hud-left,
+.hud-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.hud-btn {
+  pointer-events: auto;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+}
+
+.hud-title {
+  color: var(--cyan);
+  font-size: 1.05rem;
+}
+
+.hud-party,
+.hud-gold {
+  color: var(--gold);
+}
+
+#hud-event {
+  color: var(--gold);
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-dot.online {
+  background: #69d18b;
+  box-shadow: 0 0 8px #69d18b;
+}
+
+.status-dot.offline {
+  background: var(--pink);
+  box-shadow: 0 0 8px var(--pink);
+}
+
+.banner {
+  position: fixed;
+  top: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--panel);
+  border: 1px solid rgba(255, 91, 110, 0.6);
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  z-index: 6;
+  max-width: calc(100vw - 32px);
+  text-align: center;
+}
+
+.panel {
+  position: fixed;
+  right: 14px;
+  top: 64px;
+  width: min(300px, calc(100vw - 28px));
+  background: var(--panel);
+  border: 1px solid rgba(53, 210, 255, 0.4);
+  border-radius: 14px;
+  padding: 12px 16px;
+  z-index: 7;
+}
+
+.panel h2 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  color: var(--cyan);
+}
+
+.panel p {
+  margin: 4px 0 8px;
+  font-size: 0.88rem;
+}
+
+.panel ul,
+.panel ol {
+  margin: 6px 0;
+  padding-left: 20px;
+  font-size: 0.9rem;
+}
+
+.panel button {
+  margin-top: 6px;
+}
+
+.results-panel {
+  left: 50%;
+  right: auto;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  min-width: min(320px, calc(100vw - 28px));
+  border-color: rgba(255, 209, 102, 0.6);
+}
+
+.results-panel h2 {
+  color: var(--gold);
+  font-size: 1.3rem;
+}
+
+.results-panel ol {
+  list-style: none;
+  padding: 0;
+}
+
+.results-panel li {
+  padding: 6px 10px;
+  border-radius: 8px;
+  margin: 4px 0;
+  background: rgba(53, 210, 255, 0.08);
+}
+
+.results-panel li.me {
+  outline: 2px solid var(--gold);
+}
+
+.reward-line {
+  color: var(--gold);
+  font-weight: 800;
+}
+
+.tutorial-panel {
+  left: 14px;
+  right: auto;
+  border-color: rgba(255, 209, 102, 0.5);
+}
+
+.tutorial-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.tutorial-dots span {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.tutorial-dots span.done {
+  background: var(--gold);
+  box-shadow: 0 0 8px var(--gold);
+}
+
+.hint-line {
+  opacity: 0.75;
+  font-size: 0.8rem;
+}
+
+.countdown {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: clamp(4rem, 18vw, 9rem);
+  font-weight: 900;
+  color: var(--gold);
+  text-shadow: 0 0 30px rgba(255, 209, 102, 0.7);
+  pointer-events: none;
+  z-index: 8;
+}
+
+.score-pop {
+  position: fixed;
+  left: 50%;
+  top: 30%;
+  transform: translateX(-50%);
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--gold);
+  text-shadow: 0 0 18px rgba(255, 209, 102, 0.8);
+  pointer-events: none;
+  z-index: 8;
+}
+
+button {
+  background: rgba(53, 210, 255, 0.14);
+  color: var(--text);
+  border: 1px solid rgba(53, 210, 255, 0.55);
+  border-radius: 10px;
+  padding: 9px 14px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button:hover {
+  background: rgba(53, 210, 255, 0.28);
+}
+
+button.primary {
+  background: var(--cyan);
+  color: #04222e;
+  border-color: var(--cyan);
+  width: 100%;
+  font-size: 1.05rem;
+  padding: 12px;
+}
+
+button.link-btn {
+  background: transparent;
+  border: none;
+  color: var(--cyan);
+  text-decoration: underline;
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 4px;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(53, 210, 255, 0.35);
+  border-radius: 10px;
+  color: var(--text);
+  padding: 10px 12px;
+  font: inherit;
+  margin: 4px 0;
+}
+
+.menu {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-content: safe center;
+  padding: 18px;
+  background: rgba(7, 10, 14, 0.9);
+  overflow-y: auto;
+  z-index: 10;
+}
+
+.menu[hidden] {
+  display: none;
+}
+
+.menu-card {
+  width: min(460px, calc(100vw - 32px));
+  background: var(--panel);
+  border: 2px solid rgba(53, 210, 255, 0.4);
+  border-radius: 18px;
+  padding: 22px;
+  display: grid;
+  gap: 14px;
+}
+
+.menu-card h1 {
+  margin: 0;
+  color: var(--cyan);
+  font-size: 1.8rem;
+  text-align: center;
+}
+
+.tagline {
+  margin: 0;
+  text-align: center;
+  opacity: 0.85;
+  font-size: 0.95rem;
+}
+
+.splash-card {
+  text-align: center;
+}
+
+.splash-text {
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+.spinner {
+  width: 42px;
+  height: 42px;
+  margin: 8px auto 0;
+  border: 4px solid rgba(53, 210, 255, 0.2);
+  border-top-color: var(--cyan);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.account-box {
+  border: 1px solid rgba(255, 209, 102, 0.35);
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+#accountStatus {
+  margin: 0;
+  font-weight: 700;
+}
+
+#registerForm,
+#loginForm,
+#guestBox {
+  display: grid;
+  gap: 2px;
+}
+
+.auth-error {
+  color: var(--pink);
+  font-size: 0.85rem;
+  min-height: 1.1em;
+  margin: 4px 0 0;
+}
+
+.profile-row {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  font-weight: 800;
+  margin: 0;
+  flex-wrap: wrap;
+}
+
+.guest-warning {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px dashed rgba(255, 209, 102, 0.6);
+  border-radius: 10px;
+  color: var(--gold);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.world-box {
+  display: grid;
+  gap: 10px;
+}
+
+#openWorldBox,
+#rankedBox {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(53, 210, 255, 0.25);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+#rankedBox p {
+  margin: 0;
+  text-align: center;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.party-join {
+  display: flex;
+  gap: 8px;
+}
+
+.party-join input {
+  margin: 0;
+}
+
+.privacy-link {
+  color: var(--cyan);
+  font-size: 0.82rem;
+  text-align: center;
+  text-decoration: underline;
+}
+
+.controls-help {
+  margin: 0;
+  text-align: center;
+  font-size: 0.82rem;
+  opacity: 0.7;
+}
+
+.gallery-card {
+  width: min(560px, calc(100vw - 32px));
+}
+
+.car-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.car-card {
+  border: 1px solid rgba(53, 210, 255, 0.3);
+  border-radius: 12px;
+  padding: 10px;
+  display: grid;
+  gap: 6px;
+  text-align: center;
+}
+
+.car-card.selected {
+  border-color: var(--gold);
+  box-shadow: 0 0 12px rgba(255, 209, 102, 0.35);
+}
+
+.car-card .car-name {
+  font-weight: 800;
+}
+
+.car-card .car-price {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.stat-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.stat-bar i {
+  display: block;
+  height: 100%;
+  background: var(--cyan);
+}
+
+.stat-label {
+  font-size: 0.72rem;
+  opacity: 0.75;
+  text-align: left;
+}
+
+.touch-controls {
+  position: fixed;
+  inset: auto 0 0 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 18px 18px;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.touch-controls > div {
+  display: flex;
+  gap: 12px;
+  pointer-events: auto;
+}
+
+.touch-controls button {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  font-size: 1.5rem;
+  background: rgba(13, 18, 26, 0.75);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+@media (max-width: 640px) {
+  .panel {
+    top: auto;
+    bottom: 110px;
+    right: 10px;
+  }
+
+  .tutorial-panel {
+    left: 10px;
+    right: auto;
+  }
+}

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0d10" />
+    <title>Gizlilik ve Haklar Politikası — Hakorocks Şehri</title>
+    <style>
+      :root {
+        --bg: #0b0d10;
+        --text: #f7f4ea;
+        --cyan: #35d2ff;
+        --gold: #ffd166;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        line-height: 1.6;
+      }
+      main {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 28px 18px 48px;
+      }
+      h1 { color: var(--cyan); font-size: 1.6rem; }
+      h2 { color: var(--gold); font-size: 1.1rem; margin-top: 26px; }
+      a { color: var(--cyan); }
+      .note {
+        border: 1px dashed rgba(255, 209, 102, 0.6);
+        border-radius: 12px;
+        padding: 12px 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Gizlilik ve Haklar Politikası</h1>
+      <p><strong>Hakorocks Şehri</strong> (Hakorocks Studio) — son güncelleme: Ağustos 2026</p>
+
+      <h2>Hangi bilgiler saklanıyor?</h2>
+      <p>Hesap oluşturursan şunlar saklanır:</p>
+      <ul>
+        <li>Adın ve takma adın (oyunda görünür)</li>
+        <li>Şifren <strong>karıştırılmış (hash)</strong> olarak saklanır; kimse gerçek şifreni göremez ve biz de göremeyiz.</li>
+        <li>Oyun verilerin: altın, sahip olduğun arabalar, seçili araba, yarış puanı, en iyi akrobasi skoru ve öğreticiyi bitirip bitirmediğin.</li>
+      </ul>
+      <p>Misafir olarak oynarsan oyun verilerin yalnızca kendi cihazında (tarayıcında) saklanır, sunucuya gönderilmez.</p>
+
+      <h2>Sohbet var mı?</h2>
+      <p>Hayır. Bu oyunda oyuncular arasında yazışma/sohbet yoktur. Diğer oyuncular sadece takma adını ve arabanı görür.</p>
+
+      <h2>Kişisel bilgilerini paylaşma!</h2>
+      <p class="note">Takma adını seçerken gerçek adını, okulunu, adresini, telefon numaranı veya şifreni yazma. Bunlar senin gizli bilgilerin ve kimseyle paylaşılmamalı.</p>
+
+      <h2>Hesabını silebilirsin</h2>
+      <p>İstediğin zaman hesabını ve tüm oyun verilerini silebilirsin. Ana sitedeki hesap bölümünden ya da bu oyunun kullandığı hesap silme özelliği (/api/auth/delete) ile hesabın kalıcı olarak kaldırılır.</p>
+
+      <h2>Veliler için not</h2>
+      <p>Bu oyun çocuklar için tasarlanmıştır. Reklam yoktur, uygulama içi gerçek para ile satın alma yoktur (altın yalnızca oynayarak kazanılır), sohbet yoktur ve kişisel veri toplama en aza indirilmiştir. Sorularınız için site sahibiyle GitHub profili üzerinden iletişime geçebilirsiniz.</p>
+
+      <p><a href="./">← Oyuna dön</a></p>
+    </main>
+  </body>
+</html>

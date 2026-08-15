@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#0b0d10" />
+    <title>Hakorocks Şehri — Hakorocks Studio</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+
+    <div class="hud" id="hud" hidden>
+      <div class="hud-left">
+        <button id="menuExitBtn" type="button" class="hud-btn">☰ Menü</button>
+        <span class="hud-title">Hakorocks Şehri</span>
+        <span id="hud-status" class="status-dot offline" title="Bağlantı"></span>
+        <span id="hud-players"></span>
+        <span id="hud-party" class="hud-party" hidden></span>
+      </div>
+      <div class="hud-right">
+        <span id="hud-gold" class="hud-gold">🪙 0</span>
+        <span id="hud-event"></span>
+        <span id="hud-speed">0 km/s</span>
+      </div>
+    </div>
+
+    <div class="banner" id="banner" hidden></div>
+
+    <section class="panel race-panel" id="racePanel" hidden>
+      <h2>Yarış Alanı</h2>
+      <p id="raceInfo">Lobiye girdin, oyuncu bekleniyor…</p>
+      <ul id="raceLobbyList"></ul>
+      <button id="raceLeaveBtn" type="button">Lobiden Çık</button>
+    </section>
+
+    <section class="panel tt-panel" id="ttPanel" hidden>
+      <h2>Zamana Karşı</h2>
+      <p id="ttInfo">Start çizgisinden geçince süre başlar!</p>
+      <ol id="ttScores"></ol>
+    </section>
+
+    <section class="panel results-panel" id="resultsPanel" hidden>
+      <h2>Yarış Bitti!</h2>
+      <ol id="raceResults"></ol>
+      <p id="raceReward" class="reward-line"></p>
+    </section>
+
+    <section class="panel tutorial-panel" id="tutorialPanel" hidden>
+      <h2>Öğretici</h2>
+      <p id="tutorialStep"></p>
+      <div class="tutorial-dots" id="tutorialDots"></div>
+    </section>
+
+    <section class="panel stunt-panel" id="stuntPanel" hidden>
+      <h2>Tek Mod — Akrobasi</h2>
+      <p>Skor: <strong id="stuntScore">0</strong> · En iyi: <strong id="stuntBest">0</strong></p>
+      <p class="hint-line">Rampalardan uç, halkalardan geç! (skor/100 altın kazanırsın)</p>
+    </section>
+
+    <div class="countdown" id="countdown" hidden></div>
+    <div class="score-pop" id="scorePop" hidden></div>
+
+    <div class="touch-controls" id="touchControls" hidden>
+      <div class="touch-left">
+        <button id="touchLeft" type="button" aria-label="Sola dön">◀</button>
+        <button id="touchRight" type="button" aria-label="Sağa dön">▶</button>
+      </div>
+      <div class="touch-right">
+        <button id="touchBrake" type="button" aria-label="Fren / geri">▼</button>
+        <button id="touchGas" type="button" aria-label="Gaz">▲</button>
+      </div>
+    </div>
+
+    <!-- Açılış: hesap denemesi -->
+    <div class="menu" id="splash">
+      <div class="menu-card splash-card">
+        <h1>Hakorocks Şehri</h1>
+        <p class="splash-text">Hakorocks Studios hesabı ile giriş yapılıyor...</p>
+        <div class="spinner"></div>
+      </div>
+    </div>
+
+    <!-- Giriş / kayıt -->
+    <div class="menu" id="menu" hidden>
+      <div class="menu-card">
+        <h1>Hakorocks Şehri</h1>
+        <p class="tagline">Açık şehirde gez, arkadaşlarınla yarış, akrobasi skorları kır!</p>
+
+        <div class="account-box">
+          <p id="accountStatus">Bir hatadan dolayı hesabınız yok. Lütfen hesap oluşturmak için aşağıdaki mavi butona dokunun.</p>
+          <button id="showRegisterBtn" type="button" class="primary">Hesap Oluştur</button>
+
+          <form id="registerForm" hidden>
+            <input id="regName" type="text" maxlength="40" placeholder="Adın (ör. Hakan)" autocomplete="name" />
+            <input id="regNickname" type="text" maxlength="24" placeholder="Takma ad (arabanın üstünde görünür)" />
+            <input id="regPassword" type="password" maxlength="64" placeholder="Şifre (en az 3 karakter)" autocomplete="new-password" />
+            <button type="submit" class="primary">Kaydı Tamamla</button>
+          </form>
+
+          <form id="loginForm" hidden>
+            <input id="loginName" type="text" maxlength="40" placeholder="Ad veya takma ad" autocomplete="username" />
+            <input id="loginPassword" type="password" maxlength="64" placeholder="Şifre" autocomplete="current-password" />
+            <button type="submit">Giriş Yap</button>
+          </form>
+          <button id="showLoginBtn" type="button" class="link-btn">Zaten hesabım var — giriş yap</button>
+
+          <p class="auth-error" id="authError"></p>
+
+          <div id="guestBox" hidden>
+            <input id="guestNickname" type="text" maxlength="24" placeholder="Takma adın" />
+            <button id="guestSave" type="button">Devam Et</button>
+          </div>
+          <button id="showGuestBtn" type="button" class="link-btn">Misafir olarak devam et</button>
+        </div>
+
+        <a class="privacy-link" href="gizlilik.html" target="_blank" rel="noopener">Gizlilik ve Haklar Politikası</a>
+        <p class="controls-help">Klavye: WASD veya ok tuşları · Telefon: ekran düğmeleri</p>
+      </div>
+    </div>
+
+    <!-- Mod seçimi -->
+    <div class="menu" id="modeSelect" hidden>
+      <div class="menu-card">
+        <h1>Hakorocks Şehri</h1>
+        <p id="modeGreeting" class="tagline"></p>
+        <div class="profile-row">
+          <span id="modeGold" class="hud-gold">🪙 0</span>
+          <span id="modeRating">Puan: 100</span>
+          <span id="modeCar"></span>
+        </div>
+        <p id="guestWarning" class="guest-warning" hidden>Misafir modundasın: altın ve arabalar yalnızca bu cihazda saklanır.</p>
+
+        <div class="world-box">
+          <button id="modeOpenBtn" type="button" class="primary">🌍 Açık Dünya</button>
+          <div id="openWorldBox" hidden>
+            <button id="publicBtn" type="button">Herkese Açık Dünyaya Gir</button>
+            <button id="partyCreateBtn" type="button">Parti Kur</button>
+            <div class="party-join">
+              <input id="partyCodeInput" type="text" inputmode="numeric" maxlength="6" placeholder="Parti kodu" />
+              <button id="partyJoinBtn" type="button">Partiye Katıl</button>
+            </div>
+          </div>
+          <button id="modeRankedBtn" type="button" class="primary">🏆 Dereceli Yarış</button>
+          <div id="rankedBox" hidden>
+            <p id="rankedStatus">Rakip aranıyor…</p>
+            <button id="rankedCancelBtn" type="button">Vazgeç</button>
+          </div>
+          <button id="modeStuntBtn" type="button" class="primary">🚀 Tek Mod (Akrobasi)</button>
+          <button id="galleryBtn" type="button">🚗 Araba Galerisi</button>
+          <button id="tutorialReplayBtn" type="button">🎓 Öğreticiyi Tekrar Oyna</button>
+          <p id="menuError" class="auth-error"></p>
+        </div>
+
+        <a class="privacy-link" href="gizlilik.html" target="_blank" rel="noopener">Gizlilik ve Haklar Politikası</a>
+      </div>
+    </div>
+
+    <!-- Araba galerisi -->
+    <div class="menu" id="galleryScreen" hidden>
+      <div class="menu-card gallery-card">
+        <h1>Araba Galerisi</h1>
+        <p class="profile-row"><span id="galleryGold" class="hud-gold">🪙 0</span></p>
+        <div id="carGrid" class="car-grid"></div>
+        <p id="galleryError" class="auth-error"></p>
+        <button id="galleryBackBtn" type="button">← Mod Seçimine Dön</button>
+      </div>
+    </div>
+
+    <!-- Öğretici bitişi -->
+    <div class="menu" id="tutorialDoneScreen" hidden>
+      <div class="menu-card splash-card">
+        <h1>Hakorocks Şehri'ne hoş geldin!</h1>
+        <p class="splash-text">🎁 20 altın hediye kazandın. Şimdi şehir senin!</p>
+        <button id="tutorialFinishBtn" type="button" class="primary">Mod Seçimine Git</button>
+      </div>
+    </div>
+
+    <script src="game.js"></script>
+  </body>
+</html>

@@ -269,10 +269,26 @@ const games = [
     updates: ["Dövüş ve parkur modları", "10 kilitli karakter + SpaceCoin", "Piksel 2D yan görünüm"],
     stockBase: 188,
   },
+  {
+    slug: "yaris-sehri",
+    title: "Hakorocks Şehri",
+    path: "/oyunlar/yaris-sehri/",
+    type: "Çok Oyunculu Yarış",
+    status: "Oynanabilir",
+    description: "Hakorocks Şehri'nde arkadaşlarınla gez, dereceli yarış, rampalardan uç, altın kazan ve araba galerisini topla!",
+    longDescription: "Hakorocks Şehri — açık şehirde çok oyunculu gezinme, Yarış Alanı ve Zamana Karşı etkinlikleri, puanlı Dereceli Yarış eşleştirmesi ve rampalı Tek Mod akrobasi haritası. Etkinliklerden altın kazan, 6 arabalık galeriyi topla; altın, arabalar ve puan hesabında saklanır. Parti koduyla arkadaşlarınla aynı dünyaya düş. İlk girişte öğretici seni karşılar.",
+    accent: "red",
+    controls: "WASD/ok tuşları · dokunmatik ekran düğmeleri",
+    mobileStatus: "Mobil uyumlu",
+    mobileNote: "Ekran altı gaz/fren/direksiyon düğmeleri ile telefonda oynanır.",
+    achievements: ["İlk yarışını kazan", "Zamana karşı rekor kır", "Efsane arabasını garaja al"],
+    updates: ["Altın ekonomisi + 6 arabalık galeri", "Dereceli Yarış: puan eşleştirmeli, bot dolgulu", "Tek Mod akrobasi: rampalar ve halkalar", "Öğretici haritası + 20 altın hediye"],
+    stockBase: 195,
+  },
 ];
 
 const FUSION_GAME_PATH = "/oyunlar/birlesim-arenasi/";
-const NEW_GAME_SLUGS = new Set(["hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "2d-car-simulator"]);
+const NEW_GAME_SLUGS = new Set(["hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "2d-car-simulator", "yaris-sehri"]);
 /** Only games the Birleşim Arenası client actually implements. */
 const FUSION_GAME_SLUGS = new Set([
   "annenden-kac",

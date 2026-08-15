@@ -30,6 +30,7 @@ await copyStaticGame("hentw-premium", ["package.json"]);
 await copyStaticGame("siber-polis", ["package.json", "js/gameLogic.test.js"]);
 await copyStaticGame("space-arena");
 await copyStaticGame("2d-car-simulator", ["game.test.mjs"]);
+await copyStaticGame("yaris-sehri");
 await copyRobotAvcisi();
 console.log("[build-games] all games ready");
 
