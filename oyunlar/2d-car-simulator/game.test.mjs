@@ -8,6 +8,8 @@ import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 
 const here = dirname(fileURLToPath(import.meta.url));
+const levelsSrc = readFileSync(join(here, "levels.js"), "utf8");
+const genSrc = readFileSync(join(here, "levelgen.js"), "utf8");
 const src = readFileSync(join(here, "game.js"), "utf8");
 
 // ---------- Sahte DOM ----------
@@ -61,29 +63,38 @@ const sandbox = {
 sandbox.window = sandbox;
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
+vm.runInContext(levelsSrc, sandbox, { filename: "levels.js" });
+vm.runInContext(genSrc, sandbox, { filename: "levelgen.js" });
 vm.runInContext(src, sandbox, { filename: "game.js" });
 
 const sim = sandbox.window.__carSim;
 if (!sim) throw new Error("__carSim test kancasi bulunamadi");
 
-// ---------- Cozucu: oyunun referans yolu (duz rampa + engel sapmalari) ----------
+// ---------- Cozucu: bolumun kendi cozum cizgisi, yoksa otomatik rampa ----------
 // Boylece test, oynanabilirlik ve 3-yildiz sinirlari ayni kaynaktan beslenir.
 function solveLine(L) {
-  return sim.referencePath(L);
+  return L.solve || sim.referencePath(L);
+}
+
+// Cozum cizgisi tek parca ya da parcali olabilir (uretilen fan bolumleri).
+function strokesOf(pts) {
+  return Array.isArray(pts[0]) ? pts : [pts];
 }
 
 // Cozum cizgisi cizilmez bolgeyi ihlal ediyor mu? (4px aralikla ornekle)
 function zoneViolation(pts, L) {
-  for (let i = 0; i < pts.length - 1; i++) {
-    const a = pts[i];
-    const b = pts[i + 1];
-    const len = Math.hypot(b.x - a.x, b.y - a.y);
-    for (let d = 0; d <= len; d += 4) {
-      const px = a.x + ((b.x - a.x) * d) / len;
-      const py = a.y + ((b.y - a.y) * d) / len;
-      for (const z of L.noZones || []) {
-        if (px > z.x - 2 && px < z.x + z.w + 2 && py > z.y - 2 && py < z.y + z.h + 2) {
-          return `cizgi bolgeyi ihlal ediyor (${Math.round(px)},${Math.round(py)})`;
+  for (const stroke of strokesOf(pts)) {
+    for (let i = 0; i < stroke.length - 1; i++) {
+      const a = stroke[i];
+      const b = stroke[i + 1];
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      for (let d = 0; d <= len; d += 4) {
+        const px = a.x + ((b.x - a.x) * d) / len;
+        const py = a.y + ((b.y - a.y) * d) / len;
+        for (const z of L.noZones || []) {
+          if (px > z.x - 2 && px < z.x + z.w + 2 && py > z.y - 2 && py < z.y + z.h + 2) {
+            return `cizgi bolgeyi ihlal ediyor (${Math.round(px)},${Math.round(py)})`;
+          }
         }
       }
     }
@@ -93,8 +104,10 @@ function zoneViolation(pts, L) {
 
 function lineLength(pts) {
   let len = 0;
-  for (let i = 0; i < pts.length - 1; i++) {
-    len += Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y);
+  for (const stroke of strokesOf(pts)) {
+    for (let i = 0; i < stroke.length - 1; i++) {
+      len += Math.hypot(stroke[i + 1].x - stroke[i].x, stroke[i + 1].y - stroke[i].y);
+    }
   }
   return len;
 }
@@ -138,6 +151,66 @@ for (let i = 0; i < sim.LEVELS.length; i++) {
 
 console.log(`Toplam bolum: ${sim.LEVELS.length}`);
 console.log(`Gecen: ${sim.LEVELS.length - failures.length}, kalan: ${failures.length} (en uzun suruc: ${maxSteps} adim)`);
+
+// ---------- Uretilen bolumler: 101-200 (sonsuz mod) ----------
+// Dogrulananlar: determinizm (ayni numara ayni bolum), ardisik bolumlerin
+// birbirine benzemedigi (imza/parcalar), dunya uzunlugu, solve'un gercek
+// motorla bitirilebilirligi (murekkep limiti ve bolge ihlali dahil).
+let genPass = 0;
+let genMaxSteps = 0;
+for (let i = sim.LEVELS.length; i < sim.LEVELS.length + 100; i++) {
+  const L = sim.generateLevel(i);
+  const fresh = sim.genRebuildFresh(i);
+  if (JSON.stringify(L) !== JSON.stringify(fresh)) {
+    failures.push(`#${i + 1}: uretec deterministik degil`);
+    continue;
+  }
+  if (sim.genTooSimilar(L, sim.generateLevel(i - 1))) {
+    failures.push(`#${i + 1} (${L.name}): onceki bolume cok benziyor (${L.genChunks.join(",")})`);
+    continue;
+  }
+  if (L.worldW < 1500 || L.worldW > 2700) {
+    failures.push(`#${i + 1} (${L.name}): dunya genisligi sinir disi (${L.worldW})`);
+    continue;
+  }
+  // her uretilen bolumde en az bir eglenceli parca olmali
+  const FUN = ["fan", "mover", "movergap", "gate", "ceiling"];
+  if (!L.genChunks.some((t) => FUN.includes(t))) {
+    failures.push(`#${i + 1} (${L.name}): eglenceli parca yok (${L.genChunks.join(",")})`);
+    continue;
+  }
+  const pts = L.solve;
+  const len = Math.round(lineLength(pts));
+  if (len > L.lineLimit) {
+    failures.push(`#${i + 1} (${L.name}): cozum cizgisi cok uzun (${len} > ${L.lineLimit})`);
+    continue;
+  }
+  const violation = zoneViolation(pts, L);
+  if (violation) {
+    failures.push(`#${i + 1} (${L.name}): ${violation}`);
+    continue;
+  }
+  sim.selectLevel(i);
+  sim.setLine(pts);
+  let steps = 0;
+  while (sim.mode === "drive" && steps < 6000) {
+    sim.step();
+    steps++;
+  }
+  genMaxSteps = Math.max(genMaxSteps, steps);
+  if (sim.mode !== "won") {
+    const car = sim.car;
+    failures.push(
+      `#${i + 1} (${L.name}): ${steps} adimda "${sim.mode}" — ${sim.lastOverlay.title}: ${sim.lastOverlay.text} ` +
+        `(araba x=${Math.round(car.x)}, yukseklik=${Math.round(car.bottom)})`
+    );
+  } else if ((sim.starMap[i] || 0) !== 3) {
+    failures.push(`#${i + 1} (${L.name}): referans cozum 3 yildiz alamadi (${sim.starMap[i] || 0})`);
+  } else {
+    genPass++;
+  }
+}
+console.log(`Uretilen bolumler (101-200): ${genPass}/100 gecti (en uzun suruc: ${genMaxSteps} adim)`);
 for (const f of failures) console.log("  HATA:", f);
 
 // Regresyon: 5. bolumde (Duvar Engeli) yerde duz giden araba duvarin icinden

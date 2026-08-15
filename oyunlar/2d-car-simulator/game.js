@@ -24,222 +24,12 @@ const STAR_KEY = "car-sim2d-stars"; // {bolumIndex: 1..3}
 const BADGE_KEY = "car-sim2d-badges"; // [rozetId]
 
 // ---------- Bolumler ----------
-// grounds: arabanin ustunde gidebildigi zemin bloklari (y = ust yuzey)
-// walls: carpinca patlayan bloklar
-// truck: bedX/bedY = acik kasanin sol-ustu, bedW = kasa genisligi
-const HANDMADE_LEVELS = [
-  {
-    name: "Isinma Turu",
-    carStart: { x: 70, y: 400 },
-    grounds: [{ x: 0, y: 400, w: 820, h: 90 }],
-    walls: [],
-    noZones: [],
-    truck: { bedX: 600, bedY: 352, bedW: 120 },
-  },
-  {
-    name: "Bosluk Var",
-    carStart: { x: 70, y: 400 },
-    grounds: [
-      { x: 0, y: 400, w: 420, h: 90 },
-      { x: 500, y: 400, w: 320, h: 90 },
-    ],
-    walls: [],
-    noZones: [],
-    truck: { bedX: 640, bedY: 352, bedW: 120 },
-  },
-  {
-    name: "Yuksek Kasa",
-    carStart: { x: 70, y: 400 },
-    grounds: [
-      { x: 0, y: 400, w: 820, h: 90 },
-      { x: 560, y: 320, w: 260, h: 80 },
-    ],
-    walls: [],
-    noZones: [],
-    truck: { bedX: 620, bedY: 272, bedW: 120 },
-  },
-  {
-    name: "Merdiven Yol",
-    carStart: { x: 60, y: 400 },
-    grounds: [
-      { x: 0, y: 400, w: 300, h: 90 },
-      { x: 380, y: 380, w: 180, h: 110 },
-      { x: 640, y: 360, w: 180, h: 130 },
-    ],
-    walls: [],
-    noZones: [],
-    truck: { bedX: 672, bedY: 312, bedW: 110 },
-  },
-  {
-    name: "Duvar Engeli",
-    carStart: { x: 70, y: 400 },
-    grounds: [{ x: 0, y: 400, w: 820, h: 90 }],
-    walls: [{ x: 380, y: 296, w: 40, h: 104 }],
-    noZones: [],
-    truck: { bedX: 620, bedY: 352, bedW: 120 },
-  },
-  {
-    // Cizilmez bolge ogreticisi: tavan blogu duz rampayi kapatir,
-    // oyuncu alttan gidip son anda yuksek kasaya tirmanmak zorunda.
-    name: "Alçaktan Geçiş",
-    carStart: { x: 70, y: 400 },
-    grounds: [{ x: 0, y: 400, w: 820, h: 90 }],
-    walls: [],
-    noZones: [{ x: 280, y: 0, w: 340, h: 350 }],
-    truck: { bedX: 650, bedY: 330, bedW: 105 },
-  },
-];
-
-// Deterministik rastgele sayi ureteci (her bolum hep ayni olsun diye)
-function mulberry32(seed) {
-  let a = seed >>> 0;
-  return function () {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-const NAME_PRE = ["Sessiz", "Çılgın", "Dar", "Uzun", "Kıvrımlı", "Yüksek", "Gece", "Turbo", "Riskli", "Kolay Görünümlü", "Sinsi", "Hızlı", "Buzlu", "Tozlu", "Elektrikli", "Gölge", "Alev", "Kırık"];
-const NAME_SUF = ["Yokuş", "Geçit", "Köprü", "Tırmanış", "Vadi", "Duvar", "Atlama", "Parkur", "Rampa", "Viraj", "Zıplama", "İniş", "Koridor", "Sıçrama", "Dönemeç", "Uçurum", "Kayalık", "Çıkmaz"];
-
-// 7-100 arasi bolumler: giderek zorlasan prosedürel uretim.
-// Kurallar: baslangictan kasaya her zaman gecerli bir cizgi var (duvarlarin
-// ustunden, cizilmez bolgelerin altindan); cizilmez bolge rampayi kapatir ama
-// alttan en az 40px'lik koridor birakir; test bunu dogrular.
-function generateLevel(num, attempt = 0) {
-  const rng = mulberry32(num * 7919 + attempt * 104729);
-  const t = (num - 7) / 93; // 0..1 zorluk
-
-  const carStart = { x: 60 + Math.floor(rng() * 30), y: 400 };
-
-  const bedW = 100 + Math.floor(rng() * 30);
-  const bedX = 590 + Math.floor(rng() * (750 - bedW - 590));
-  const liftMax = 20 + t * 150;
-  const bedY = 352 - Math.floor(rng() * liftMax);
-  const truck = { bedX, bedY, bedW };
-
-  // rampa (baslangic -> kasa ortasi duz cizgisi) verilen x'te y
-  const bedCX = bedX + bedW / 2;
-  const rampY = (x) => carStart.y + ((bedY - carStart.y) * (x - carStart.x)) / (bedCX - carStart.x);
-
-  const grounds = [];
-  const startW = 300 + Math.floor(rng() * 120);
-  const flat = bedY + 48 >= 396;
-  if (flat) {
-    if (rng() < 0.5) {
-      grounds.push({ x: 0, y: 400, w: 820, h: 90 });
-    } else {
-      const gapW = 60 + Math.floor(rng() * (60 + t * 80));
-      grounds.push({ x: 0, y: 400, w: startW, h: 90 });
-      grounds.push({ x: startW + gapW, y: 400, w: 820 - startW - gapW, h: 90 });
-    }
-  } else {
-    grounds.push({ x: 0, y: 400, w: startW, h: 90 });
-    // kamyonetin altindaki yuksek platform
-    const platTop = bedY + 48;
-    grounds.push({ x: bedX - 60, y: platTop, w: 820 - (bedX - 60), h: 400 - platTop + 90 });
-    // arada 0-2 orta platform; rampanin en az 25px altinda kalmali
-    const midCount = Math.floor(rng() * (1 + t * 2));
-    let px = startW + 40;
-    for (let i = 0; i < midCount; i++) {
-      const pw = 90 + Math.floor(rng() * 120);
-      if (px + pw > bedX - 120) break;
-      const minY = rampY(px + pw) + 25;
-      if (minY < 380) {
-        const py = Math.floor(minY + rng() * (400 - minY));
-        grounds.push({ x: px, y: py, w: pw, h: 400 - py + 90 });
-      }
-      px += pw + 60 + Math.floor(rng() * 80);
-    }
-  }
-
-  // cizilmez bolge: 12. bolumden itibaren. Yuksek kasali bolumlerde tavan
-  // blogu rampayi kapatir (alttan 40px+ koridor kalir); duz bolumlerde yerden
-  // yukselen blok cikar (ustunden asilmali). Iki tur de cizimi de engeller.
-  const noZones = [];
-  if (num >= 12 && rng() < 0.35 + t * 0.25) {
-    const zw = 100 + Math.floor(rng() * 80);
-    const zx = 250 + Math.floor(rng() * Math.max(1, bedX - 180 - zw - 250));
-    const minDepth = Math.ceil(rampY(zx + zw)) + 15; // tavan rampayi gercekten kapatsin
-    if (minDepth <= 345) {
-      const depth = Math.min(360, minDepth + Math.floor(rng() * Math.max(1, 346 - minDepth)));
-      noZones.push({ x: zx, y: 0, w: zw, h: depth });
-    } else {
-      const pw = 60 + Math.floor(rng() * 50);
-      const px2 = 250 + Math.floor(rng() * Math.max(1, bedX - 140 - pw - 250));
-      const top = 240 + Math.floor(rng() * 80);
-      noZones.push({ x: px2, y: top, w: pw, h: 490 - top });
-    }
-  }
-
-  // duvarlar: rampayi kesiyorsa ustunden gecilecek kadar pay birak;
-  // cizilmez bolgeye 110px'den fazla yaklasamaz (S-kivrimi icin yer kalsin)
-  const walls = [];
-  const wallCount = rng() < 0.25 - t * 0.2 ? 0 : 1 + Math.floor(rng() * Math.min(3, 1 + t * 3));
-  let wx = 230;
-  for (let i = 0; i < wallCount; i++) {
-    const ww = 30 + Math.floor(rng() * 20);
-    const maxX = bedX - 140;
-    wx += Math.floor(rng() * 60);
-    if (wx + ww > maxX) break;
-    const zone = noZones[0];
-    if (zone && wx < zone.x + zone.w + 110 && wx + ww > zone.x - 110) {
-      wx += ww + 130;
-      continue; // bolgeye cok yakin duvar: atla
-    }
-    const wh = 40 + Math.floor(rng() * (50 + t * 70));
-    walls.push({ x: wx, y: 400 - wh, w: ww, h: wh });
-    wx += ww + 130;
-  }
-
-  // ileri bolumlerde bazen murekkep limiti: savurgan rampa yetmez
-  let lineLimit = 0; // 0 = standart limit (MAX_LINE)
-  if (num >= 35 && rng() < 0.3) {
-    lineLimit = 900 + Math.floor(rng() * 150);
-  }
-
-  const name = `${NAME_PRE[Math.floor(rng() * NAME_PRE.length)]} ${NAME_SUF[Math.floor(rng() * NAME_SUF.length)]}`;
-  return { name, carStart, grounds, walls, noZones, lineLimit, truck };
-}
-
-// Bolum "imzasi": yukseklik, duvar, bolge, bosluk karakteri.
-// Ard arda ayni karakterde bolum gelmesin diye karsilastirmada kullanilir.
-function levelSignature(L) {
-  const lift = 352 - L.truck.bedY;
-  const liftBucket = lift < 25 ? 0 : lift < 80 ? 1 : 2;
-  const zone = (L.noZones || [])[0];
-  const zoneKind = !zone ? 0 : zone.y === 0 ? 1 : 2;
-  const sorted = [...L.grounds].sort((a, b) => a.x - b.x);
-  let gap = 0;
-  for (let i = 0; i < sorted.length - 1; i++) {
-    gap += Math.max(0, sorted[i + 1].x - (sorted[i].x + sorted[i].w));
-  }
-  const gapBucket = gap === 0 ? 0 : gap < 120 ? 1 : 2;
-  return [liftBucket, L.walls.length, zoneKind, gapBucket];
-}
-
-function tooSimilar(a, b) {
-  let same = 0;
-  for (let i = 0; i < a.length; i++) if (a[i] === b[i]) same++;
-  return same >= 3; // 4 ozellikten 3'u ayniysa tekrar say
-}
-
-const LEVELS = [...HANDMADE_LEVELS];
-for (let num = 7; num <= 100; num++) {
-  let candidate = generateLevel(num);
-  const prevSig = levelSignature(LEVELS[LEVELS.length - 1]);
-  for (let attempt = 1; attempt <= 8 && tooSimilar(levelSignature(candidate), prevSig); attempt++) {
-    candidate = generateLevel(num, attempt);
-  }
-  // ard arda ayni isim gelmesin
-  if (candidate.name === LEVELS[LEVELS.length - 1].name) {
-    candidate = { ...candidate, name: candidate.name + " II" };
-  }
-  LEVELS.push(candidate);
-}
+// 100 el yapimi bolum levels.js'de tanimli (game.js'den once yuklenir, LEVELS).
+// 101. bolumden itibaren levelgen.js'deki prosedurel uretec devreye girer
+// (tohum = bolum numarasi; cozulebilirlik solve ile gomulu, uzun dunyalar).
+// Alanlar: grounds (zemin), walls (carpar), noZones (cizilmez), fans (yukari iter),
+// movers (salinan engel), truck (kasa), lineLimit, worldW (uretilenlerde),
+// solve (testin referans cizgisi; tek parca ya da parcali).
 
 // Referans cozum cizgisi: duz rampa + duvar ustunden / bolge kenarindan
 // sapmalar. Yildiz hesabinda "par" olarak kullanilir; otomatik test de ayni
@@ -263,18 +53,27 @@ function referencePath(L) {
   return pts;
 }
 
+// solve cizgisi tek parca (nokta dizisi) ya da parcali (parcalarin dizisi)
+// olabilir — parcali cizgiler uretilen fan bolumlerinde kullanilir.
+function solveStrokes(L) {
+  const s = L.solve;
+  if (!s) return [referencePath(L)];
+  return Array.isArray(s[0]) ? s : [s];
+}
+
 function referenceLength(L) {
-  const pts = referencePath(L);
   let len = 0;
-  for (let i = 0; i < pts.length - 1; i++) {
-    len += Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y);
+  for (const pts of solveStrokes(L)) {
+    for (let i = 0; i < pts.length - 1; i++) {
+      len += Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y);
+    }
   }
   return len;
 }
 
 // ---------- Durum ----------
-let progress = Math.min(Number(localStorage.getItem(SAVE_KEY)) || 0, LEVELS.length);
-let levelIndex = Math.min(progress, LEVELS.length - 1);
+let progress = Math.max(0, Number(localStorage.getItem(SAVE_KEY)) || 0); // bitirilen bolum sayisi (100'u asabilir: sonsuz mod)
+let levelIndex = progress; // kaldigi bolumden devam
 let tries = 1;
 let mode = "menu"; // menu | draw | drive | paused | won | lost
 let pausedFrom = null;
@@ -284,7 +83,10 @@ let line = []; // cizgi: ayri parcalar (stroke) listesi; her parca nokta dizisi
 let lineLength = 0;
 let drawing = false;
 let penLifted = false; // cizilmez bolgede kalem kalkti mi
+let driveFrame = 0; // surus basladigindan beri gecen kare (hareketli engeller icin)
 let car = null;
+let camX = 0; // kamera: dunyanin gorunen sol kenari (surus sirasinda arabayi izler)
+let viewScale = 1; // cizim modunda tum dunya ekrana sigsin diye olcek (uzun bolumlerde <1)
 let confetti = [];
 let lastWinStars = 0;
 let lastNewBadges = [];
@@ -324,7 +126,14 @@ function checkBadges() {
 }
 
 function level() {
-  return LEVELS[levelIndex];
+  // 100 el yapimi bolumden sonra prosedurel uretec (levelgen.js) devralir
+  return LEVELS[levelIndex] || generateLevel(levelIndex);
+}
+
+// Dunya genisligi: el yapimi bolumler tek ekran; uretilen bolumler 1600+ px.
+function worldWidth() {
+  const L = level();
+  return (L && L.worldW) || W;
 }
 
 function resetCar() {
@@ -338,7 +147,8 @@ function resetCar() {
 }
 
 function updateHud() {
-  hudLevel.textContent = `Bölüm ${levelIndex + 1}/${LEVELS.length}`;
+  hudLevel.textContent =
+    levelIndex < LEVELS.length ? `Bölüm ${levelIndex + 1}/${LEVELS.length}` : `Bölüm ${levelIndex + 1}`;
   hudTries.textContent = `Deneme ${tries}`;
 }
 
@@ -378,7 +188,8 @@ function showIntro() {
     text:
       "Basılı tutup çizgi çiz, bırak — araba kendisi dümdüz gider. " +
       "Çizgi yol olur: arabayı kamyonetin açık arkasına sok! " +
-      `100 bölüm var, kaldığın yerden devam edersin. (${progress}/${LEVELS.length} bitti)`,
+      `${LEVELS.length} el yapımı bölüm var; onlar bitince bilgisayar sonsuza kadar yepyeni bölümler üretir. ` +
+      `Kaldığın yerden devam edersin. (${progress} bölüm bitti)`,
     buttons: [
       { label: "Başla", onClick: () => { tries = 1; startLevel(); } },
       { label: "Bölüm Seç", secondary: true, onClick: showLevelSelect },
@@ -387,7 +198,8 @@ function showIntro() {
 }
 
 function showWin() {
-  const last = levelIndex === LEVELS.length - 1;
+  const last = levelIndex === LEVELS.length - 1; // son el yapimi bolum
+  const endless = levelIndex >= LEVELS.length; // uretilen bolum
   const starText = "★".repeat(lastWinStars) + "☆".repeat(3 - lastWinStars);
   const badgeText = lastNewBadges.length
     ? ` Yeni rozet: ${lastNewBadges.map((b) => `${b.icon} ${b.name}`).join(", ")}!`
@@ -395,13 +207,16 @@ function showWin() {
   renderOverlay({
     title: last ? "Tebrikler! 🏆" : "Başardın!",
     text: last
-      ? `100 bölümün hepsini bitirdin! Arabayı her kasaya soktun. Efsanesin! ${starText}${badgeText}`
-      : `${level().name} bölümü bitti — ${starText} Sıradaki bölüm seni bekliyor!${badgeText}`,
+      ? `100 el yapımı bölümün hepsini bitirdin! Efsanesin! ${starText}${badgeText} ` +
+        "Ama bitmedi: bundan sonra her seferinde bilgisayarın ürettiği yepyeni bölümler gelecek — sonsuza kadar!"
+      : endless
+        ? `${level().name} (Bölüm ${levelIndex + 1}) bitti — ${starText} Sıradaki bölüm yepyeni üretilecek!${badgeText}`
+        : `${level().name} bölümü bitti — ${starText} Sıradaki bölüm seni bekliyor!${badgeText}`,
     buttons: [
       {
-        label: last ? "Baştan Oyna" : "Sonraki Bölüm",
+        label: "Sonraki Bölüm",
         onClick: () => {
-          levelIndex = last ? 0 : levelIndex + 1;
+          levelIndex += 1; // son el yapimi bolumden sonra uretec devralir
           tries = 1;
           startLevel();
         },
@@ -477,17 +292,30 @@ function showLevelSelect() {
     updateHud();
     showLevelSelect();
   };
+  // Sonsuz mod: uretilen bolumler secim izgarasina sigmaz; devam dugmesi yeterli.
+  const buttons = [];
+  if (progress >= LEVELS.length) {
+    buttons.push({
+      label: `∞ Sonsuz Mod: Bölüm ${progress + 1}'den devam`,
+      onClick: () => {
+        levelIndex = progress;
+        tries = 1;
+        startLevel();
+      },
+    });
+  }
+  buttons.push(
+    { label: "← Geri", secondary: true, onClick: renderForMode },
+    { label: "İlerlemeyi Sıfırla", secondary: true, onClick: resetProgress },
+  );
   renderOverlay({
     title: "Bölüm Seç",
     text:
       progress >= LEVELS.length
-        ? `Bütün bölümler açık! Toplam ${totalStars()} yıldızın var.`
+        ? `100 el yapımı bölüm bitti, ${totalStars()} yıldızın var. Sonsuz modda Bölüm ${progress + 1}'desin — her bölüm yepyeni üretiliyor!`
         : `${progress}/${LEVELS.length} bölüm bitti, ${totalStars()} yıldız topladın.`,
     extra: wrap,
-    buttons: [
-      { label: "← Geri", secondary: true, onClick: renderForMode },
-      { label: "İlerlemeyi Sıfırla", secondary: true, onClick: resetProgress },
-    ],
+    buttons,
   });
 }
 
@@ -513,6 +341,8 @@ function startLevel() {
   lineLength = 0;
   drawing = false;
   penLifted = false;
+  driveFrame = 0;
+  camX = 0;
   confetti = [];
   pausedFrom = null;
   stopEngine();
@@ -521,7 +351,11 @@ function startLevel() {
   updateHud();
   hideOverlay();
   mode = "draw";
-  if ((level().noZones || []).length > 0) {
+  if ((level().fans || []).length > 0) {
+    hint.textContent = "Fanlar havadaki arabayı yukarı iter — çizgiyi erken bitirip rüzgâra bırak!";
+  } else if ((level().movers || []).length > 0) {
+    hint.textContent = "Turuncu engeller salınıyor — rotanı erişim yollarının dışından kur!";
+  } else if ((level().noZones || []).length > 0) {
     hint.textContent = "Mor bölgeye çizgi çizemezsin — çizgiyi çevresinden geçir!";
   } else if (level().lineLimit) {
     hint.textContent = `Dikkat: bu bölümde mürekkep sınırlı (${level().lineLimit} birim)!`;
@@ -687,9 +521,11 @@ document.addEventListener("pointerdown", () => {
 // ---------- Cizgi cizme ----------
 function canvasPos(event) {
   const rect = canvas.getBoundingClientRect();
+  // ekran -> dunya donusumu: cizim modunda olcek (uzun bolumler tum ekrana
+  // sigar), surus sirasinda kamera kaymasi (camX) hesaba katilir.
   return {
-    x: ((event.clientX - rect.left) / rect.width) * W,
-    y: ((event.clientY - rect.top) / rect.height) * H,
+    x: ((event.clientX - rect.left) / rect.width) * (W / viewScale) + camX,
+    y: ((event.clientY - rect.top) / rect.height) * (H / viewScale),
   };
 }
 
@@ -763,6 +599,12 @@ resetButton.addEventListener("click", () => {
 menuButton.addEventListener("click", showLevelSelect);
 
 // ---------- Fizik ----------
+// Hareketli engelin o anki konumu (surus karesine bagli salinim)
+function moverPos(m) {
+  const off = Math.sin(driveFrame * m.speed + (m.phase || 0)) * m.range;
+  return m.axis === "x" ? { ...m, x: m.x + off } : { ...m, y: m.y + off };
+}
+
 // Cizgi + zemin + kasa tabani: "yuzeyler". Araba nokta gibi dusunulur.
 function surfaces() {
   const list = [];
@@ -781,9 +623,20 @@ function surfaces() {
 
 function stepCar() {
   const prevBottom = car.bottom;
+  driveFrame += 1;
   car.x += CAR_SPEED;
   car.vy += GRAVITY;
   car.bottom += car.vy;
+
+  // fanlar: araba HAVADAYKEN yukari iter (cizgideyken etkilemez).
+  // Yukselis hizi sinirli: araba fanin ust cizgisinde sakin bir sekilde suzulur.
+  if (!car.grounded) {
+    for (const f of level().fans || []) {
+      if (car.x > f.x && car.x < f.x + f.w && car.bottom > f.y && car.bottom < f.y + f.h) {
+        car.vy = Math.max(car.vy - f.lift, -1.3);
+      }
+    }
+  }
 
   let landed = null;
   for (const s of surfaces()) {
@@ -826,6 +679,20 @@ function stepCar() {
 
   // cizilmez bolgeler arabayi engellemez; sadece icine cizgi cizilemez
 
+  // hareketli engeller: surus baslayinca salinir (kare sayisina bagli, deterministik)
+  for (const m of level().movers || []) {
+    const p = moverPos(m);
+    if (
+      car.x > p.x + 2 &&
+      car.x < p.x + p.w - 2 &&
+      car.bottom > p.y + 6 &&
+      car.bottom - 24 < p.y + p.h
+    ) {
+      retryLevel("Araba hareketli engele çarptı! Engel sürekli yer değiştiriyor — rotanı onun erişemeyeceği yerden kur.");
+      return;
+    }
+  }
+
   // kasanin sag duvarina (kabine) carpma: kasa icinde degilken kasa yuksekliginde saga dayanirsa
   const t = level().truck;
   const inBedX = car.x > t.bedX && car.x < t.bedX + t.bedW;
@@ -840,12 +707,12 @@ function stepCar() {
     return;
   }
 
-  // dustu ya da ekrandan cikti
+  // dustu ya da dunyanin sonundan cikti
   if (car.bottom > H + 40) {
     retryLevel("Araba aşağı düştü! Çizginin ucu kasaya bakmalı.");
     return;
   }
-  if (car.x > W + 30) {
+  if (car.x > worldWidth() + 30) {
     retryLevel("Araba kamyoneti geçti gitti! Çizgiyi kasanın içinde bitir.");
   }
 }
@@ -938,6 +805,58 @@ function drawNoZones() {
   }
 }
 
+// Fanlar: camgobegi yukari ok alani (havadaki arabayi yukari iter)
+function drawFans() {
+  for (const f of level().fans || []) {
+    ctx.fillStyle = "rgba(92, 214, 255, 0.07)";
+    ctx.fillRect(f.x, f.y, f.w, f.h);
+    ctx.strokeStyle = "rgba(92, 214, 255, 0.55)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    ctx.strokeRect(f.x, f.y, f.w, f.h);
+    ctx.setLineDash([]);
+    ctx.fillStyle = "rgba(92, 214, 255, 0.8)";
+    for (let ay = f.y + f.h - 18; ay > f.y + 10; ay -= 26) {
+      for (let ax = f.x + 16; ax < f.x + f.w - 8; ax += 30) {
+        ctx.beginPath();
+        ctx.moveTo(ax - 6, ay);
+        ctx.lineTo(ax, ay - 8);
+        ctx.lineTo(ax + 6, ay);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+    ctx.font = "bold 11px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText("FAN", f.x + f.w / 2, f.y + 14);
+  }
+}
+
+// Hareketli engeller: turuncu seritli blok + salinim yolu (kesik cizgi)
+function drawMovers() {
+  for (const m of level().movers || []) {
+    ctx.strokeStyle = "rgba(255, 166, 77, 0.4)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    if (m.axis === "x") {
+      ctx.moveTo(m.x - m.range + m.w / 2, m.y + m.h / 2);
+      ctx.lineTo(m.x + m.range + m.w / 2, m.y + m.h / 2);
+    } else {
+      ctx.moveTo(m.x + m.w / 2, m.y - m.range + m.h / 2);
+      ctx.lineTo(m.x + m.w / 2, m.y + m.range + m.h / 2);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const p = moverPos(m);
+    ctx.fillStyle = "#3a2a14";
+    ctx.fillRect(p.x, p.y, p.w, p.h);
+    ctx.fillStyle = "#ffa64d";
+    ctx.fillRect(p.x, p.y, p.w, 4);
+    ctx.fillRect(p.x, p.y + p.h - 4, p.w, 4);
+  }
+}
+
 function drawTruck() {
   const t = level().truck;
   const cabX = t.bedX + t.bedW;
@@ -1013,11 +932,11 @@ function drawLine() {
   const hasPoints = line.some((stroke) => stroke.length > 1);
   if (hasPoints) {
     ctx.strokeStyle = "#ffd166";
-    ctx.lineWidth = 5;
+    ctx.lineWidth = 5 / viewScale; // uzaklasan kamerada da ayni gorunur kalinlik
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.shadowColor = "rgba(255, 209, 102, 0.6)";
-    ctx.shadowBlur = 8;
+    ctx.shadowBlur = 8 / viewScale;
     for (const stroke of line) {
       if (stroke.length < 2) continue;
       ctx.beginPath();
@@ -1027,14 +946,16 @@ function drawLine() {
     }
     ctx.shadowBlur = 0;
   }
+}
 
-  if (drawing) {
-    const left = Math.max(0, Math.round(lineLimit() - lineLength));
-    ctx.fillStyle = "#ffd166";
-    ctx.font = "bold 14px system-ui";
-    ctx.textAlign = "left";
-    ctx.fillText(`Çizgi: ${left}`, 12, 24);
-  }
+// Murekkep gostergesi: ekran uzayinda (kamera donusumunun disinda) cizilir
+function drawInkHud() {
+  if (!drawing) return;
+  const left = Math.max(0, Math.round(lineLimit() - lineLength));
+  ctx.fillStyle = "#ffd166";
+  ctx.font = "bold 14px system-ui";
+  ctx.textAlign = "left";
+  ctx.fillText(`Çizgi: ${left}`, 12, 24);
 }
 
 function spawnConfetti() {
@@ -1062,13 +983,32 @@ function drawConfetti() {
 // ---------- Ana dongu ----------
 function loop() {
   if (mode === "drive") stepCar();
+  // Kamera: surus sirasinda arabayi yatay izler; diger modlarda (cizim dahil)
+  // tum dunyayi ekrana sigdirir. El yapimi bolumlerde dunya = ekran oldugundan
+  // ne kayma ne olcek degisir (worldWidth() = W, camX = 0, viewScale = 1).
+  const ww = worldWidth();
+  if (mode === "drive" && ww > W) {
+    const target = Math.max(0, Math.min(car.x - W * 0.38, ww - W));
+    camX += (target - camX) * 0.3;
+    viewScale = 1;
+  } else {
+    camX = 0;
+    viewScale = ww > W ? W / ww : 1;
+  }
   drawBackground();
+  ctx.save();
+  ctx.scale(viewScale, viewScale);
+  ctx.translate(-camX, 0);
   drawGrounds();
   drawNoZones();
+  drawFans();
+  drawMovers();
   drawTruck();
   drawLine();
   drawCar();
   drawConfetti();
+  ctx.restore();
+  drawInkHud();
   requestAnimationFrame(loop);
 }
 
@@ -1087,6 +1027,11 @@ if (typeof window !== "undefined") {
     MAX_LINE,
     referencePath,
     referenceLength,
+    worldWidth,
+    generateLevel,
+    genLevelSignature,
+    genTooSimilar,
+    genRebuildFresh,
     get mode() { return mode; },
     get levelIndex() { return levelIndex; },
     get car() { return car; },
@@ -1094,15 +1039,19 @@ if (typeof window !== "undefined") {
     get starMap() { return starMap; },
     get badges() { return badges; },
     selectLevel(i) {
-      levelIndex = Math.max(0, Math.min(i, LEVELS.length - 1));
+      levelIndex = Math.max(0, i); // 100'u asan numaralar uretece gider
       tries = 1;
       startLevel();
     },
     setLine(points) {
-      line = [points];
+      // tek parca (nokta dizisi) ya da parcali cizgi (parca dizileri)
+      const strokes = Array.isArray(points[0]) ? points : [points];
+      line = strokes;
       lineLength = 0;
-      for (let i = 0; i < points.length - 1; i++) {
-        lineLength += Math.hypot(points[i + 1].x - points[i].x, points[i + 1].y - points[i].y);
+      for (const pts of strokes) {
+        for (let i = 0; i < pts.length - 1; i++) {
+          lineLength += Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y);
+        }
       }
       drawing = false;
       penLifted = false;
