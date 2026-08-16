@@ -4,24 +4,26 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta http-equiv="cache-control" content="no-store" />
-    <title>RHGPO</title>
-    <link rel="stylesheet" href="styles.css" />
+    <title>RHGPO 2 — Rüzgarlı Liman</title>
+    <!-- ?v= busts 30-day asset cache on Coolify/CDN after each ship -->
+    <link rel="stylesheet" href="styles.css?v=2-20260730c" />
   </head>
   <body>
     <main class="game-shell">
       <section class="hero-panel">
         <div>
-          <p class="eyebrow">Rüzgarlı havada gemi park etme oyunu</p>
-          <h1>RHGPO</h1>
+          <p class="eyebrow">Yeni sürüm · Rüzgarlı liman kaptanı</p>
+          <h1>RHGPO <span class="version-pill">2</span></h1>
           <p>
-            Limandaki park alanına yanaş, sonra motor modunda halatları doğru sırayla çek.
-            Beş turu tamamlarsan kaptan rozetini kaparsın.
+            Parlak denizde gemiyle limana yanaş, Space/E ile park et; motor turunda
+            halatları doğru sırayla çek. Beş tur = kaptan rozeti.
           </p>
         </div>
         <div class="hero-actions">
           <button id="startButton" type="button">Oyuna Başla</button>
           <button id="restartButton" type="button">Yeniden Başlat</button>
           <p class="best-score" id="bestScoreLabel">En iyi skor: 0</p>
+          <p class="build-tag" id="buildTag">Sürüm 2 · taze yükleme</p>
         </div>
       </section>
 
@@ -82,7 +84,7 @@
     </main>
 
     <!-- Plain scripts (file:// and static server friendly; no ES modules). -->
-    <script src="./logic.js"></script>
-    <script src="./game.js" defer></script>
+    <script src="./logic.js?v=2-20260730c"></script>
+    <script src="./game.js?v=2-20260730c" defer></script>
   </body>
 </html>

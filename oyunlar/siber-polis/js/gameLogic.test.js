@@ -83,6 +83,30 @@ test("cark: rng üretimi geçerli sembol seti ve doğrulanabilir", () => {
   }
 });
 
+test("cark: özel target'taki 🪐/🛸 sembol listesine eklenir (pizza/vaka9/11)", () => {
+  // Eski hata: symbolCount=4 iken hedefde 🪐 vardı ama çarkta yoktu
+  const pizza = makeCarkPuzzle({
+    target: ["🪐", "⭐", "🌙", "🚀"],
+    clue: "uzay",
+  });
+  assert.equal(pizza.wheels, 4);
+  assert.ok(pizza.symbols.includes("🪐"), "halkalı gezegen çarkta olmalı");
+  assert.equal(checkAnswer(pizza, ["🪐", "⭐", "🌙", "🚀"]), true);
+
+  const vitrin = makeCarkPuzzle({
+    target: ["🛸", "🌙", "☀️", "⭐"],
+  });
+  assert.ok(vitrin.symbols.includes("🛸"), "UFO çarkta olmalı");
+  assert.equal(checkAnswer(vitrin, ["🛸", "🌙", "☀️", "⭐"]), true);
+
+  const final = makeCarkPuzzle({
+    target: ["🪐", "🛸", "🪐", "⭐"],
+  });
+  assert.ok(final.symbols.includes("🪐"));
+  assert.ok(final.symbols.includes("🛸"));
+  assert.equal(checkAnswer(final, ["🪐", "🛸", "🪐", "⭐"]), true);
+});
+
 // ---------------------------------------------------------------------------
 // 🔑 Kod Kilidi
 // ---------------------------------------------------------------------------

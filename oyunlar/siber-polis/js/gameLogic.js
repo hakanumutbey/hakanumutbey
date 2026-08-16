@@ -89,10 +89,17 @@ export function makeCarkPuzzle({
   clue,
   hint,
 } = {}) {
-  const syms = symbols ? symbols.slice(0, symbolCount) : CARK_SEMBOLLERI.slice(0, symbolCount);
+  const pool = symbols ? symbols.slice() : CARK_SEMBOLLERI.slice();
+  // Varsayılan: ilk N sembol (sv1-5: 4, sv6+: 6). Özel target'ta
+  // 🪐/🛸 gibi sonradaki semboller de olabilsin diye hedef sembolleri eklenir.
+  const n = Math.min(Math.max(1, Number(symbolCount) || pool.length), pool.length);
+  const syms = pool.slice(0, n);
   const t = target
     ? target.slice()
     : Array.from({ length: wheels }, () => syms[Math.floor(rng() * syms.length)]);
+  for (const s of t) {
+    if (!syms.includes(s)) syms.push(s);
+  }
   return {
     type: "cark",
     title: "Çark Kilidi",

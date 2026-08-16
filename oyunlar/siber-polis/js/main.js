@@ -363,8 +363,11 @@ function openPuzzleWindow(lockId, puzzle, path, filesWin) {
     // Çarklar hedeften farklı bir başlangıç konumunda açılır
     const syms = puzzle.symbols;
     const current = puzzle.target.map((t, i) => {
-      const idx = Math.max(0, syms.indexOf(t));
-      return syms[(idx + 1 + (i % (syms.length - 1))) % syms.length];
+      const found = syms.indexOf(t);
+      const idx = found >= 0 ? found : 0;
+      // En az 1 adım kaydır; tek sembol olsa bile güvenli
+      const step = 1 + (syms.length > 1 ? i % (syms.length - 1) : 0);
+      return syms[(idx + step) % syms.length];
     });
 
     const wrap = document.createElement("div");

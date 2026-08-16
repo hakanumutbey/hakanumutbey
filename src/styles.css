@@ -5197,3 +5197,44 @@ html[data-auth-gate="locked"] body {
     width: min(100%, 420px);
   }
 }
+
+.season-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: grid;
+  gap: 6px;
+  max-width: min(460px, calc(100vw - 32px));
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 2px solid rgba(255, 209, 102, 0.65);
+  background: rgba(10, 14, 22, 0.96);
+  color: #f7f4ea;
+  text-align: center;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 24px rgba(255, 209, 102, 0.25);
+}
+
+.season-toast strong {
+  color: #ffd166;
+  font-size: 1.05rem;
+}
+
+.season-toast span {
+  font-size: 0.88rem;
+  opacity: 0.85;
+}
+
+.season-toast button {
+  justify-self: center;
+  margin-top: 4px;
+  padding: 7px 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(85, 214, 255, 0.5);
+  background: rgba(85, 214, 255, 0.16);
+  color: #f7f4ea;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}

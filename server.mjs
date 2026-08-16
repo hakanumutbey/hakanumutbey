@@ -26,7 +26,7 @@ const sessions = new Map();
 const voiceRooms = new Map();
 const siyahAdamRooms = new Map();
 const yarisSehriWorlds = new Map();
-const games = ["annenden-kac", "bardak", "essiz-zindan", "skeleton-wars", "rhgpo", "siyah-adam", "birlesim-arenasi", "vale", "robot-avcisi", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "space-arena", "yaris-sehri"];
+const games = ["annenden-kac", "bardak", "essiz-zindan", "skeleton-wars", "rhgpo", "siyah-adam", "birlesim-arenasi", "vale", "robot-avcisi", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "space-arena", "2d-car-simulator", "yaris-sehri"];
 const baseValues = {
   "annenden-kac": 128,
   bardak: 96,
@@ -42,6 +42,7 @@ const baseValues = {
   hentw3: 176,
   "hentw-premium": 210,
   "siber-polis": 140,
+  "2d-car-simulator": 99,
   "yaris-sehri": 195,
 };
 const averagePlayMinutes = {
@@ -59,15 +60,20 @@ const averagePlayMinutes = {
   hentw3: 12,
   "hentw-premium": 14,
   "siber-polis": 12,
+  "2d-car-simulator": 8,
   "yaris-sehri": 12,
 };
 const voteOptionIds = ["uzay-yarisi", "market-savasi", "okul-gorevi"];
 
-// Sezon temaları: 7'şer gün, bu sırayla döner (sezon 1 = arabaci).
-// 6 Hakorocks Şehri teması + her döngünün 7. sezonu başka bir oyunun (şimdilik 2D Car Simulator).
+// Sezon temaları: 7'şer gün, bu sırayla döner. İlk 3 hafta "zaman" sezonları:
+// 1 arabaci (Hakorocks Şehri WS süresi) → 2 araba-zaman (2D Car Simulator heartbeat süresi)
+// → 3 site-zaman (tüm site heartbeat süresi) → yarisci → polis → akrobasi → buz → altin
+// → araba-simulator (bölüm sayılı) → başa dön.
 // Yüklemenin (load) öncesinde tanımlı olmalı — normalizeYarisSeason modül başında çalışır.
 const YARIS_SEASON_OBJECTIVES = [
-  { id: "arabaci", name: "🚗 Arabacı Sezonu", desc: "Oyunda en çok zaman geçiren kazanır.", unit: "time", game: { slug: "yaris-sehri", name: "Hakorocks Şehri" } },
+  { id: "arabaci", name: "🚗 Arabacı Sezonu", desc: "Hakorocks Şehri'nde en çok zaman geçiren kazanır.", unit: "time", game: { slug: "yaris-sehri", name: "Hakorocks Şehri" } },
+  { id: "araba-zaman", name: "🏎️ 2D Car Simulator Zaman Sezonu", desc: "2D Car Simulator'da en çok zaman geçiren kazanır.", unit: "time", game: { slug: "2d-car-simulator", name: "2D Car Simulator" } },
+  { id: "site-zaman", name: "🌐 Site Zamanı Sezonu", desc: "Sitede toplam en çok zaman geçiren kazanır.", unit: "time", game: { slug: "", name: "Hakorocks Studio" } },
   { id: "yarisci", name: "🏁 Yarışçı Sezonu", desc: "En çok yarış (açık dünya + dereceli) kazanan.", unit: "win", game: { slug: "yaris-sehri", name: "Hakorocks Şehri" } },
   { id: "polis", name: "🚔 Polis Sezonu", desc: "Kovalamacada en çok galibiyet alan takım üyesi.", unit: "win", game: { slug: "yaris-sehri", name: "Hakorocks Şehri" } },
   { id: "akrobasi", name: "🛞 Akrobasi Sezonu", desc: "Tek Mod'da haftalık toplam puanı en yüksek olan.", unit: "point", game: { slug: "yaris-sehri", name: "Hakorocks Şehri" } },
@@ -444,11 +450,13 @@ async function handleApi(request, response) {
     const body = await readBody(request, 64_000);
     const sessionId = safeText(body.sessionId, 120);
     if (sessionId) {
+      const activeGame = games.includes(body.activeGame) ? body.activeGame : "";
       sessions.set(sessionId, {
         lastSeen: Date.now(),
         device: ["mobile", "tablet", "desktop"].includes(body.device) ? body.device : "desktop",
-        activeGame: games.includes(body.activeGame) ? body.activeGame : "",
+        activeGame,
       });
+      trackSeasonHeartbeat(sessionId, activeGame);
     }
     sendJson(response, currentStats());
     return;
@@ -4139,6 +4147,30 @@ function addYarisSeasonGold(account, amount) {
 
 // Genel sezon skoru rate limit'i: dakikada 30, günde 200 bildirim (bellek içi).
 const seasonScoreRate = new Map(); // accountId -> { minuteStart, minuteCount, dayStart, dayCount }
+
+// Heartbeat süre takibi (araba-zaman / site-zaman sezonları): sessionId -> son heartbeat zamanı
+const seasonHeartbeat = new Map();
+
+function trackSeasonHeartbeat(sessionId, activeGame) {
+  const objective = yarisSeason.objective;
+  if (objective !== "araba-zaman" && objective !== "site-zaman") return;
+  const account = accountBySessionId(sessionId);
+  if (!account) return; // misafirler sayılmaz
+  if (objective === "araba-zaman" && activeGame !== "2d-car-simulator") return;
+  const now = Date.now();
+  const prev = seasonHeartbeat.get(sessionId);
+  seasonHeartbeat.set(sessionId, now);
+  if (!prev) return; // ilk heartbeat'te başlangıç işaretlenir
+  // Sekme uyursa/ara verirse tek seferde en fazla 90 sn say
+  const deltaSec = clamp(Math.round((now - prev) / 1000), 0, 90);
+  if (deltaSec > 0) addYarisSeasonScore(account, objective, deltaSec);
+  // Harita şişmesin
+  if (seasonHeartbeat.size > 5000) {
+    for (const [id, seen] of seasonHeartbeat) {
+      if (now - seen > 3600000) seasonHeartbeat.delete(id);
+    }
+  }
+}
 
 function checkSeasonScoreRateLimit(accountId) {
   const now = Date.now();

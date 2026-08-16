@@ -2007,6 +2007,7 @@ function renderYarisSeason() {
   const objectiveId = objective?.id || "yarisci";
   const gameSlug = latestSeason.game?.slug || "yaris-sehri";
   const gameName = latestSeason.game?.name || "Hakorocks Şehri";
+  const gameHref = latestSeason.game?.slug ? `/oyunlar/${escapeHtml(gameSlug)}/` : "/";
   const top = (latestSeason.top || []).slice(0, 20);
   const left = Math.max(0, Number(latestSeason.endsAt) - Date.now());
   const days = Math.floor(left / 86400000);
@@ -2036,7 +2037,7 @@ function renderYarisSeason() {
     <div class="pulse-feed-panel season-panel">
       <div class="account-box-head">
         <h3>${objective ? escapeHtml(objective.name) : `Sezon ${latestSeason.season || "—"}`} — ${days} gün ${hours} saat kaldı</h3>
-        <a class="button primary" href="/oyunlar/${escapeHtml(gameSlug)}/">Oyna</a>
+        <a class="button primary" href="${gameHref}">Oyna</a>
       </div>
       ${objective ? `<p class="section-note" style="margin:0 0 8px">${escapeHtml(gameName)} · ${escapeHtml(objective.desc)}</p>` : ""}
       <div class="pulse-feed season-top">${rows}</div>
@@ -5802,6 +5803,7 @@ async function refreshLiveData() {
   renderStudioPanel();
   renderSocialDashboard();
   maybeNotifySocialChanges();
+  maybeNotifySeasonChange();
   refreshPublicState();
   refreshBanStatus();
   const gameModal = document.querySelector("[data-game-modal]");
@@ -5956,8 +5958,34 @@ function initHeroStars() {
   }
 }
 
-function maybeNotifySocialChanges() {
-  if (typeof Notification === "undefined" || notificationPermission !== "granted" || !latestSocial.account) return;
+// Yeni sezon başlayınca bir kere gösterilen banner (localStorage'da son görülen sezon tutulur)
+function maybeNotifySeasonChange() {
+  if (!latestSeason?.season) return;
+  let seen = 0;
+  try {
+    seen = Number(localStorage.getItem("hakorocks-season-seen") || 0);
+  } catch {}
+  if (latestSeason.season <= seen) return;
+  if (document.querySelector("[data-season-toast]")) return;
+  const objective = latestSeason.objective;
+  const toast = document.createElement("div");
+  toast.className = "season-toast";
+  toast.setAttribute("data-season-toast", "1");
+  toast.innerHTML = `
+    <strong>🎉 Yeni Sezon Başladı: ${escapeHtml(objective?.name || `Sezon ${latestSeason.season}`)}!</strong>
+    <span>${escapeHtml(objective?.desc || "")}</span>
+    <button type="button" data-season-toast-close>Tamam</button>
+  `;
+  toast.querySelector("[data-season-toast-close]").addEventListener("click", () => {
+    try {
+      localStorage.setItem("hakorocks-season-seen", String(latestSeason.season));
+    } catch {}
+    toast.remove();
+  });
+  document.body.appendChild(toast);
+}
+
+function maybeNotifySocialChanges() {  if (typeof Notification === "undefined" || notificationPermission !== "granted" || !latestSocial.account) return;
   try {
     const seenRequests = new Set(JSON.parse(localStorage.getItem("hakorocks-seen-requests") || "[]"));
     const seenInvites = new Set(JSON.parse(localStorage.getItem("hakorocks-seen-invites") || "[]"));
