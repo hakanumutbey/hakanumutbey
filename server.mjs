@@ -25,6 +25,7 @@ const githubApiBase = process.env.GITHUB_API_BASE || "https://api.github.com";
 const sessions = new Map();
 const voiceRooms = new Map();
 const siyahAdamRooms = new Map();
+const sesliPartiRooms = new Map();
 const yarisSehriWorlds = new Map();
 const games = ["annenden-kac", "bardak", "essiz-zindan", "skeleton-wars", "rhgpo", "siyah-adam", "birlesim-arenasi", "vale", "robot-avcisi", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "space-arena", "2d-car-simulator", "yaris-sehri"];
 const baseValues = {
@@ -344,6 +345,22 @@ yarisSehriSocketServer.on("connection", (socket) => {
       startYarisChaseBySocket(socket);
       return;
     }
+    if (message?.type === "gold-create") {
+      joinYarisGold(socket, message, true);
+      return;
+    }
+    if (message?.type === "gold-join") {
+      joinYarisGold(socket, message, false);
+      return;
+    }
+    if (message?.type === "gold-duration") {
+      setYarisGoldDuration(socket, message);
+      return;
+    }
+    if (message?.type === "gold-start") {
+      startYarisGoldBySocket(socket);
+      return;
+    }
     if (message?.type === "leave") {
       leaveYarisWorld(socket);
       return;
@@ -353,6 +370,48 @@ yarisSehriSocketServer.on("connection", (socket) => {
   socket.on("close", () => {
     leaveYarisRankedQueue(socket);
     leaveYarisWorld(socket);
+  });
+});
+
+const sesliPartiSocketServer = new WebSocketServer({ noServer: true });
+sesliPartiSocketServer.on("connection", (socket) => {
+  socket.sesliPartiPlayerId = "";
+  socket.sesliPartiRoomCode = "";
+  socket.sesliPartiLastPosAt = 0;
+
+  socket.on("message", (raw) => {
+    if (raw.length > 8000) return;
+    let message;
+    try {
+      message = JSON.parse(raw.toString());
+    } catch {
+      return;
+    }
+
+    if (message?.type === "create") {
+      createSesliPartiRoom(socket, message);
+      return;
+    }
+    if (message?.type === "join") {
+      joinSesliPartiRoom(socket, message);
+      return;
+    }
+    if (message?.type === "pos") {
+      setSesliPartiPos(socket, message);
+      return;
+    }
+    if (message?.type === "signal") {
+      relaySesliPartiSignal(socket, message);
+      return;
+    }
+    if (message?.type === "leave") {
+      leaveSesliPartiRoom(socket);
+      return;
+    }
+  });
+
+  socket.on("close", () => {
+    leaveSesliPartiRoom(socket);
   });
 });
 
@@ -373,6 +432,12 @@ server.on("upgrade", (request, socket, head) => {
   if (pathname === "/yaris-sehri") {
     yarisSehriSocketServer.handleUpgrade(request, socket, head, (ws) => {
       yarisSehriSocketServer.emit("connection", ws, request);
+    });
+    return;
+  }
+  if (pathname === "/sesli-parti") {
+    sesliPartiSocketServer.handleUpgrade(request, socket, head, (ws) => {
+      sesliPartiSocketServer.emit("connection", ws, request);
     });
     return;
   }
@@ -2818,6 +2883,160 @@ function normalizeVoiceRoomId(value) {
   return roomId || "";
 }
 
+// --- Sesli Parti (projeler/sesli-parti) ---
+// Yakınlık sesli sohbet: oda/kod yönetimi + konum yayını + WebRTC sinyalleşmesi.
+// Ses sunucudan geçmez; istemciler eşler-arası (mesh) bağlanır.
+const SESLI_PARTI_GRID = { w: 20, h: 14 };
+const SESLI_PARTI_MAX_PLAYERS = 12;
+const SESLI_PARTI_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+
+function createSesliPartiCode() {
+  const bytes = randomBytes(6);
+  let code = "";
+  for (let i = 0; i < 6; i += 1) {
+    code += SESLI_PARTI_CODE_ALPHABET[bytes[i] % SESLI_PARTI_CODE_ALPHABET.length];
+  }
+  return code;
+}
+
+function normalizeSesliPartiNickname(value) {
+  return safeText(value, 16) || "Oyuncu";
+}
+
+function normalizeSesliPartiAvatar(value) {
+  const avatar = Math.floor(Number(value));
+  return Number.isInteger(avatar) && avatar >= 0 && avatar < 10 ? avatar : 0;
+}
+
+function randomSesliPartiSpawn(room) {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const x = Math.floor(Math.random() * SESLI_PARTI_GRID.w);
+    const y = Math.floor(Math.random() * SESLI_PARTI_GRID.h);
+    const taken = [...room.players.values()].some((player) => player.x === x && player.y === y);
+    if (!taken) return { x, y };
+  }
+  return {
+    x: Math.floor(Math.random() * SESLI_PARTI_GRID.w),
+    y: Math.floor(Math.random() * SESLI_PARTI_GRID.h),
+  };
+}
+
+function sesliPartiPlayerSnapshot(player) {
+  return {
+    id: player.id,
+    nickname: player.nickname,
+    avatar: player.avatar,
+    x: player.x,
+    y: player.y,
+  };
+}
+
+function sendSesliParti(socket, payload) {
+  if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(payload));
+}
+
+function broadcastSesliPartiState(room) {
+  const payload = {
+    type: "state",
+    code: room.code,
+    players: [...room.players.values()].map(sesliPartiPlayerSnapshot),
+  };
+  for (const player of room.players.values()) {
+    sendSesliParti(player.socket, payload);
+  }
+}
+
+function enterSesliPartiRoom(socket, room, message) {
+  leaveSesliPartiRoom(socket);
+  const playerId = createRecordId("sp");
+  const spawn = randomSesliPartiSpawn(room);
+  const player = {
+    id: playerId,
+    socket,
+    nickname: normalizeSesliPartiNickname(message.nickname),
+    avatar: normalizeSesliPartiAvatar(message.avatar),
+    x: spawn.x,
+    y: spawn.y,
+  };
+  room.players.set(playerId, player);
+  socket.sesliPartiPlayerId = playerId;
+  socket.sesliPartiRoomCode = room.code;
+  sendSesliParti(socket, {
+    type: "joined",
+    code: room.code,
+    id: playerId,
+    grid: SESLI_PARTI_GRID,
+    players: [...room.players.values()].map(sesliPartiPlayerSnapshot),
+  });
+  broadcastSesliPartiState(room);
+}
+
+function createSesliPartiRoom(socket, message) {
+  let code = createSesliPartiCode();
+  while (sesliPartiRooms.has(code)) code = createSesliPartiCode();
+  const room = { code, players: new Map() };
+  sesliPartiRooms.set(code, room);
+  enterSesliPartiRoom(socket, room, message);
+}
+
+function joinSesliPartiRoom(socket, message) {
+  const code = safeText(message.code, 12).toUpperCase();
+  const room = sesliPartiRooms.get(code);
+  if (!room) {
+    sendSesliParti(socket, { type: "error", code: "room-not-found" });
+    return;
+  }
+  if (room.players.size >= SESLI_PARTI_MAX_PLAYERS) {
+    sendSesliParti(socket, { type: "error", code: "room-full" });
+    return;
+  }
+  enterSesliPartiRoom(socket, room, message);
+}
+
+function setSesliPartiPos(socket, message) {
+  const room = sesliPartiRooms.get(socket.sesliPartiRoomCode);
+  const player = room?.players.get(socket.sesliPartiPlayerId);
+  if (!room || !player) return;
+  const now = Date.now();
+  if (now - socket.sesliPartiLastPosAt < 80) return;
+  socket.sesliPartiLastPosAt = now;
+  const x = Math.floor(Number(message.x));
+  const y = Math.floor(Number(message.y));
+  if (!Number.isInteger(x) || !Number.isInteger(y)) return;
+  if (x < 0 || y < 0 || x >= SESLI_PARTI_GRID.w || y >= SESLI_PARTI_GRID.h) return;
+  player.x = x;
+  player.y = y;
+  const payload = { type: "pos", id: player.id, x, y };
+  for (const other of room.players.values()) {
+    if (other.id !== player.id) sendSesliParti(other.socket, payload);
+  }
+}
+
+function relaySesliPartiSignal(socket, message) {
+  const room = sesliPartiRooms.get(socket.sesliPartiRoomCode);
+  const from = socket.sesliPartiPlayerId;
+  if (!room || !from) return;
+  const target = room.players.get(safeText(message.to, 60));
+  if (!target) return;
+  sendSesliParti(target.socket, { type: "signal", from, data: message.data });
+}
+
+function leaveSesliPartiRoom(socket) {
+  const room = sesliPartiRooms.get(socket.sesliPartiRoomCode);
+  const playerId = socket.sesliPartiPlayerId;
+  socket.sesliPartiPlayerId = "";
+  socket.sesliPartiRoomCode = "";
+  if (!room || !playerId) return;
+  room.players.delete(playerId);
+  if (room.players.size === 0) {
+    sesliPartiRooms.delete(room.code);
+    return;
+  }
+  for (const other of room.players.values()) {
+    sendSesliParti(other.socket, { type: "player-left", id: playerId });
+  }
+}
+
 const BLACK_PHASE = {
   LOBBY: "lobby",
   DAY: "day",
@@ -3488,13 +3707,13 @@ function broadcastBlackRoom(roomId) {
 
 const YARIS_LIMITS = {
   maxPlayers: 20,
-  mapSize: 6000,
+  mapSize: 8000,
   posMinIntervalMs: 50,
   raceMinPlayers: 2,
   raceMaxPlayers: 5,
   raceLobbyMs: 15000,
   raceCountdownMs: 3000,
-  raceMaxMs: 120000,
+  raceMaxMs: 150000,
   raceResultsMs: 12000,
   ttMaxScores: 5,
   ttMinMs: 5000,
@@ -3504,31 +3723,31 @@ const YARIS_LIMITS = {
 const YARIS_COLORS = ["#ff5b6e", "#4ea3ff", "#69d18b", "#ffd166", "#b67dff", "#ff9f43", "#34d1bf", "#ff8fd6", "#e8eef6"];
 
 // Yarış rotası: şehir çevre yolunda saat yönünde tur; start/bitiş route[0].
-// Not: y burada zemin düzleminin 2. koordinatı (istemcide 3D z ekseni).
+// Not: y burada zemin düzleminin 2. koordinatı (istemcide 3D z ekseni). Harita 8000x8000, yol ızgarası 800.
 const YARIS_RACE_ROUTE = [
-  { x: 600, y: 600 },
-  { x: 3000, y: 600 },
-  { x: 5400, y: 600 },
-  { x: 5400, y: 3000 },
-  { x: 5400, y: 5400 },
-  { x: 3000, y: 5400 },
-  { x: 600, y: 5400 },
-  { x: 600, y: 3000 },
+  { x: 800, y: 800 },
+  { x: 4000, y: 800 },
+  { x: 7200, y: 800 },
+  { x: 7200, y: 4000 },
+  { x: 7200, y: 7200 },
+  { x: 4000, y: 7200 },
+  { x: 800, y: 7200 },
+  { x: 800, y: 4000 },
 ];
 
 // Zamana karşı rotası: güneyde küçük tur; start/bitiş route[0].
 const YARIS_TT_ROUTE = [
-  { x: 3000, y: 5400 },
-  { x: 4200, y: 5400 },
-  { x: 5400, y: 5400 },
-  { x: 5400, y: 4200 },
-  { x: 4200, y: 4200 },
-  { x: 3000, y: 4200 },
+  { x: 4000, y: 7200 },
+  { x: 5600, y: 7200 },
+  { x: 7200, y: 7200 },
+  { x: 7200, y: 5600 },
+  { x: 5600, y: 5600 },
+  { x: 4000, y: 5600 },
 ];
 
 const YARIS_ZONES = {
-  race: { x: 240, y: 240, w: 720, h: 720 },
-  tt: { x: 2640, y: 5040, w: 720, h: 720 },
+  race: { x: 320, y: 320, w: 960, h: 960 },
+  tt: { x: 3520, y: 6720, w: 960, h: 960 },
 };
 
 let yarisPlayerCounter = 0;
@@ -3719,8 +3938,8 @@ function joinYarisWorld(socket, message) {
     accountId: account?.id || "",
     isBot: false,
     h: 0,
-    x: 3000 + (Math.random() * 120 - 60),
-    y: 3000 + (Math.random() * 120 - 60),
+    x: 4000 + (Math.random() * 120 - 60),
+    y: 4000 + (Math.random() * 120 - 60),
     angle: 0,
     speed: 0,
     socket,
@@ -3982,6 +4201,7 @@ function leaveYarisWorld(socket) {
   if (!worldId || !playerId) return;
   const world = yarisSehriWorlds.get(worldId);
   if (!world) return;
+  const leavingPlayer = world.players.get(playerId); // silinmeden önce yakala (altın düşürme konumu)
   world.players.delete(playerId);
   // Kovalamaca odasından çıkış: lobide host devri + yayın; maçta takımdan düşürme.
   if (world.isChase && world.chase) {
@@ -4001,6 +4221,23 @@ function leaveYarisWorld(socket) {
     if (![...world.players.values()].some((p) => !p.isBot)) {
       yarisSehriWorlds.delete(worldId);
     }
+    return;
+  }
+  // Altın Kapma çıkışı: taşıyıcı çıkarsa altın yerde kalır (konumu taşıyıcınınki olur)
+  if (world.isGoldGrab && world.gold) {
+    const gold = world.gold;
+    if (gold.hostId === playerId) {
+      const nextHuman = [...world.players.values()].find((p) => p.id !== playerId);
+      gold.hostId = nextHuman?.id || "";
+    }
+    if (gold.phase === "lobby") {
+      broadcastYarisGoldLobby(world);
+    } else if (gold.holderId === playerId) {
+      gold.holderId = "";
+      if (leavingPlayer) gold.goldPos = { x: Math.round(leavingPlayer.x), y: Math.round(leavingPlayer.y) };
+      broadcastYarisWorld(world, { type: "gold-update", gold: publicYarisGold(world) });
+    }
+    if (world.players.size === 0) yarisSehriWorlds.delete(worldId);
     return;
   }
   const race = world.race;
@@ -4062,8 +4299,8 @@ function tickYarisWorlds() {
         }
       }
     }
-    // Kovalamaca dünyasında insan kalmadıysa (botlar tutuyor olabilir) kapat.
-    if (world.isChase && ![...world.players.values()].some((p) => p.socket)) {
+    // Kovalamaca/altın dünyasında insan kalmadıysa (varsa botlar tutuyor olabilir) kapat.
+    if ((world.isChase || world.isGoldGrab) && ![...world.players.values()].some((p) => p.socket)) {
       yarisSehriWorlds.delete(worldId);
       continue;
     }
@@ -4110,11 +4347,13 @@ function tickYarisWorlds() {
 
     if (world.isRanked) updateYarisRankedBots(world, now);
     if (world.isChase) updateYarisChase(world, now, worldId);
+    if (world.isGoldGrab) updateYarisGold(world, now, worldId);
 
     broadcastYarisWorld(world, {
       type: "state",
       t: now,
       weather: world.weather,
+      gold: world.isGoldGrab ? { phase: world.gold.phase, goldPos: world.gold.goldPos, holderId: world.gold.holderId, immuneUntil: world.gold.immuneUntil, endsAt: world.gold.endsAt } : undefined,
       players: [...world.players.values()].map(publicYarisPlayer),
     });
   }
@@ -4308,7 +4547,7 @@ const YARIS_RANKED_LIMITS = { matchMinPlayers: 2, matchMaxPlayers: 5, soloWaitMs
 // Üretim parametreleri istemciyle birebir aynı olmalı (oyunlar/yaris-sehri/game.js YARIS_MAPS).
 const YARIS_MAPS = [
   { id: "klasik", name: "Klasik Şehir", desc: "Her şeyden biraz: merkez, parklar, liman.", seed: 20260815, params: {} },
-  { id: "liman", name: "Büyük Liman", desc: "Geniş su ve uzun iskeleler.", seed: 20260816, params: { waterStart: 5000, piers: 6 } },
+  { id: "liman", name: "Büyük Liman", desc: "Geniş su ve uzun iskeleler.", seed: 20260816, params: { waterStart: 6400, piers: 6 } },
   { id: "gokdelen", name: "Gökdelenler", desc: "Yoğun ve çok yüksek şehir merkezi.", seed: 20260817, params: { downtownRadius: 2, downtownH: [180, 330] } },
   { id: "park-sehri", name: "Park Şehri", desc: "Her köşede park ve gölet.", seed: 20260818, params: { parkChance: 0.5, pondChance: 0.6 } },
   { id: "sanayi", name: "Sanayi Bölgesi", desc: "Depolar, vinçler, geniş alanlar.", seed: 20260819, params: { industrialWide: true, craneChance: 0.85 } },
@@ -4357,6 +4596,7 @@ function createYarisProfile() {
     paints: ["standart"],
     selectedPaint: "standart",
     chaseCups: 0,
+    goldGrabWins: 0,
     seasonWins: [],
     rating: 100,
     tutorialDone: false,
@@ -4386,6 +4626,7 @@ function normalizeYarisProfile(value) {
     paints,
     selectedPaint: paints.includes(selectedPaint) ? selectedPaint : "standart",
     chaseCups: clamp(Math.floor(Number(value.chaseCups) || 0), 0, 100000),
+    goldGrabWins: clamp(Math.floor(Number(value.goldGrabWins) || 0), 0, 100000),
     seasonWins: Array.isArray(value.seasonWins)
       ? value.seasonWins
           .map((entry) => ({ season: Math.floor(Number(entry?.season) || 0), rank: Math.floor(Number(entry?.rank) || 0) }))
@@ -4780,8 +5021,8 @@ function joinYarisChase(socket, message, create) {
     accountId: account?.id || "",
     isBot: false,
     h: 0,
-    x: 3000 + (Math.random() * 120 - 60),
-    y: 3000 + (Math.random() * 120 - 60),
+    x: 4000 + (Math.random() * 120 - 60),
+    y: 4000 + (Math.random() * 120 - 60),
     angle: 0,
     speed: 0,
     socket,
@@ -4876,15 +5117,15 @@ function startYarisChaseBySocket(socket) {
   chase.robbers.forEach((id, i) => {
     const p = world.players.get(id);
     if (!p) return;
-    p.x = 3000 + (i % 3) * 80 - 80;
-    p.y = 3000 + Math.floor(i / 3) * 80 - 40;
+    p.x = 4000 + (i % 3) * 80 - 80;
+    p.y = 4000 + Math.floor(i / 3) * 80 - 40;
     p.angle = Math.PI / 2;
   });
   chase.cops.forEach((id, i) => {
     const p = world.players.get(id);
     if (!p) return;
-    p.x = 600 + (i % 3) * 70 - 70;
-    p.y = 600 + Math.floor(i / 3) * 70;
+    p.x = 800 + (i % 3) * 70 - 70;
+    p.y = 800 + Math.floor(i / 3) * 70;
     p.angle = Math.PI / 2;
   });
 
@@ -5071,4 +5312,285 @@ function finishYarisChase(world, winner) {
     results,
     chase: publicYarisChase(world),
   });
+}
+
+// ---------------------------------------------------------------------------
+// Altın Kapma: parti kodlu oda, altını kap-tut-kazan (bot YOK, min 2 oyuncu)
+// ---------------------------------------------------------------------------
+
+const YARIS_GOLD_LIMITS = {
+  // Test ortamında kısa süre eklenebilir: YARIS_GOLD_TEST_DURATIONS="0.05,5,8,10,12,15"
+  durations: process.env.YARIS_GOLD_TEST_DURATIONS
+    ? process.env.YARIS_GOLD_TEST_DURATIONS.split(",").map(Number).filter(Number.isFinite)
+    : [5, 8, 10, 12, 15],
+  defaultMin: 5,
+  pickupDist: 30,
+  stealDist: 40,
+  immunityMs: 1000, // alan oyuncu 1 sn dokunulmaz
+  resultsMs: 15000,
+  winGold: 50,
+  joinGold: 10,
+  roadStep: 800,
+  roadHalf: 60,
+};
+
+function createYarisGold() {
+  return {
+    hostId: "",
+    durationMin: YARIS_GOLD_LIMITS.defaultMin,
+    phase: "lobby", // lobby | running | ended
+    goldPos: null, // { x, y }
+    holderId: "",
+    immuneUntil: 0,
+    endsAt: 0,
+    resultsEndAt: 0,
+  };
+}
+
+// Rastgele YOL üstü nokta (bina içinde olmaz: yol ızgarası bantlarından seçilir)
+function randomYarisRoadPoint() {
+  const lines = Math.round(YARIS_LIMITS.mapSize / YARIS_GOLD_LIMITS.roadStep); // 0..10
+  const k = Math.floor(Math.random() * (lines + 1));
+  const along = 400 + Math.random() * (YARIS_LIMITS.mapSize - 800);
+  if (Math.random() < 0.5) {
+    return { x: k * YARIS_GOLD_LIMITS.roadStep, y: Math.round(along) }; // dikey yol
+  }
+  return { x: Math.round(along), y: k * YARIS_GOLD_LIMITS.roadStep }; // yatay yol
+}
+
+function publicYarisGold(world) {
+  const gold = world.gold;
+  return {
+    hostId: gold.hostId,
+    durationMin: gold.durationMin,
+    phase: gold.phase,
+    goldPos: gold.goldPos,
+    holderId: gold.holderId,
+    immuneUntil: gold.immuneUntil,
+    endsAt: gold.endsAt,
+    players: [...world.players.values()]
+      .filter((p) => !p.isBot)
+      .map((p) => ({ id: p.id, nickname: p.nickname, color: p.color, paint: p.paint || "standart" })),
+  };
+}
+
+function broadcastYarisGoldLobby(world) {
+  broadcastYarisWorld(world, { type: "gold-lobby", gold: publicYarisGold(world) });
+}
+
+function joinYarisGold(socket, message, create) {
+  const sessionId = safeText(message.sessionId, 120);
+  if (!sessionId) {
+    sendYaris(socket, { type: "yaris-error", code: "invalid-join", message: "Oturum bilgisi eksik." });
+    return;
+  }
+  const account = accountBySessionId(sessionId);
+  const nickname = safeText(message.nickname, 24) || account?.nickname || "misafir";
+  const color = normalizeYarisColor(message.color);
+  const paint = account
+    ? yarisProfileOf(account).selectedPaint
+    : normalizeYarisPaintId(message.paint) || "standart";
+
+  let world;
+  if (create) {
+    let code = "";
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const candidate = String(Math.floor(100000 + Math.random() * 900000));
+      if (!yarisSehriWorlds.has(`gold-${candidate}`)) {
+        code = candidate;
+        break;
+      }
+    }
+    if (!code) {
+      sendYaris(socket, { type: "yaris-error", code: "gold-create-failed", message: "Oda kurulamadı, tekrar dene." });
+      return;
+    }
+    const mapId = message.mapId != null ? normalizeYarisMapId(message.mapId) : YARIS_DEFAULT_MAP_ID;
+    if (!mapId) {
+      sendYaris(socket, { type: "yaris-error", code: "unknown-map", message: "Böyle bir harita yok." });
+      return;
+    }
+    world = createYarisWorld(`gold-${code}`, code, mapId);
+    world.isGoldGrab = true;
+    world.gold = createYarisGold();
+    yarisSehriWorlds.set(world.id, world);
+  } else {
+    const code = safeText(message.code, 8).replace(/\D/g, "").slice(0, 6);
+    if (code.length !== 6) {
+      sendYaris(socket, { type: "yaris-error", code: "invalid-gold-code", message: "Oda kodu 6 haneli olmalı." });
+      return;
+    }
+    world = yarisSehriWorlds.get(`gold-${code}`);
+    if (!world || !world.isGoldGrab) {
+      sendYaris(socket, { type: "yaris-error", code: "gold-not-found", message: "Bu kodla bir altın odası bulunamadı." });
+      return;
+    }
+    if (world.gold.phase !== "lobby") {
+      sendYaris(socket, { type: "yaris-error", code: "gold-in-progress", message: "Maç çoktan başladı." });
+      return;
+    }
+    if (world.players.size >= YARIS_LIMITS.maxPlayers) {
+      sendYaris(socket, { type: "yaris-error", code: "gold-full", message: "Oda dolu." });
+      return;
+    }
+  }
+
+  if (socket.yarisWorldId) leaveYarisWorld(socket);
+
+  yarisPlayerCounter += 1;
+  const player = {
+    id: `yp${yarisPlayerCounter}`,
+    sessionId,
+    nickname,
+    color,
+    paint,
+    accountId: account?.id || "",
+    isBot: false,
+    h: 0,
+    x: 4000 + (Math.random() * 120 - 60),
+    y: 4000 + (Math.random() * 120 - 60),
+    angle: 0,
+    speed: 0,
+    socket,
+    joinedAt: Date.now(),
+  };
+  world.players.set(player.id, player);
+  socket.yarisPlayerId = player.id;
+  socket.yarisWorldId = world.id;
+  socket.yarisLastPosAt = 0;
+  if (!world.gold.hostId) world.gold.hostId = player.id;
+
+  sendYaris(socket, {
+    type: "joined",
+    worldId: world.id,
+    partyCode: world.partyCode,
+    goldGrab: true,
+    mapSeed: world.mapSeed,
+    mapId: world.mapId,
+    weather: world.weather,
+    selfId: player.id,
+    players: [...world.players.values()].map(publicYarisPlayer),
+    race: publicYarisRace(world),
+    ttScores: [],
+    routes: { race: YARIS_RACE_ROUTE, tt: YARIS_TT_ROUTE },
+    zones: YARIS_ZONES,
+    limits: { maxPlayers: YARIS_LIMITS.maxPlayers, raceMinPlayers: YARIS_LIMITS.raceMinPlayers, raceMaxPlayers: YARIS_LIMITS.raceMaxPlayers },
+    profile: account ? yarisProfileOf(account) : null,
+  });
+  broadcastYarisGoldLobby(world);
+}
+
+function setYarisGoldDuration(socket, message) {
+  const { world, player } = yarisPlayerOf(socket);
+  if (!world?.isGoldGrab || !player) return;
+  const gold = world.gold;
+  if (gold.phase !== "lobby" || gold.hostId !== player.id) return;
+  const minutes = Number(message.minutes);
+  if (!YARIS_GOLD_LIMITS.durations.includes(minutes)) return;
+  gold.durationMin = minutes;
+  broadcastYarisGoldLobby(world);
+}
+
+function startYarisGoldBySocket(socket) {
+  const { world, player } = yarisPlayerOf(socket);
+  if (!world?.isGoldGrab || !player) return;
+  const gold = world.gold;
+  if (gold.phase !== "lobby" || gold.hostId !== player.id) return;
+  const humans = [...world.players.values()].filter((p) => !p.isBot);
+  if (humans.length < 2) {
+    sendYaris(socket, { type: "yaris-error", code: "gold-not-enough", message: "Başlatmak için en az 2 oyuncu gerekli." });
+    return;
+  }
+  gold.phase = "running";
+  gold.goldPos = randomYarisRoadPoint();
+  gold.holderId = "";
+  gold.immuneUntil = 0;
+  gold.endsAt = Date.now() + gold.durationMin * 60000;
+  broadcastYarisWorld(world, { type: "gold-start", gold: publicYarisGold(world) });
+}
+
+function updateYarisGold(world, now, worldId) {
+  const gold = world.gold;
+  if (!gold) return;
+
+  if (gold.phase === "running") {
+    if (!gold.holderId) {
+      // Alma: 30 birim yaklaşan alır
+      for (const player of world.players.values()) {
+        if (player.isBot) continue;
+        if (Math.hypot(player.x - gold.goldPos.x, player.y - gold.goldPos.y) <= YARIS_GOLD_LIMITS.pickupDist) {
+          gold.holderId = player.id;
+          gold.immuneUntil = now + YARIS_GOLD_LIMITS.immunityMs;
+          broadcastYarisWorld(world, { type: "gold-update", gold: publicYarisGold(world) });
+          break;
+        }
+      }
+    } else if (now >= gold.immuneUntil) {
+      // Çalma: başka araba 40 birim temas ederse altın ona geçer
+      const holder = world.players.get(gold.holderId);
+      if (!holder) {
+        gold.holderId = "";
+      } else {
+        for (const player of world.players.values()) {
+          if (player.isBot || player.id === gold.holderId) continue;
+          if (Math.hypot(player.x - holder.x, player.y - holder.y) <= YARIS_GOLD_LIMITS.stealDist) {
+            gold.holderId = player.id;
+            gold.immuneUntil = now + YARIS_GOLD_LIMITS.immunityMs;
+            broadcastYarisWorld(world, { type: "gold-update", gold: publicYarisGold(world) });
+            break;
+          }
+        }
+      }
+    }
+    if (now >= gold.endsAt) finishYarisGold(world);
+  }
+
+  if (gold.phase === "ended" && now >= gold.resultsEndAt) {
+    broadcastYarisWorld(world, { type: "gold-closed" });
+    for (const player of world.players.values()) {
+      if (player.socket) {
+        player.socket.yarisWorldId = "";
+        player.socket.yarisPlayerId = "";
+      }
+    }
+    yarisSehriWorlds.delete(worldId);
+  }
+}
+
+function finishYarisGold(world) {
+  const gold = world.gold;
+  if (gold.phase === "ended") return;
+  gold.phase = "ended";
+  gold.resultsEndAt = Date.now() + YARIS_GOLD_LIMITS.resultsMs;
+  const winnerId = gold.holderId || ""; // boş = kimse alamadı, beraberlik
+  gold.winnerId = winnerId;
+
+  const results = [];
+  let accountsChanged = false;
+  for (const player of world.players.values()) {
+    if (player.isBot) continue;
+    const won = winnerId !== "" && player.id === winnerId;
+    const goldEarned = won ? YARIS_GOLD_LIMITS.winGold : YARIS_GOLD_LIMITS.joinGold;
+    const row = {
+      id: player.id,
+      nickname: player.nickname,
+      color: player.color,
+      won,
+      goldEarned,
+      cupEarned: won ? 1 : 0,
+    };
+    const account = player.accountId ? accountById(player.accountId) : null;
+    const profile = account ? yarisProfileOf(account) : null;
+    if (profile) {
+      profile.gold += goldEarned;
+      if (won) profile.goldGrabWins = (profile.goldGrabWins || 0) + 1;
+      row.newGold = profile.gold;
+      row.newWins = profile.goldGrabWins || 0;
+      accountsChanged = true;
+      if (player.socket) sendYaris(player.socket, { type: "profile", profile });
+    }
+    results.push(row);
+  }
+  if (accountsChanged) writeJson("accounts.json", accounts).catch(() => {});
+  broadcastYarisWorld(world, { type: "gold-end", winnerId, results, gold: publicYarisGold(world) });
 }

@@ -12,8 +12,8 @@ import * as THREE from "three";
 
 window.__yarisBooted = true;
 
-const CITY_SIZE = 6000;
-const ROAD_STEP = 600;
+const CITY_SIZE = 8000;
+const ROAD_STEP = 800;
 const ROAD_HALF = 60;
 const CP_RADIUS = 85;
 const GRAVITY = 1500;
@@ -32,7 +32,7 @@ const CARS = [
 // 10 seçilebilir harita (server.mjs YARIS_MAPS ile aynı — doğrulama sunucuda)
 const YARIS_MAPS = [
   { id: "klasik", name: "Klasik Şehir", desc: "Her şeyden biraz: merkez, parklar, liman.", seed: 20260815, params: {} },
-  { id: "liman", name: "Büyük Liman", desc: "Geniş su ve uzun iskeleler.", seed: 20260816, params: { waterStart: 5000, piers: 6 } },
+  { id: "liman", name: "Büyük Liman", desc: "Geniş su ve uzun iskeleler.", seed: 20260816, params: { waterStart: 6400, piers: 6 } },
   { id: "gokdelen", name: "Gökdelenler", desc: "Yoğun ve çok yüksek şehir merkezi.", seed: 20260817, params: { downtownRadius: 2, downtownH: [180, 330] } },
   { id: "park-sehri", name: "Park Şehri", desc: "Her köşede park ve gölet.", seed: 20260818, params: { parkChance: 0.5, pondChance: 0.6 } },
   { id: "sanayi", name: "Sanayi Bölgesi", desc: "Depolar, vinçler, geniş alanlar.", seed: 20260819, params: { industrialWide: true, craneChance: 0.85 } },
@@ -67,22 +67,22 @@ function paintOf(paintId) {
 }
 
 const LOCAL_RACE_ROUTE = [
-  { x: 600, z: 600 },
-  { x: 3000, z: 600 },
-  { x: 5400, z: 600 },
-  { x: 5400, z: 3000 },
-  { x: 5400, z: 5400 },
-  { x: 3000, z: 5400 },
-  { x: 600, z: 5400 },
-  { x: 600, z: 3000 },
+  { x: 800, z: 800 },
+  { x: 4000, z: 800 },
+  { x: 7200, z: 800 },
+  { x: 7200, z: 4000 },
+  { x: 7200, z: 7200 },
+  { x: 4000, z: 7200 },
+  { x: 800, z: 7200 },
+  { x: 800, z: 4000 },
 ];
 const LOCAL_TT_ROUTE = [
-  { x: 3000, z: 5400 },
-  { x: 4200, z: 5400 },
-  { x: 5400, z: 5400 },
-  { x: 5400, z: 4200 },
-  { x: 4200, z: 4200 },
-  { x: 3000, z: 4200 },
+  { x: 4000, z: 7200 },
+  { x: 5600, z: 7200 },
+  { x: 7200, z: 7200 },
+  { x: 7200, z: 5600 },
+  { x: 5600, z: 5600 },
+  { x: 4000, z: 5600 },
 ];
 const LOCAL_ZONES = {
   race: { x: 240, z: 240, w: 720, h: 720 },
@@ -90,7 +90,7 @@ const LOCAL_ZONES = {
 };
 
 const MAPS = {
-  city: { w: CITY_SIZE, h: CITY_SIZE, spawn: { x: 3000, z: 3000, angle: -Math.PI / 2 } },
+  city: { w: CITY_SIZE, h: CITY_SIZE, spawn: { x: 4000, z: 4000, angle: -Math.PI / 2 } },
   stunt: { w: 3600, h: 2400, spawn: { x: 250, z: 1200, angle: 0 } },
   tutorial: { w: 2000, h: 1300, spawn: { x: 250, z: 250, angle: 0 } },
   ice: { w: 2400, h: 2400, spawn: { x: 1200, z: 1200, angle: 0 } },
@@ -278,7 +278,7 @@ function cityDataFor(mapId) {
 // ---------------------------------------------------------------------------
 
 function defaultProfile() {
-  return { gold: 0, cars: ["minik"], selectedCar: "minik", paints: ["standart"], selectedPaint: "standart", chaseCups: 0, seasonWins: [], rating: 100, tutorialDone: false, ttBestMs: 0, stuntBest: 0, iceBest: 0 };
+  return { gold: 0, cars: ["minik"], selectedCar: "minik", paints: ["standart"], selectedPaint: "standart", chaseCups: 0, goldGrabWins: 0, seasonWins: [], rating: 100, tutorialDone: false, ttBestMs: 0, stuntBest: 0, iceBest: 0 };
 }
 
 const state = {
@@ -314,8 +314,8 @@ const state = {
 };
 
 const car = {
-  x: 3000,
-  z: 3000,
+  x: 4000,
+  z: 4000,
   h: 0,
   vh: 0,
   angle: -Math.PI / 2,
@@ -435,6 +435,7 @@ function showScreen(name) {
     touchControls.hidden = true;
     chatPanel.hidden = true;
     document.querySelector("#chaseScreen").hidden = true;
+    document.querySelector("#goldScreen").hidden = true;
   }
 }
 
@@ -553,6 +554,7 @@ function normalizeProfile(value) {
     paints: [...new Set(paints)],
     selectedPaint: paints.includes(value.selectedPaint) ? value.selectedPaint : "standart",
     chaseCups: Math.floor(Number(value.chaseCups) || 0),
+    goldGrabWins: Math.floor(Number(value.goldGrabWins) || 0),
     seasonWins: Array.isArray(value.seasonWins)
       ? value.seasonWins.filter((w) => w && w.season > 0 && w.rank >= 1 && w.rank <= 3).slice(0, 50)
       : [],
@@ -638,6 +640,11 @@ const SKY_COLOR = 0x22344e;
 const canvas = document.querySelector("#game");
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+// Görsel cila: ACES tone mapping + tek directional yumuşak gölge (sadece arabalar düşürür)
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.06;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.5, 3200);
 
 const FOG_NEAR = 350;
@@ -663,8 +670,27 @@ function makeBaseScene() {
   scene.userData.hemi = hemi;
   const sun = new THREE.DirectionalLight(0xfff2cc, 1.1);
   sun.position.set(0.4, 1, 0.25);
+  sun.castShadow = !state.lowQuality;
+  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.camera.left = -170;
+  sun.shadow.camera.right = 170;
+  sun.shadow.camera.top = 170;
+  sun.shadow.camera.bottom = -170;
+  sun.shadow.camera.near = 10;
+  sun.shadow.camera.far = 700;
   scene.add(sun);
+  scene.add(sun.target);
+  scene.userData.sun = sun;
   return scene;
+}
+
+// Güneş + gölge kamerası arabayı takip eder (küçük gölge haritası ucuz kalır)
+function updateSunShadow() {
+  const sun = active?.scene?.userData?.sun;
+  if (!sun) return;
+  sun.position.set(car.x + 140, 260, car.z + 70);
+  sun.target.position.set(car.x, 0, car.z);
+  sun.target.updateMatrixWorld();
 }
 
 function applyFog(scene) {
@@ -786,6 +812,7 @@ function buildCityScene(mapId) {
   );
   ground.rotation.x = -Math.PI / 2;
   ground.position.set(half, 0, half);
+  ground.receiveShadow = true;
   scene.add(ground);
 
   // Yollar (uzun ince kutular) + orta çizgiler
@@ -858,8 +885,21 @@ function buildCityScene(mapId) {
   });
   scene.add(buildingMesh);
 
+  // Çatı plakaları (tek ekstra draw call, binalara derinlik verir)
+  const roofMesh = new THREE.InstancedMesh(boxGeo, new THREE.MeshLambertMaterial({ color: 0xffffff }), Math.max(1, data.buildings.length));
+  data.buildings.forEach((b, i) => {
+    dummy.position.set(b.x + b.w / 2, b.height + 1, b.z + b.h / 2);
+    dummy.scale.set(b.w * 0.92, 2, b.h * 0.92);
+    dummy.rotation.y = 0;
+    dummy.updateMatrix();
+    roofMesh.setMatrixAt(i, dummy.matrix);
+    color.setHSL(b.hue, b.sat * 0.7, Math.min(0.75, b.light + 0.18));
+    roofMesh.setColorAt(i, color);
+  });
+  scene.add(roofMesh);
+
   // Liman: doğu kenarı su + iskeleler + rıhtım (harita paramına göre genişlik/adet)
-  const waterStart = params.waterStart ?? 5460;
+  const waterStart = params.waterStart ?? 7260;
   const water = new THREE.Mesh(
     new THREE.PlaneGeometry(CITY_SIZE - waterStart, CITY_SIZE),
     new THREE.MeshLambertMaterial({ color: 0x1b4d6e }),
@@ -867,6 +907,7 @@ function buildCityScene(mapId) {
   water.rotation.x = -Math.PI / 2;
   water.position.set(waterStart + (CITY_SIZE - waterStart) / 2, 0.12, half);
   scene.add(water);
+  refs.waterMesh = water;
   const dockMat = new THREE.MeshLambertMaterial({ color: 0x4a4238 });
   const pierCount = params.piers ?? 4;
   const pierLength = Math.min(320, CITY_SIZE - waterStart - 60);
@@ -1302,6 +1343,7 @@ function buildCarMesh(carId, colorHex, paintId = "standart") {
   }
   const bodyMesh = new THREE.Mesh(new THREE.BoxGeometry(body.len, body.hei, body.wid), bodyMaterial);
   bodyMesh.position.y = 1.3;
+  bodyMesh.castShadow = true;
   group.add(bodyMesh);
   if (paint.type === "rainbow") group.userData.rainbowBody = bodyMaterial;
 
@@ -1310,23 +1352,43 @@ function buildCarMesh(carId, colorHex, paintId = "standart") {
     new THREE.MeshLambertMaterial({ color: 0x11161f }),
   );
   cabin.position.set(-body.len * 0.05, 1.3 + body.hei / 2 + body.cab / 2, 0);
+  cabin.castShadow = true;
   group.add(cabin);
 
   const wheelGeo = new THREE.CylinderGeometry(0.9, 0.9, 0.7, 10);
   const wheelMat = new THREE.MeshLambertMaterial({ color: 0x15181d });
   const wx = body.len / 2 - 1.4;
   const wz = body.wid / 2;
+  const wheels = [];
   for (const [px, pz] of [
     [wx, wz],
     [wx, -wz],
     [-wx, wz],
     [-wx, -wz],
   ]) {
+    // Pivot grubu: z ekseni dingil — pivot.rotation.z ile tekerlek döner
+    const pivot = new THREE.Group();
+    pivot.position.set(px, 0.9, pz);
     const wheel = new THREE.Mesh(wheelGeo, wheelMat);
     wheel.rotation.x = Math.PI / 2;
-    wheel.position.set(px, 0.9, pz);
-    group.add(wheel);
+    wheel.castShadow = true;
+    pivot.add(wheel);
+    // Dönüşü gösteren jant şeridi
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.25, 1.5, 0.75), new THREE.MeshBasicMaterial({ color: 0x8a93a5 }));
+    stripe.rotation.x = Math.PI / 2;
+    stripe.position.z = pz > 0 ? 0.36 : -0.36;
+    pivot.add(stripe);
+    group.add(pivot);
+    wheels.push(pivot);
   }
+  group.userData.wheels = wheels;
+
+  // Fren farı (frende parlar)
+  const brakeMat = new THREE.MeshLambertMaterial({ color: 0x550000, emissive: 0xff2222, emissiveIntensity: 0.12 });
+  const brakeLight = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.5, body.wid * 0.7), brakeMat);
+  brakeLight.position.set(-body.len / 2 - 0.05, 1.4, 0);
+  group.add(brakeLight);
+  group.userData.brakeMat = brakeMat;
 
   if (body.spoiler) {
     const spoiler = new THREE.Mesh(
@@ -1526,7 +1588,12 @@ function autoQuality(nowMs) {
     if (fps > 0 && fps < 42) {
       state.lowQuality = true;
       renderer.setPixelRatio(1);
-      for (const entry of Object.values(sceneCache)) applyFog(entry.scene);
+      // Gölge basamağı: düşük cihazda gölgeler kapanır (blob gölgeler kalır)
+      renderer.shadowMap.autoUpdate = false;
+      for (const entry of Object.values(sceneCache)) {
+        applyFog(entry.scene);
+        if (entry.scene.userData.sun) entry.scene.userData.sun.castShadow = false;
+      }
       console.info("[yaris-sehri] düşük fps algılandı, kalite düşürüldü");
     }
   }
@@ -1546,11 +1613,24 @@ function drawMinimap(nowMs) {
   g.fillStyle = "rgba(10,14,20,0.9)";
   g.fillRect(0, 0, minimap.width, minimap.height);
   if (state.map === "city") {
+    // Yollar (büyük harita: ızgarayı çiz)
+    g.strokeStyle = "rgba(120,140,170,0.4)";
+    g.lineWidth = 1;
+    for (let k = 0; k <= CITY_SIZE / ROAD_STEP; k += 1) {
+      g.beginPath();
+      g.moveTo(k * ROAD_STEP * scale, 0);
+      g.lineTo(k * ROAD_STEP * scale, CITY_SIZE * scale);
+      g.stroke();
+      g.beginPath();
+      g.moveTo(0, k * ROAD_STEP * scale);
+      g.lineTo(CITY_SIZE * scale, k * ROAD_STEP * scale);
+      g.stroke();
+    }
     // Bölgeler kabaca renkli
-    const block = 600 * scale;
+    const block = 800 * scale;
     for (let bi = 0; bi < 9; bi += 1) {
       for (let bj = 0; bj < 9; bj += 1) {
-        const district = districtOf(bi, bj);
+        const district = districtOf(bi, bj, active?.cityData?.params || {});
         g.fillStyle = {
           downtown: "rgba(90,130,200,0.35)",
           residential: "rgba(140,110,70,0.3)",
@@ -1558,16 +1638,40 @@ function drawMinimap(nowMs) {
           plaza: "rgba(255,209,102,0.4)",
           stadium: "rgba(105,209,139,0.4)",
         }[district] || "rgba(60,80,60,0.3)";
-        g.fillRect((bi * 600 + 75) * scale, (bj * 600 + 75) * scale, block - 75 * scale, block - 75 * scale);
+        g.fillRect((bi * 800 + 75) * scale, (bj * 800 + 75) * scale, block - 75 * scale, block - 75 * scale);
       }
     }
-    // Liman (doğu kenarı su)
+    // Liman (doğu kenarı su — harita paramına göre)
+    const waterStart = active?.cityData?.params?.waterStart ?? 7260;
     g.fillStyle = "rgba(60,140,190,0.5)";
-    g.fillRect(5460 * scale, 0, (CITY_SIZE - 5460) * scale, CITY_SIZE * scale);
+    g.fillRect(waterStart * scale, 0, (CITY_SIZE - waterStart) * scale, CITY_SIZE * scale);
     g.fillStyle = "rgba(53,210,255,0.5)";
     g.fillRect(state.zones.race.x * scale, state.zones.race.z * scale, state.zones.race.w * scale, state.zones.race.h * scale);
     g.fillStyle = "rgba(255,209,102,0.5)";
     g.fillRect(state.zones.tt.x * scale, state.zones.tt.z * scale, state.zones.tt.w * scale, state.zones.tt.h * scale);
+    // Altın Kapma: yerdeyse altın nabızlı yıldız simgesiyle baştan görünür
+    if (state.mode === "gold" && goldGrab.phase === "running" && !goldGrab.holderId && goldGrab.goldPos) {
+      const gx = goldGrab.goldPos.x * scale;
+      const gz = goldGrab.goldPos.z * scale;
+      const pulse = 5 + Math.sin(nowMs / 220) * 1.6;
+      g.save();
+      g.translate(gx, gz);
+      g.rotate(nowMs / 700);
+      g.fillStyle = "#ffd700";
+      g.strokeStyle = "#fff3b0";
+      g.lineWidth = 1.5;
+      g.beginPath();
+      for (let p = 0; p < 10; p += 1) {
+        const r = p % 2 === 0 ? pulse : pulse * 0.45;
+        const a = (p / 10) * Math.PI * 2 - Math.PI / 2;
+        if (p === 0) g.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+        else g.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      }
+      g.closePath();
+      g.fill();
+      g.stroke();
+      g.restore();
+    }
   } else if (state.map === "ice") {
     g.fillStyle = "rgba(30,80,120,0.6)";
     g.fillRect(0, 0, minimap.width, minimap.height);
@@ -1581,16 +1685,27 @@ function drawMinimap(nowMs) {
       }
     }
   }
-  for (const remote of state.remotes.values()) {
-    g.fillStyle = remote.color;
-    g.fillRect(remote.x * scale - 1.5, remote.z * scale - 1.5, 3, 3);
+  // Altın Kapma'da taşıyıcı sarı dolgu + kırmızı çizgi; diğerleri normal renk
+  const goldHolderId = state.mode === "gold" && goldGrab.phase === "running" ? goldGrab.holderId : "";
+  const drawPlayerDot = (id, x, z, color, size) => {
+    if (id && id === goldHolderId) {
+      g.fillStyle = "#ffd700";
+      g.fillRect(x * scale - size, z * scale - size, size * 2, size * 2);
+      g.strokeStyle = "#ff2a2a";
+      g.lineWidth = 2;
+      g.strokeRect(x * scale - size - 1, z * scale - size - 1, size * 2 + 2, size * 2 + 2);
+      return;
+    }
+    g.fillStyle = color;
+    g.fillRect(x * scale - 1.5, z * scale - 1.5, 3, 3);
+  };
+  for (const [id, remote] of state.remotes) {
+    drawPlayerDot(id, remote.x, remote.z, remote.color, 3);
   }
   for (const bot of state.bots) {
-    g.fillStyle = bot.color;
-    g.fillRect(bot.x * scale - 1.5, bot.z * scale - 1.5, 3, 3);
+    drawPlayerDot("", bot.x, bot.z, bot.color, 3);
   }
-  g.fillStyle = "#ffffff";
-  g.fillRect(car.x * scale - 2, car.z * scale - 2, 4, 4);
+  drawPlayerDot(state.selfId, car.x, car.z, "#ffffff", 4);
 }
 
 // ---------------------------------------------------------------------------
@@ -1809,6 +1924,32 @@ function bindModeUI() {
   document.querySelector("#chaseLeaveBtn").addEventListener("click", () => exitToModes());
   for (const btn of document.querySelectorAll("#chaseTeamSizes button")) {
     btn.addEventListener("click", () => sendWs({ type: "chase-teamsize", size: Number(btn.dataset.size) }));
+  }
+  // Altın Kapma bağlantıları
+  document.querySelector("#modeGoldBtn").addEventListener("click", () => {
+    const box = document.querySelector("#goldBox");
+    box.hidden = !box.hidden;
+    openWorldBox.hidden = true;
+    rankedBox.hidden = true;
+    document.querySelector("#chaseBox").hidden = true;
+  });
+  document.querySelector("#goldCreateBtn").addEventListener("click", () => {
+    menuError.textContent = "";
+    connectGold("gold-create");
+  });
+  document.querySelector("#goldJoinBtn").addEventListener("click", () => {
+    const code = document.querySelector("#goldCodeInput").value.replace(/\D/g, "").slice(0, 6);
+    if (code.length !== 6) {
+      menuError.textContent = "Oda kodu 6 haneli olmalı.";
+      return;
+    }
+    menuError.textContent = "";
+    connectGold("gold-join", code);
+  });
+  document.querySelector("#goldStartBtn").addEventListener("click", () => sendWs({ type: "gold-start" }));
+  document.querySelector("#goldLeaveBtn").addEventListener("click", () => exitToModes());
+  for (const btn of document.querySelectorAll("#goldDurations button")) {
+    btn.addEventListener("click", () => sendWs({ type: "gold-duration", minutes: Number(btn.dataset.min) }));
   }
   // Kovalamaca harita kartları (host seçer, sunucu doğrular)
   const chaseMapGrid = document.querySelector("#chaseMapGrid");
@@ -2110,7 +2251,12 @@ function exitToModes(note = "") {
   chase.myTeam = "";
   chase.selfCaught = false;
   chase.caught = [];
+  goldGrab.phase = "";
+  goldGrab.holderId = "";
+  goldGrab.goldPos = null;
+  removeGoldCoin();
   document.querySelector("#chaseScreen").hidden = true;
+  document.querySelector("#goldScreen").hidden = true;
   tutorialPanel.hidden = true;
   stuntPanel.hidden = true;
   icePanel.hidden = true;
@@ -2170,7 +2316,7 @@ function bindSocket({ purpose }) {
   socket.addEventListener("open", () => {
     if (purpose === "ranked") {
       sendWs({ type: "ranked-queue", sessionId, nickname: state.nickname, color: selectedCarColor(), paint: state.profile.selectedPaint });
-    } else if (purpose === "chase-create" || purpose === "chase-join") {
+    } else if (purpose === "chase-create" || purpose === "chase-join" || purpose === "gold-create" || purpose === "gold-join") {
       sendWs({
         type: purpose,
         sessionId,
@@ -2213,12 +2359,20 @@ function bindSocket({ purpose }) {
       menuError.textContent = "Sunucuya bağlanılamadı, kovalamaca şu an oynanamaz.";
       return;
     }
+    if ((purpose === "gold-create" || purpose === "gold-join") && !joinedOnce) {
+      menuError.textContent = "Sunucuya bağlanılamadı, altın kapma şu an oynanamaz.";
+      return;
+    }
     if (purpose === "ranked" && state.mode === "ranked") {
       exitToModes("Bağlantı koptu, maç bitti.");
       return;
     }
     if ((purpose === "chase-create" || purpose === "chase-join") && state.mode === "chase") {
       exitToModes("Bağlantı koptu, kovalamaca bitti.");
+      return;
+    }
+    if ((purpose === "gold-create" || purpose === "gold-join") && state.mode === "gold") {
+      exitToModes("Bağlantı koptu, altın kapma bitti.");
       return;
     }
     if (joinedOnce && state.mode === "open") {
@@ -2324,6 +2478,18 @@ function handleServerMessage(message) {
         document.querySelector("#chaseScreen").hidden = false;
         document.querySelector("#chaseCodeLabel").textContent = state.partyCode;
       }
+      if (message.goldGrab) {
+        // Altın Kapma odasına girildi: lobiyi bekle
+        state.mode = "gold";
+        state.map = "city";
+        goldGrab.phase = "lobby";
+        goldGrab.rewardApplied = false;
+        rebuildSelfCar();
+        setActiveMap("city");
+        showScreen("game");
+        document.querySelector("#goldScreen").hidden = false;
+        document.querySelector("#goldCodeLabel").textContent = state.partyCode;
+      }
       if (state.partyCode) {
         hudParty.textContent = `Parti kodu: ${state.partyCode}`;
         hudParty.hidden = false;
@@ -2336,6 +2502,13 @@ function handleServerMessage(message) {
       if (message.weather && message.weather !== state.weather) {
         state.weather = message.weather;
         applyWeatherVisuals();
+      }
+      if (message.gold && state.mode === "gold") {
+        goldGrab.phase = message.gold.phase;
+        if (message.gold.goldPos) goldGrab.goldPos = { x: message.gold.goldPos.x, z: message.gold.goldPos.y };
+        goldGrab.holderId = message.gold.holderId || "";
+        goldGrab.immuneUntil = message.gold.immuneUntil || 0;
+        goldGrab.endsAt = message.gold.endsAt || goldGrab.endsAt;
       }
       const seen = new Set();
       for (const player of message.players || []) {
@@ -2412,6 +2585,21 @@ function handleServerMessage(message) {
       break;
     case "chase-closed":
       exitToModes("Kovalamaca bitti!");
+      break;
+    case "gold-lobby":
+      applyGoldLobby(message.gold);
+      break;
+    case "gold-start":
+      applyGoldStart(message.gold);
+      break;
+    case "gold-update":
+      applyGoldUpdate(message.gold);
+      break;
+    case "gold-end":
+      applyGoldEnd(message);
+      break;
+    case "gold-closed":
+      exitToModes("Altın Kapma bitti!");
       break;
     case "yaris-error":
       showBanner(message.message || "Bir hata oluştu.");
@@ -2584,7 +2772,7 @@ function showRaceResults() {
 }
 
 function raceTick() {
-  if (!state.joined || state.mode === "stunt" || state.mode === "tutorial" || state.mode === "ice" || state.mode === "chase") {
+  if (!state.joined || state.mode === "stunt" || state.mode === "tutorial" || state.mode === "ice" || state.mode === "chase" || state.mode === "gold") {
     countdownEl.hidden = true;
     return;
   }
@@ -2982,11 +3170,11 @@ function applyChaseStart(data) {
   const team = chase.myTeam === "cops" ? data.cops : data.robbers;
   const index = Math.max(0, team.findIndex((p) => p.id === state.selfId));
   if (chase.myTeam === "cops") {
-    car.x = 600 + (index % 3) * 70 - 70;
-    car.z = 600 + Math.floor(index / 3) * 70;
+    car.x = 800 + (index % 3) * 70 - 70;
+    car.z = 800 + Math.floor(index / 3) * 70;
   } else {
-    car.x = 3000 + (index % 3) * 80 - 80;
-    car.z = 3000 + Math.floor(index / 3) * 80 - 40;
+    car.x = 4000 + (index % 3) * 80 - 80;
+    car.z = 4000 + Math.floor(index / 3) * 80 - 40;
   }
   car.angle = Math.PI / 2;
   car.speed = 0;
@@ -3053,6 +3241,182 @@ function chaseTick(nowMs) {
     const free = chase.robbers.filter((id) => !chase.caught.includes(id)).length;
     const role = chase.myTeam === "cops" ? "🚔 Polis" : chase.caught.includes(state.selfId) ? "👮 Yakalandın" : "🏃 Kaçak";
     hudEvent.textContent = `${role} · ${mins}:${secs} · serbest kaçak: ${free}`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Altın Kapma (istemci) — bot yok, min 2 oyuncu
+// ---------------------------------------------------------------------------
+
+const goldGrab = {
+  phase: "",
+  hostId: "",
+  durationMin: 10,
+  goldPos: null, // { x, z }
+  holderId: "",
+  immuneUntil: 0,
+  endsAt: 0,
+  winnerId: "",
+  results: [],
+  rewardApplied: false,
+};
+
+let goldCoinMesh = null;
+
+function connectGold(action, code = "") {
+  clearTimeout(state.reconnectTimer);
+  if (location.protocol === "file:") {
+    menuError.textContent = "Altın Kapma için sunucu bağlantısı gerekli.";
+    return;
+  }
+  try {
+    socket = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/yaris-sehri`);
+  } catch {
+    menuError.textContent = "Sunucuya bağlanılamadı.";
+    return;
+  }
+  state.chaseJoinCode = code;
+  bindSocket({ purpose: action });
+}
+
+function applyGoldLobby(data) {
+  if (!data || state.mode !== "gold") return;
+  goldGrab.hostId = data.hostId;
+  goldGrab.durationMin = data.durationMin;
+  goldGrab.phase = data.phase;
+  if (data.phase !== "lobby") return;
+  document.querySelector("#goldScreen").hidden = false;
+  document.querySelector("#goldCodeLabel").textContent = state.partyCode;
+  document.querySelector("#goldPlayerList").innerHTML = (data.players || [])
+    .map((p) => `<li><span style="color:${p.color}">●</span> ${escapeHtml(p.nickname)}${p.id === data.hostId ? " 👑" : ""}</li>`)
+    .join("");
+  for (const btn of document.querySelectorAll("#goldDurations button")) {
+    btn.classList.toggle("active", Number(btn.dataset.min) === data.durationMin);
+  }
+  const isHost = data.hostId === state.selfId;
+  document.querySelector("#goldStartBtn").disabled = !isHost;
+  document.querySelector("#goldStartBtn").textContent = isHost ? "Başlat!" : "Oda sahibi başlatacak…";
+}
+
+function applyGoldStart(data) {
+  if (!data) return;
+  goldGrab.phase = data.phase;
+  goldGrab.goldPos = data.goldPos ? { x: data.goldPos.x, z: data.goldPos.y } : null;
+  goldGrab.holderId = "";
+  goldGrab.endsAt = data.endsAt;
+  goldGrab.rewardApplied = false;
+  document.querySelector("#goldScreen").hidden = true;
+  showScorePop("Altın düştü! Kap! 🪙");
+}
+
+function applyGoldUpdate(data) {
+  if (!data) return;
+  goldGrab.phase = data.phase;
+  if (data.goldPos) goldGrab.goldPos = { x: data.goldPos.x, z: data.goldPos.y };
+  const prevHolder = goldGrab.holderId;
+  goldGrab.holderId = data.holderId || "";
+  goldGrab.immuneUntil = data.immuneUntil || 0;
+  if (goldGrab.holderId && goldGrab.holderId !== prevHolder) {
+    showScorePop(goldGrab.holderId === state.selfId ? "Altın sende! 🪙 Kaç!" : "Altın el değiştirdi!");
+  }
+}
+
+function applyGoldEnd(message) {
+  goldGrab.phase = "ended";
+  goldGrab.winnerId = message.winnerId || "";
+  goldGrab.results = message.results || [];
+  const mine = goldGrab.results.find((item) => item.id === state.selfId);
+  if (!account && mine && !goldGrab.rewardApplied) {
+    goldGrab.rewardApplied = true;
+    state.profile.gold += mine.goldEarned || 0;
+    if (mine.cupEarned) state.profile.goldGrabWins = (state.profile.goldGrabWins || 0) + 1;
+    saveGuestProfile();
+    refreshGoldDisplays();
+  }
+  resultsPanel.hidden = false;
+  document.querySelector("#resultsPanel h2").textContent =
+    goldGrab.winnerId ? "🪙 Altın Kapıldı!" : "🪙 Beraberlik — altın sahipsiz kaldı!";
+  raceResults.innerHTML = goldGrab.results
+    .map((item) => {
+      const me = item.id === state.selfId ? " me" : "";
+      const crown = item.won ? "👑 " : "";
+      return `<li class="${me.trim()}">${crown}<span style="color:${item.color}">●</span> ${escapeHtml(item.nickname)} — 🪙${item.goldEarned}${item.cupEarned ? " +kupa" : ""}</li>`;
+    })
+    .join("");
+  raceReward.textContent = mine ? `Kazandın: 🪙${mine.goldEarned}${mine.cupEarned ? " · Altın Kapma Kupası!" : ""}` : "";
+}
+
+function ensureGoldCoin() {
+  if (goldCoinMesh) return goldCoinMesh;
+  const group = new THREE.Group();
+  const coin = new THREE.Mesh(
+    new THREE.CylinderGeometry(3, 3, 0.8, 20),
+    new THREE.MeshLambertMaterial({ color: 0xffd700, emissive: 0x6a5200 }),
+  );
+  coin.rotation.x = Math.PI / 2;
+  group.add(coin);
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(3.8, 0.3, 6, 20),
+    new THREE.MeshBasicMaterial({ color: 0xffe27a }),
+  );
+  group.add(ring);
+  group.visible = false;
+  goldCoinMesh = group;
+  return group;
+}
+
+function removeGoldCoin() {
+  if (goldCoinMesh) {
+    goldCoinMesh.parent?.remove(goldCoinMesh);
+    goldCoinMesh.visible = false;
+  }
+}
+
+function goldTick(nowMs, dt) {
+  if (state.mode !== "gold") return;
+  // Dönen altın: taşıyıcının üstünde, kimsede yoksa yerde (goldPos)
+  const coin = ensureGoldCoin();
+  if (goldGrab.phase === "running" && active) {
+    if (coin.parent !== active.scene) active.scene.add(coin);
+    coin.visible = true;
+    coin.rotation.y += 4 * dt;
+    if (goldGrab.holderId) {
+      let tx;
+      let tz;
+      let th = 0;
+      if (goldGrab.holderId === state.selfId) {
+        tx = car.x;
+        tz = car.z;
+        th = Math.max(0, car.h);
+      } else {
+        const remote = state.remotes.get(goldGrab.holderId);
+        if (!remote) {
+          coin.visible = false;
+          return;
+        }
+        tx = remote.x;
+        tz = remote.z;
+        th = remote.h;
+      }
+      coin.position.set(tx, th + 10, tz);
+    } else if (goldGrab.goldPos) {
+      coin.position.set(goldGrab.goldPos.x, 7 + Math.sin(nowMs / 300) * 1.5, goldGrab.goldPos.z);
+    }
+  } else {
+    coin.visible = false;
+  }
+
+  if (goldGrab.phase === "running") {
+    const left = Math.max(0, goldGrab.endsAt - nowMs);
+    const mins = Math.floor(left / 60000);
+    const secs = String(Math.floor((left % 60000) / 1000)).padStart(2, "0");
+    const holderNick =
+      goldGrab.holderId === state.selfId
+        ? "SENDE! 🪙"
+        : state.remotes.get(goldGrab.holderId)?.nickname
+          ? `${state.remotes.get(goldGrab.holderId).nickname}'te`
+          : "yerde";
+    hudEvent.textContent = `🪙 ${holderNick} · ${mins}:${secs}`;
   }
 }
 
@@ -3485,8 +3849,10 @@ async function flushIceScore(final) {
   }
 }
 
-function updateRemotes(dt) {  const t = Math.min(1, dt * 9);
+function updateRemotes(dt) {
+  const t = Math.min(1, dt * 9);
   for (const remote of state.remotes.values()) {
+    const moveDist = Math.hypot(remote.tx - remote.x, remote.tz - remote.z);
     remote.x += (remote.tx - remote.x) * t;
     remote.z += (remote.tz - remote.z) * t;
     remote.h += (remote.th - remote.h) * t;
@@ -3497,6 +3863,10 @@ function updateRemotes(dt) {  const t = Math.min(1, dt * 9);
     if (remote.mesh) {
       remote.mesh.position.set(remote.x, remote.h, remote.z);
       remote.mesh.rotation.y = -remote.a;
+      if (remote.mesh.userData.wheels && dt > 0) {
+        const spin = (moveDist * t) / 0.9;
+        for (const wheel of remote.mesh.userData.wheels) wheel.rotation.z -= spin;
+      }
       remote.tag.position.set(remote.x, remote.h + 7, remote.z);
       remote.shadow.position.set(remote.x, 0.06, remote.z);
       remote.shadow.material.opacity = clamp(0.4 - remote.h * 0.004, 0.08, 0.4);
@@ -3529,11 +3899,15 @@ function updateRingVisibility(nowMs) {
       ring.material.opacity = isNext ? 0.95 : 0.3;
       ring.scale.setScalar(isNext ? 1 + Math.sin(nowMs / 180) * 0.08 : 1);
     });
-    // Bölge zeminleri nabız
+    // Bölge zeminleri nabız + su animasyonu
     for (const group of [refs.raceZone, refs.ttZone]) {
       if (group?.children[0]) {
         group.children[0].material.opacity = 0.08 + Math.sin(nowMs / 350) * 0.05;
       }
+    }
+    if (refs.waterMesh) {
+      refs.waterMesh.position.y = 0.12 + Math.sin(nowMs / 900) * 0.18;
+      refs.waterMesh.material.color.setHSL(0.56, 0.5, 0.32 + Math.sin(nowMs / 1300) * 0.05);
     }
   } else if (state.map === "stunt" && refs.stuntRings) {
     refs.stuntRings.forEach((mesh, i) => {
@@ -3554,12 +3928,31 @@ function updateRingVisibility(nowMs) {
   }
 }
 
-function syncSelfCar() {
+function syncSelfCar(dt = 0) {
   if (!selfCar.mesh) return;
   selfCar.mesh.position.set(car.x, car.h, car.z);
   selfCar.mesh.rotation.y = -car.angle;
   // Havada hafif yunuslama
   selfCar.mesh.rotation.z = car.vh !== 0 ? clamp(-car.vh * 0.0008, -0.3, 0.3) : 0;
+  // Tekerlek dönüşü + fren farı
+  if (selfCar.mesh.userData.wheels && dt > 0) {
+    const spin = (car.speed * dt) / 0.9;
+    for (const wheel of selfCar.mesh.userData.wheels) wheel.rotation.z -= spin;
+  }
+  if (selfCar.mesh.userData.brakeMat) {
+    selfCar.mesh.userData.brakeMat.emissiveIntensity = input.brake ? 1 : 0.12;
+  }
+  // Gece haritasında far (nokta ışık, sadece kendi arabamız)
+  const isNight = Boolean(active?.cityData?.params?.night);
+  if (isNight && !selfCar.mesh.userData.headlight) {
+    const headlight = new THREE.PointLight(0xfff2cc, 60, 110, 1.8);
+    headlight.position.set(carStats().body.len / 2 + 2, 2.4, 0);
+    selfCar.mesh.add(headlight);
+    selfCar.mesh.userData.headlight = headlight;
+  } else if (!isNight && selfCar.mesh.userData.headlight) {
+    selfCar.mesh.remove(selfCar.mesh.userData.headlight);
+    selfCar.mesh.userData.headlight = null;
+  }
   selfCar.tag.position.set(car.x, car.h + 7, car.z);
   selfCar.shadow.position.set(car.x, 0.06, car.z);
   selfCar.shadow.material.opacity = clamp(0.4 - car.h * 0.004, 0.08, 0.4);
@@ -3580,13 +3973,16 @@ function updateHud(nowMs) {
         ? "Buzlu Zemin"
         : state.mode === "chase"
           ? "Polis Kovalamaca"
-          : state.mode === "tutorial"
+          : state.mode === "gold"
+            ? "Altın Kapma"
+            : state.mode === "tutorial"
             ? "Öğretici"
             : state.online
               ? `${driverCount} sürücü çevrimiçi`
               : `${driverCount} sürücü (yerel)`;
 
   if (state.mode === "chase") return; // hudEvent'i chaseTick yönetir
+  if (state.mode === "gold") return; // hudEvent'i goldTick yönetir
 
   if (race.phase === "lobby" && isInRace()) {
     const left = Math.max(0, Math.ceil((race.lobbyDeadline - Date.now()) / 1000));
@@ -3612,6 +4008,62 @@ function showScorePop(text) {
   showScorePop.timer = setTimeout(() => {
     scorePop.hidden = true;
   }, 1400);
+}
+
+// Hedef oku (DOM overlay): yarış/TT/öğretici checkpoint'i veya altın taşıyıcıyı gösterir
+const targetArrowEl = document.querySelector("#targetArrow");
+const arrowProj = new THREE.Vector3();
+
+function currentArrowTarget() {
+  if (state.screen !== "game") return null;
+  if (race.phase === "running" && isInRace() && !race.finished) {
+    const route = state.routes.race;
+    const t = race.nextCp >= route.length ? route[0] : route[race.nextCp];
+    return { x: t.x, z: t.z, color: "#35d2ff" };
+  }
+  if (tt.running) {
+    const route = state.routes.tt;
+    const t = tt.next >= route.length ? route[0] : route[tt.next];
+    return { x: t.x, z: t.z, color: "#ffd166" };
+  }
+  if (state.mode === "gold" && goldGrab.phase === "running" && goldGrab.holderId !== state.selfId) {
+    if (goldGrab.holderId) {
+      const holder = state.remotes.get(goldGrab.holderId);
+      if (holder) return { x: holder.x, z: holder.z, color: "#ffd700" };
+    } else if (goldGrab.goldPos) {
+      return { x: goldGrab.goldPos.x, z: goldGrab.goldPos.z, color: "#ffd700" };
+    }
+    return null;
+  }
+  if (state.mode === "tutorial" && !tutorial.done) {
+    if (tutorial.step === 1) return { x: TUT_CHECKPOINT.x, z: TUT_CHECKPOINT.z, color: "#69d18b" };
+    if (tutorial.step === 2) return { x: TUT_RAMP.x + TUT_RAMP.w / 2, z: TUT_RAMP.z + TUT_RAMP.h / 2, color: "#69d18b" };
+    if (tutorial.step === 3) return { x: TUT_FINISH.x, z: TUT_FINISH.z, color: "#69d18b" };
+  }
+  return null;
+}
+
+function updateTargetArrow() {
+  const target = currentArrowTarget();
+  if (!target) {
+    targetArrowEl.hidden = true;
+    return;
+  }
+  // Arabanın ekran konumu + kamera yönüne göreli açı
+  arrowProj.set(car.x, Math.max(0, car.h) + 6, car.z).project(camera);
+  const sx = (arrowProj.x * 0.5 + 0.5) * innerWidth;
+  const sy = (-arrowProj.y * 0.5 + 0.5) * innerHeight;
+  let rel = Math.atan2(target.z - car.z, target.x - car.x) - camState.yaw;
+  while (rel > Math.PI) rel -= Math.PI * 2;
+  while (rel < -Math.PI) rel += Math.PI * 2;
+  const r = 64;
+  const ax = sx + Math.sin(rel) * r;
+  const ay = sy - Math.cos(rel) * r;
+  targetArrowEl.hidden = false;
+  targetArrowEl.style.color = target.color;
+  targetArrowEl.style.left = `${ax - 16}px`;
+  targetArrowEl.style.top = `${ay - 16}px`;
+  targetArrowEl.style.transform = `rotate(${rel}rad)`;
 }
 
 // Gökkuşağı boyası: renk sürekli döner
@@ -3645,11 +4097,14 @@ function frame(nowMs) {
     stuntTick(nowMs);
     iceTick(nowMs, dt);
     chaseTick(nowMs);
+    goldTick(nowMs, dt);
     updateWeatherFx(dt, nowMs);
     updateRainbowPaints(nowMs);
-    syncSelfCar();
+    syncSelfCar(dt);
+    updateSunShadow();
     updateChatBubbles(nowMs);
     updateRingVisibility(nowMs);
+    updateTargetArrow();
     updateCamera3D(dt);
     updateHud(nowMs);
     drawMinimap(nowMs);

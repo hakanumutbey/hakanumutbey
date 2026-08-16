@@ -68,6 +68,7 @@
 
     <div class="countdown" id="countdown" hidden></div>
     <div class="score-pop" id="scorePop" hidden></div>
+    <div id="targetArrow" hidden>▲</div>
 
     <div class="chat-history" id="chatHistory"></div>
 
@@ -177,6 +178,14 @@
               <button id="chaseJoinBtn" type="button">Odaya Katıl</button>
             </div>
           </div>
+          <button id="modeGoldBtn" type="button" class="primary">🪙 Altın Kapma</button>
+          <div id="goldBox" hidden>
+            <button id="goldCreateBtn" type="button">Oda Kur</button>
+            <div class="party-join">
+              <input id="goldCodeInput" type="text" inputmode="numeric" maxlength="6" placeholder="Oda kodu" />
+              <button id="goldJoinBtn" type="button">Odaya Katıl</button>
+            </div>
+          </div>
           <button id="galleryBtn" type="button">🚗 Araba Galerisi</button>
           <button id="tutorialReplayBtn" type="button">🎓 Öğreticiyi Tekrar Oyna</button>
           <p id="menuError" class="auth-error"></p>
@@ -200,6 +209,26 @@
         <div id="paintGrid" class="car-grid" hidden></div>
         <p id="galleryError" class="auth-error"></p>
         <button id="galleryBackBtn" type="button">← Mod Seçimine Dön</button>
+      </div>
+    </div>
+
+    <!-- Altın Kapma lobisi -->
+    <div class="menu" id="goldScreen" hidden>
+      <div class="menu-card">
+        <h1>🪙 Altın Kapma</h1>
+        <p class="tagline">Oda kodu: <strong id="goldCodeLabel" class="hud-party"></strong> — arkadaşların bu kodla katılır</p>
+        <div class="teamsize-row" id="goldDurations">
+          <span>Süre:</span>
+          <button type="button" data-min="5">5 dk</button>
+          <button type="button" data-min="8">8 dk</button>
+          <button type="button" data-min="10">10 dk</button>
+          <button type="button" data-min="12">12 dk</button>
+          <button type="button" data-min="15">15 dk</button>
+        </div>
+        <ul id="goldPlayerList" class="chase-players"></ul>
+        <button id="goldStartBtn" type="button" class="primary">Başlat!</button>
+        <button id="goldLeaveBtn" type="button">Odadan Çık</button>
+        <p class="hint-line">Altın şehirde rastgele bir yola düşer. Kap, üstünde dursun, süre bitince elinde tutan kazanır! Temas eden çalar (alan 1 sn korunur). Kazanan 🪙50, herkes 🪙10. Bot yok!</p>
       </div>
     </div>
 
@@ -233,7 +262,7 @@
       </div>
     </div>
 
-    <canvas id="minimap" width="150" height="150" hidden></canvas>
+    <canvas id="minimap" width="215" height="215" hidden></canvas>
 
     <script type="importmap">
       { "imports": { "three": "./lib/three.module.min.js" } }
