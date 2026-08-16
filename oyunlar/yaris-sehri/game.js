@@ -1446,8 +1446,10 @@ function removeBotMeshes() {
 const camPos = new THREE.Vector3(3000, 60, 2900);
 const camTarget = new THREE.Vector3(3000, 0, 3000);
 // Yumuşatılmış kamera durumu: yaw ve yükseklik arabayı gecikmeli takip eder
-// (ani dönüş/inişlerde sarsıntıyı önler).
-const camState = { yaw: -Math.PI / 2, h: 0 };
+// (ani dönüş/inişlerde sarsıntıyı önler). Konum arabaya sert bağlıdır — aksi halde
+// hız arttıkça kamera geride kalır ("kamera uzaklaşıyor" hatası: hedef hızla ilerlerken
+// k=6'lık konum filtresi ~hız/6 birim geride dengeye oturuyordu, 860 hızda ~140 birim!).
+const camState = { yaw: -Math.PI / 2, h: 0, dist: 26 };
 
 function snapCamera() {
   // Mod başı/respawn: sarsıntısız başlangıç için kamera anında yerine oturur.
@@ -1455,9 +1457,10 @@ function snapCamera() {
   state.camYawOffset = 0;
   camState.yaw = car.angle;
   camState.h = Math.max(0, car.h);
+  camState.dist = 26 + Math.abs(car.speed) * 0.014;
   const fx = Math.cos(camState.yaw);
   const fz = Math.sin(camState.yaw);
-  camPos.set(car.x - fx * 26, camState.h + 13, car.z - fz * 26);
+  camPos.set(car.x - fx * camState.dist, camState.h + 13, car.z - fz * camState.dist);
   camTarget.set(car.x + fx * 16, camState.h + 3, car.z + fz * 16);
   camera.position.copy(camPos);
   camera.lookAt(camTarget);
@@ -1482,16 +1485,20 @@ function updateCamera3D(dt) {
   // Dikey: rampa/inişlerde yükseklik yumuşak takip (~5/s)
   camState.h += (Math.max(0, car.h) - camState.h) * (1 - Math.exp(-5 * dt));
 
+  // Mesafe: hıza bağlı hedef mesafe yumuşak takip eder (~7/s; çarpışma hız düşüşünde sıçramaz)
+  camState.dist += (26 + Math.abs(car.speed) * 0.014 - camState.dist) * (1 - Math.exp(-7 * dt));
+
+  // Konum: arabaya doğrudan bağlı (yumuşaklık yaw/mesafe/yükseklik üzerinden gelir)
   const fx = Math.cos(camState.yaw);
   const fz = Math.sin(camState.yaw);
-  const dist = 26 + Math.abs(car.speed) * 0.014;
-  const wantX = car.x - fx * dist;
-  const wantZ = car.z - fz * dist;
-  const wantY = camState.h + 13;
-  const t = 1 - Math.exp(-6 * dt);
-  camPos.x += (wantX - camPos.x) * t;
-  camPos.y += (wantY - camPos.y) * t;
-  camPos.z += (wantZ - camPos.z) * t;
+  camPos.set(car.x - fx * camState.dist, camState.h + 13, car.z - fz * camState.dist);
+
+  // Güvenlik payı: saçma değer ya da aşırı uzaklık -> sert oturt
+  const tooFar = Math.hypot(camPos.x - car.x, camPos.z - car.z) > camState.dist * 3;
+  if (!Number.isFinite(camPos.x + camPos.y + camPos.z + camTarget.x) || tooFar) {
+    snapCamera();
+    return;
+  }
   camera.position.copy(camPos);
 
   // Bakış hedefi de yumuşatılır (~8/s) — ani dönüşlerde görüntü sarsılmaz

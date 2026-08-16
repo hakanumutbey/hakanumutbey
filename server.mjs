@@ -787,10 +787,19 @@ async function handleApi(request, response) {
       return;
     }
     addYarisSeasonScore(account, objective.id, amount);
+    // Bölüm sezonu (araba-simulator): her level-complete bildirimi +5 altın (tek cüzdana)
+    let goldEarned = 0;
+    if (objective.id === "araba-simulator") {
+      goldEarned = 5 * amount;
+      const profile = yarisProfileOf(account);
+      profile.gold += goldEarned;
+      writeJson("accounts.json", accounts).catch(() => {});
+    }
     sendJson(response, {
       ok: true,
       counted: true,
       score: yarisSeason.scores[account.id]?.score || 0,
+      goldEarned,
       season: yarisSeason.season,
       objective: objective.id,
     });
@@ -800,6 +809,12 @@ async function handleApi(request, response) {
     // Public (auth'suz): mevcut sezon + ilk 20 + geçmiş sezon şampiyonları.
     // Canonical: /api/seasons/leaderboard (eski yaris-sehri yolu geriye uyumluluk için durur).
     const objective = yarisSeasonObjective(yarisSeason.season);
+    // Sezonda oynayarak altın kazanma bilgisi (site gösterebilir)
+    const goldReward = ["ws-time", "game-time", "site-time"].includes(objective.kind)
+      ? { text: "Bu sezonda oynadıkça altın kazanırsın: her 5 dakika +1 altın!", goldPerSeconds: 300, gold: 1 }
+      : objective.id === "araba-simulator"
+        ? { text: "Bu sezonda her tamamlanan bölüm +5 altın!", goldPer: "level-complete", gold: 5 }
+        : null;
     const top = Object.entries(yarisSeason.scores)
       .map(([accountId, entry]) => ({
         accountId,
@@ -815,6 +830,7 @@ async function handleApi(request, response) {
       season: yarisSeason.season,
       objective,
       game: objective.game,
+      goldReward,
       startedAt: yarisSeason.startedAt,
       endsAt: yarisSeason.endsAt,
       top,
@@ -4039,7 +4055,10 @@ function tickYarisWorlds() {
           const seconds = Math.floor(player.timeAccum);
           player.timeAccum -= seconds;
           const account = accountById(player.accountId);
-          if (account) addYarisSeasonScore(account, "arabaci", seconds);
+          if (account) {
+            addYarisSeasonScore(account, "arabaci", seconds);
+            addYarisTimeGold(account, seconds);
+          }
         }
       }
     }
@@ -4167,6 +4186,23 @@ const seasonScoreRate = new Map(); // accountId -> { minuteStart, minuteCount, d
 // Heartbeat süre takibi (araba-zaman / site-zaman sezonları): sessionId -> son heartbeat zamanı
 const seasonHeartbeat = new Map();
 
+// Zaman sezonlarında oynadıkça altın: skora işlenen her 5 dakika +1🪙 (kalıntı korunur).
+// Test için env ile düşürülebilir: YARIS_TIME_GOLD_SECONDS
+const YARIS_TIME_GOLD_SECONDS = Number(process.env.YARIS_TIME_GOLD_SECONDS || 300);
+const seasonTimeGold = new Map(); // accountId -> altına çevrilmemiş saniye
+
+function addYarisTimeGold(account, seconds) {
+  const total = (seasonTimeGold.get(account.id) || 0) + seconds;
+  const gold = Math.floor(total / YARIS_TIME_GOLD_SECONDS);
+  seasonTimeGold.set(account.id, total % YARIS_TIME_GOLD_SECONDS);
+  if (gold > 0) {
+    // Site geneli tek cüzdan: yaris-sehri profil altını
+    const profile = yarisProfileOf(account);
+    profile.gold += gold;
+    writeJson("accounts.json", accounts).catch(() => {});
+  }
+}
+
 function trackSeasonHeartbeat(sessionId, activeGame) {
   const objective = yarisSeasonObjective(yarisSeason.season);
   const kind = objective.kind || "";
@@ -4180,7 +4216,10 @@ function trackSeasonHeartbeat(sessionId, activeGame) {
   if (!prev) return; // ilk heartbeat'te başlangıç işaretlenir
   // Sekme uyursa/ara verirse tek seferde en fazla 90 sn say
   const deltaSec = clamp(Math.round((now - prev) / 1000), 0, 90);
-  if (deltaSec > 0) addYarisSeasonScore(account, objective.id, deltaSec);
+  if (deltaSec > 0) {
+    addYarisSeasonScore(account, objective.id, deltaSec);
+    addYarisTimeGold(account, deltaSec);
+  }
   // Harita şişmesin
   if (seasonHeartbeat.size > 5000) {
     for (const [id, seen] of seasonHeartbeat) {

@@ -580,7 +580,9 @@
       state.energy = Math.max(0, state.energy - dt * 0.5);
     }
 
-    const windScale = towMode && !state.engineOn ? 0.06 : 0.22;
+    // Ruzgar etkisi: surus halinde ~0.7, motor kapali cekide ~0.45
+    // (onceki 0.22 / 0.06 degerleri ruzgari neredeyse hissedilmez yapiyordu).
+    const windScale = towMode && !state.engineOn ? 0.45 : 0.7;
     ship.vx += state.wind.x * windForce * windScale * dt;
     ship.vy += state.wind.y * windForce * windScale * dt;
     if (towMode && !state.engineOn) {

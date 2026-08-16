@@ -2040,6 +2040,7 @@ function renderYarisSeason() {
         <a class="button primary" href="${gameHref}">Oyna</a>
       </div>
       ${objective ? `<p class="section-note" style="margin:0 0 8px">${escapeHtml(gameName)} · ${escapeHtml(objective.desc)}</p>` : ""}
+      ${latestSeason.goldReward?.text ? `<p class="section-note" style="margin:0 0 8px">🪙 ${escapeHtml(latestSeason.goldReward.text)}</p>` : ""}
       <div class="pulse-feed season-top">${rows}</div>
       ${past ? `<div class="account-box-head" style="margin-top:12px"><h3>Geçmiş sezonlar</h3></div><div class="pulse-feed">${past}</div>` : ""}
       <p class="section-note" style="margin:10px 0 0">
