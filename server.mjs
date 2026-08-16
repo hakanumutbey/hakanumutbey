@@ -66,20 +66,36 @@ const averagePlayMinutes = {
 const voteOptionIds = ["uzay-yarisi", "market-savasi", "okul-gorevi"];
 
 // Sezon temaları: 7'şer gün, bu sırayla döner. İlk 3 hafta "zaman" sezonları:
-// 1 arabaci (Hakorocks Şehri WS süresi) → 2 araba-zaman (2D Car Simulator heartbeat süresi)
-// → 3 site-zaman (tüm site heartbeat süresi) → yarisci → polis → akrobasi → buz → altin
-// → araba-simulator (bölüm sayılı) → başa dön.
+// 1 arabaci (Hakorocks Şehri WS süresi) → 2 araba-zaman → 3 site-zaman → yarisci → polis
+// → akrobasi → buz → altin → araba-simulator (bölüm sayılı) → 10-24: diğer oyunların
+// "oyun-zamanı" sezonları (kind: "game-time", heartbeat süresi) → başa dön.
 // Yüklemenin (load) öncesinde tanımlı olmalı — normalizeYarisSeason modül başında çalışır.
 const YARIS_SEASON_OBJECTIVES = [
-  { id: "arabaci", name: "🚗 Arabacı Sezonu", desc: "Hakorocks Şehri'nde en çok zaman geçiren kazanır.", unit: "time", game: { slug: "yaris-sehri", name: "Hakorocks Şehri" } },
-  { id: "araba-zaman", name: "🏎️ 2D Car Simulator Zaman Sezonu", desc: "2D Car Simulator'da en çok zaman geçiren kazanır.", unit: "time", game: { slug: "2d-car-simulator", name: "2D Car Simulator" } },
-  { id: "site-zaman", name: "🌐 Site Zamanı Sezonu", desc: "Sitede toplam en çok zaman geçiren kazanır.", unit: "time", game: { slug: "", name: "Hakorocks Studio" } },
+  { id: "arabaci", name: "🚗 Arabacı Sezonu", desc: "Hakorocks Şehri'nde en çok zaman geçiren kazanır.", unit: "time", kind: "ws-time", game: { slug: "yaris-sehri", name: "Hakorocks Şehri" } },
+  { id: "araba-zaman", name: "🏎️ 2D Car Simulator Zaman Sezonu", desc: "2D Car Simulator'da en çok zaman geçiren kazanır.", unit: "time", kind: "game-time", game: { slug: "2d-car-simulator", name: "2D Car Simulator" } },
+  { id: "site-zaman", name: "🌐 Site Zamanı Sezonu", desc: "Sitede toplam en çok zaman geçiren kazanır.", unit: "time", kind: "site-time", game: { slug: "", name: "Hakorocks Studio" } },
   { id: "yarisci", name: "🏁 Yarışçı Sezonu", desc: "En çok yarış (açık dünya + dereceli) kazanan.", unit: "win", game: { slug: "yaris-sehri", name: "Hakorocks Şehri" } },
   { id: "polis", name: "🚔 Polis Sezonu", desc: "Kovalamacada en çok galibiyet alan takım üyesi.", unit: "win", game: { slug: "yaris-sehri", name: "Hakorocks Şehri" } },
   { id: "akrobasi", name: "🛞 Akrobasi Sezonu", desc: "Tek Mod'da haftalık toplam puanı en yüksek olan.", unit: "point", game: { slug: "yaris-sehri", name: "Hakorocks Şehri" } },
   { id: "buz", name: "🧊 Buz Ustası Sezonu", desc: "Buzlu Zemin'de haftalık toplam puanı en yüksek olan.", unit: "point", game: { slug: "yaris-sehri", name: "Hakorocks Şehri" } },
   { id: "altin", name: "🪙 Altın Avcısı Sezonu", desc: "Haftanın en çok altın kazananı (harcamalar sayılmaz).", unit: "gold", game: { slug: "yaris-sehri", name: "Hakorocks Şehri" } },
   { id: "araba-simulator", name: "🚗 2D Car Simulator Sezonu", desc: "Haftanın en çok bölüm tamamlayanı.", unit: "win", game: { slug: "2d-car-simulator", name: "2D Car Simulator" } },
+  // --- Diğer oyunların oyun-zamanı sezonları (heartbeat tabanlı) ---
+  { id: "skeleton-wars", name: "💀 İskelet Savaşçısı Sezonu", desc: "Skeleton Wars'ta en uzun süre kılıç sallayan savaşçı kazanır.", unit: "time", kind: "game-time", game: { slug: "skeleton-wars", name: "Skeleton Wars" } },
+  { id: "siber-polis", name: "👮 Siber Polis Sezonu", desc: "Vaka dosyalarında en çok mesai yapan dedektif kazanır.", unit: "time", kind: "game-time", game: { slug: "siber-polis", name: "Siber Polis" } },
+  { id: "space-arena", name: "🚀 Uzay Arenası Sezonu", desc: "Uzay Arenası'nda en çok dövüş ve parkur antrenmanı yapan kazanır.", unit: "time", kind: "game-time", game: { slug: "space-arena", name: "Space Arena" } },
+  { id: "annenden-kac", name: "🏃 Kaçış Ustası Sezonu", desc: "Annenden Kaç'ta kaçış antrenmanına en çok vakit ayıran kazanır.", unit: "time", kind: "game-time", game: { slug: "annenden-kac", name: "Annenden Kaç" } },
+  { id: "bardak", name: "🥤 Bardak Şampiyonu Sezonu", desc: "Bardak'ta en çok atış antrenmanı yapan kazanır.", unit: "time", kind: "game-time", game: { slug: "bardak", name: "Bardak" } },
+  { id: "birlesim-arenasi", name: "⚔️ Birleşim Arenası Sezonu", desc: "Birleşim Arenası'nda en çok strateji kuran kazanır.", unit: "time", kind: "game-time", game: { slug: "birlesim-arenasi", name: "Birleşim Arenası" } },
+  { id: "robot-avcisi", name: "🤖 Robot Avcısı Sezonu", desc: "Robot Avcısı'nda en uzun av süresini yapan kazanır.", unit: "time", kind: "game-time", game: { slug: "robot-avcisi", name: "Robot Avcısı" } },
+  { id: "vale", name: "🚗 Vale Sezonu", desc: "Vale'de en çok park mesaisi yapan sürücü kazanır.", unit: "time", kind: "game-time", game: { slug: "vale", name: "Vale" } },
+  { id: "essiz-zindan", name: "🏰 Zindan Kaşifi Sezonu", desc: "Eşsiz Zindan'da keşfe en çok vakit ayıran kaşif kazanır.", unit: "time", kind: "game-time", game: { slug: "essiz-zindan", name: "Eşsiz Zindan" } },
+  { id: "rhgpo", name: "🎯 RHGPO Ustası Sezonu", desc: "RHGPO'da en çok oynama süresi biriktiren kazanır.", unit: "time", kind: "game-time", game: { slug: "rhgpo", name: "RHGPO" } },
+  { id: "siyah-adam", name: "🕵️ Siyah Adam Sezonu", desc: "Siyah Adam'da en çok şüpheli kovalayan kazanır.", unit: "time", kind: "game-time", game: { slug: "siyah-adam", name: "Siyah Adam" } },
+  { id: "hentw", name: "🛡️ HENTW Sezonu", desc: "HENTW üssünü en uzun süre savunan kazanır.", unit: "time", kind: "game-time", game: { slug: "hentw", name: "HENTW" } },
+  { id: "hentw2", name: "🌊 HENTW 2 Sezonu", desc: "HENTW 2 haritalarında en çok dalga atlatan kazanır.", unit: "time", kind: "game-time", game: { slug: "hentw2", name: "HENTW 2" } },
+  { id: "hentw3", name: "🔥 HENTW 3 Sezonu", desc: "HENTW 3'te ateş hattında en çok kalan kazanır.", unit: "time", kind: "game-time", game: { slug: "hentw3", name: "HENTW 3" } },
+  { id: "hentw-premium", name: "💎 HENTW Premium Sezonu", desc: "HENTW Premium'da en çok malzeme toplayan kazanır.", unit: "time", kind: "game-time", game: { slug: "hentw-premium", name: "HENTW Premium" } },
 ];
 
 const mimeTypes = {
@@ -4152,18 +4168,19 @@ const seasonScoreRate = new Map(); // accountId -> { minuteStart, minuteCount, d
 const seasonHeartbeat = new Map();
 
 function trackSeasonHeartbeat(sessionId, activeGame) {
-  const objective = yarisSeason.objective;
-  if (objective !== "araba-zaman" && objective !== "site-zaman") return;
+  const objective = yarisSeasonObjective(yarisSeason.season);
+  const kind = objective.kind || "";
+  if (kind !== "game-time" && kind !== "site-time") return;
   const account = accountBySessionId(sessionId);
   if (!account) return; // misafirler sayılmaz
-  if (objective === "araba-zaman" && activeGame !== "2d-car-simulator") return;
+  if (kind === "game-time" && activeGame !== objective.game.slug) return;
   const now = Date.now();
   const prev = seasonHeartbeat.get(sessionId);
   seasonHeartbeat.set(sessionId, now);
   if (!prev) return; // ilk heartbeat'te başlangıç işaretlenir
   // Sekme uyursa/ara verirse tek seferde en fazla 90 sn say
   const deltaSec = clamp(Math.round((now - prev) / 1000), 0, 90);
-  if (deltaSec > 0) addYarisSeasonScore(account, objective, deltaSec);
+  if (deltaSec > 0) addYarisSeasonScore(account, objective.id, deltaSec);
   // Harita şişmesin
   if (seasonHeartbeat.size > 5000) {
     for (const [id, seen] of seasonHeartbeat) {
