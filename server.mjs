@@ -4848,39 +4848,20 @@ function startYarisChaseBySocket(socket) {
     return;
   }
 
-  // Takımlar: karıştır, sırayla polis/kaçak dağıt; botlarla teamSize'a tamamla.
+  // Takımlar: SADECE gerçek oyuncular (bot yok). Sırayla polis/kaçak dağıt;
+  // hiçbir takım seçilen boyutu aşamaz — dolu takıma denk gelen diğerine geçer,
+  // ikisi de doluysa artan kaçak olur (örn. 5 kişi + 2v2 -> 2 polis 3 kaçak).
   const shuffled = [...humans].sort(() => Math.random() - 0.5);
   chase.cops = [];
   chase.robbers = [];
   shuffled.forEach((p, index) => {
-    (index % 2 === 0 ? chase.cops : chase.robbers).push(p.id);
+    const preferCops = index % 2 === 0;
+    if (preferCops && chase.cops.length < chase.teamSize) chase.cops.push(p.id);
+    else if (!preferCops && chase.robbers.length < chase.teamSize) chase.robbers.push(p.id);
+    else if (preferCops && chase.robbers.length < chase.teamSize) chase.robbers.push(p.id);
+    else if (!preferCops && chase.cops.length < chase.teamSize) chase.cops.push(p.id);
+    else chase.robbers.push(p.id); // iki takım da dolu: artan kaçak
   });
-  const botNames = ["Bot Polis Rıza", "Bot Polis Alev", "Bot Kaçak Tilki", "Bot Kaçak Gölge", "Bot Polis Şimşek", "Bot Kaçak Rüzgar"];
-  let botIndex = 0;
-  const addBot = (team) => {
-    yarisPlayerCounter += 1;
-    const botId = `yp${yarisPlayerCounter}`;
-    world.players.set(botId, {
-      id: botId,
-      sessionId: "",
-      nickname: botNames[botIndex++ % botNames.length],
-      color: team === "cops" ? "#4ea3ff" : "#ff9f43",
-      paint: "standart",
-      accountId: "",
-      isBot: true,
-      h: 0,
-      x: 3000,
-      y: 3000,
-      angle: Math.random() * Math.PI * 2,
-      speed: 0,
-      socket: null,
-      joinedAt: Date.now(),
-    });
-    (team === "cops" ? chase.cops : chase.robbers).push(botId);
-  };
-  while (chase.cops.length < chase.teamSize) addBot("cops");
-  while (chase.robbers.length < chase.teamSize) addBot("robbers");
-  // Eşitlik için: takımlar tam teamSize olur (insan fazlaysa bot eklenmez)
 
   chase.caught = [];
   chase.catches = {};
