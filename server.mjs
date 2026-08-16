@@ -63,6 +63,19 @@ const averagePlayMinutes = {
 };
 const voteOptionIds = ["uzay-yarisi", "market-savasi", "okul-gorevi"];
 
+// Sezon temaları: 7'şer gün, bu sırayla döner (sezon 1 = arabaci).
+// 6 Hakorocks Şehri teması + her döngünün 7. sezonu başka bir oyunun (şimdilik 2D Car Simulator).
+// Yüklemenin (load) öncesinde tanımlı olmalı — normalizeYarisSeason modül başında çalışır.
+const YARIS_SEASON_OBJECTIVES = [
+  { id: "arabaci", name: "🚗 Arabacı Sezonu", desc: "Oyunda en çok zaman geçiren kazanır.", unit: "time", game: { slug: "yaris-sehri", name: "Hakorocks Şehri" } },
+  { id: "yarisci", name: "🏁 Yarışçı Sezonu", desc: "En çok yarış (açık dünya + dereceli) kazanan.", unit: "win", game: { slug: "yaris-sehri", name: "Hakorocks Şehri" } },
+  { id: "polis", name: "🚔 Polis Sezonu", desc: "Kovalamacada en çok galibiyet alan takım üyesi.", unit: "win", game: { slug: "yaris-sehri", name: "Hakorocks Şehri" } },
+  { id: "akrobasi", name: "🛞 Akrobasi Sezonu", desc: "Tek Mod'da haftalık toplam puanı en yüksek olan.", unit: "point", game: { slug: "yaris-sehri", name: "Hakorocks Şehri" } },
+  { id: "buz", name: "🧊 Buz Ustası Sezonu", desc: "Buzlu Zemin'de haftalık toplam puanı en yüksek olan.", unit: "point", game: { slug: "yaris-sehri", name: "Hakorocks Şehri" } },
+  { id: "altin", name: "🪙 Altın Avcısı Sezonu", desc: "Haftanın en çok altın kazananı (harcamalar sayılmaz).", unit: "gold", game: { slug: "yaris-sehri", name: "Hakorocks Şehri" } },
+  { id: "araba-simulator", name: "🚗 2D Car Simulator Sezonu", desc: "Haftanın en çok bölüm tamamlayanı.", unit: "win", game: { slug: "2d-car-simulator", name: "2D Car Simulator" } },
+];
+
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
   ".js": "application/javascript; charset=utf-8",
@@ -132,6 +145,7 @@ let invites = normalizeInvites(await readJson("invites.json", []));
   }
 }
 let adminState = normalizeAdminState(await readJson("admin.json", {}));
+let yarisSeason = normalizeYarisSeason(await readJson("yaris-season.json", null));
 const adminTokens = new Map();
 const adminAuthSessions = new Map();
 let githubConsecutiveFailures = 0;
@@ -286,6 +300,26 @@ yarisSehriSocketServer.on("connection", (socket) => {
     }
     if (message?.type === "chat") {
       handleYarisChat(socket, message);
+      return;
+    }
+    if (message?.type === "chase-create") {
+      joinYarisChase(socket, message, true);
+      return;
+    }
+    if (message?.type === "chase-join") {
+      joinYarisChase(socket, message, false);
+      return;
+    }
+    if (message?.type === "chase-teamsize") {
+      setYarisChaseTeamSize(socket, message);
+      return;
+    }
+    if (message?.type === "chase-map") {
+      setYarisChaseMap(socket, message);
+      return;
+    }
+    if (message?.type === "chase-start") {
+      startYarisChaseBySocket(socket);
       return;
     }
     if (message?.type === "leave") {
@@ -698,8 +732,73 @@ async function handleApi(request, response) {
     });
     return;
   }
-  if (request.method === "GET" && url.pathname === "/api/yaris-sehri/profile") {
-    const account = yarisAccountFromAuth(
+  if (request.method === "POST" && url.pathname === "/api/season-score") {
+    // Genel sezon skoru (yaris dışı oyunlar için): sadece aktif sezonun oyunu sayılır.
+    const body = await readBody(request, 16_000);
+    const account = yarisAccountFromAuth(safeText(body.sessionId, 120), safeText(body.authToken, 128));
+    if (!account) {
+      response.writeHead(401, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "invalid-auth", message: "Oturum doğrulanamadı." }));
+      return;
+    }
+    const game = safeText(body.game, 40);
+    const kind = safeText(body.kind, 30);
+    const amount = Math.floor(Number(body.amount));
+    const SEASON_SCORE_KINDS = { "level-complete": { maxAmount: 1, objective: "araba-simulator" } };
+    const kindDef = SEASON_SCORE_KINDS[kind];
+    if (!kindDef || !Number.isFinite(amount) || amount < 1 || amount > kindDef.maxAmount) {
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "invalid-score", message: "Skor geçersiz." }));
+      return;
+    }
+    const objective = yarisSeasonObjective(yarisSeason.season);
+    if (objective.game.slug !== game || objective.id !== kindDef.objective) {
+      // Farklı sezon aktif: hata değil, sadece sayılmaz (istemci sessizce geçer)
+      sendJson(response, { ok: true, counted: false, season: yarisSeason.season, objective: objective.id });
+      return;
+    }
+    if (!checkSeasonScoreRateLimit(account.id)) {
+      response.writeHead(429, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "rate-limited", message: "Çok hızlı skor gönderiyorsun, biraz bekle." }));
+      return;
+    }
+    addYarisSeasonScore(account, objective.id, amount);
+    sendJson(response, {
+      ok: true,
+      counted: true,
+      score: yarisSeason.scores[account.id]?.score || 0,
+      season: yarisSeason.season,
+      objective: objective.id,
+    });
+    return;
+  }
+  if (request.method === "GET" && (url.pathname === "/api/yaris-sehri/leaderboard" || url.pathname === "/api/seasons/leaderboard")) {
+    // Public (auth'suz): mevcut sezon + ilk 20 + geçmiş sezon şampiyonları.
+    // Canonical: /api/seasons/leaderboard (eski yaris-sehri yolu geriye uyumluluk için durur).
+    const objective = yarisSeasonObjective(yarisSeason.season);
+    const top = Object.entries(yarisSeason.scores)
+      .map(([accountId, entry]) => ({
+        accountId,
+        nickname: safeText(entry?.nickname, 24) || "oyuncu",
+        score: clamp(Math.floor(Number(entry?.score) || 0), 0, 100000000),
+        updatedAt: Number(entry?.updatedAt) || 0,
+      }))
+      .filter((entry) => entry.score > 0)
+      .sort((a, b) => b.score - a.score || a.updatedAt - b.updatedAt)
+      .slice(0, 20)
+      .map(({ nickname, score }) => ({ nickname, score }));
+    sendJson(response, {
+      season: yarisSeason.season,
+      objective,
+      game: objective.game,
+      startedAt: yarisSeason.startedAt,
+      endsAt: yarisSeason.endsAt,
+      top,
+      pastSeasons: yarisSeason.pastSeasons,
+    });
+    return;
+  }
+  if (request.method === "GET" && url.pathname === "/api/yaris-sehri/profile") {    const account = yarisAccountFromAuth(
       safeText(url.searchParams.get("sessionId"), 120),
       safeText(url.searchParams.get("authToken"), 128),
     );
@@ -708,7 +807,60 @@ async function handleApi(request, response) {
       response.end(JSON.stringify({ error: "invalid-auth", message: "Oturum doğrulanamadı." }));
       return;
     }
-    sendJson(response, { ok: true, profile: yarisProfileOf(account), cars: YARIS_CARS });
+    sendJson(response, { ok: true, profile: yarisProfileOf(account), cars: YARIS_CARS, paints: YARIS_PAINTS });
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/yaris-sehri/buy-paint") {
+    const body = await readBody(request, 16_000);
+    const account = yarisAccountFromAuth(safeText(body.sessionId, 120), safeText(body.authToken, 128));
+    if (!account) {
+      response.writeHead(401, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "invalid-auth", message: "Oturum doğrulanamadı." }));
+      return;
+    }
+    const paintId = safeText(body.paintId, 24);
+    const paint = YARIS_PAINTS.find((item) => item.id === paintId);
+    const profile = yarisProfileOf(account);
+    if (!paint) {
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "unknown-paint", message: "Böyle bir boya yok." }));
+      return;
+    }
+    if (profile.paints.includes(paint.id)) {
+      response.writeHead(409, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "already-owned", message: "Bu boya zaten sende var." }));
+      return;
+    }
+    if (profile.gold < paint.price) {
+      response.writeHead(402, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "not-enough-gold", message: "Yeterli altının yok." }));
+      return;
+    }
+    profile.gold -= paint.price;
+    profile.paints.push(paint.id);
+    profile.selectedPaint = paint.id;
+    await writeJson("accounts.json", accounts);
+    sendJson(response, { ok: true, profile });
+    return;
+  }
+  if (request.method === "POST" && url.pathname === "/api/yaris-sehri/select-paint") {
+    const body = await readBody(request, 16_000);
+    const account = yarisAccountFromAuth(safeText(body.sessionId, 120), safeText(body.authToken, 128));
+    if (!account) {
+      response.writeHead(401, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "invalid-auth", message: "Oturum doğrulanamadı." }));
+      return;
+    }
+    const paintId = safeText(body.paintId, 24);
+    const profile = yarisProfileOf(account);
+    if (!profile.paints.includes(paintId)) {
+      response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(JSON.stringify({ error: "not-owned", message: "Bu boyaya sahip değilsin." }));
+      return;
+    }
+    profile.selectedPaint = paintId;
+    await writeJson("accounts.json", accounts);
+    sendJson(response, { ok: true, profile });
     return;
   }
   if (request.method === "POST" && url.pathname === "/api/yaris-sehri/buy-car") {
@@ -778,6 +930,7 @@ async function handleApi(request, response) {
       profile.tutorialDone = true;
       goldEarned = 20;
       profile.gold += goldEarned;
+      addYarisSeasonGold(account, goldEarned);
       await writeJson("accounts.json", accounts);
     }
     sendJson(response, { ok: true, profile, goldEarned });
@@ -802,6 +955,8 @@ async function handleApi(request, response) {
     if (score > profile.stuntBest) {
       // Sadece yeni rekor farkı kadar altın ver (skor/100 kuralı).
       goldEarned = Math.floor(score / 100) - Math.floor(profile.stuntBest / 100);
+      addYarisSeasonScore(account, "akrobasi", score - profile.stuntBest); // haftalık puan
+      addYarisSeasonGold(account, goldEarned);
       profile.stuntBest = score;
       profile.gold += goldEarned;
       await writeJson("accounts.json", accounts);
@@ -829,6 +984,8 @@ async function handleApi(request, response) {
     if (score > profile.iceBest) {
       // Buzlu Zemin: skor/150 altın, sadece yeni rekor farkı kadar.
       goldEarned = Math.floor(score / 150) - Math.floor(profile.iceBest / 150);
+      addYarisSeasonScore(account, "buz", score - profile.iceBest); // haftalık puan
+      addYarisSeasonGold(account, goldEarned);
       profile.iceBest = score;
       profile.gold += goldEarned;
       await writeJson("accounts.json", accounts);
@@ -3356,10 +3513,15 @@ function createYarisRace() {
   };
 }
 
-function createYarisWorld(id, partyCode) {
+function createYarisWorld(id, partyCode, mapId) {
+  const def = yarisMapDef(mapId) || yarisMapDef(YARIS_DEFAULT_MAP_ID);
   return {
     id,
     partyCode: partyCode || "",
+    mapId: def.id,
+    mapSeed: def.seed,
+    weather: "clear", // clear | rain | storm
+    weatherNextAt: Date.now() + 120000 + Math.random() * 120000,
     players: new Map(), // playerId -> player
     race: createYarisRace(),
     ttScores: [], // { nickname, timeMs }
@@ -3372,6 +3534,7 @@ function publicYarisPlayer(player) {
     id: player.id,
     nickname: player.nickname,
     color: player.color,
+    paint: player.paint || "standart",
     x: Math.round(player.x),
     y: Math.round(player.y),
     h: Math.round((player.h || 0) * 10) / 10,
@@ -3422,6 +3585,10 @@ function joinYarisWorld(socket, message) {
   const account = accountBySessionId(sessionId);
   const nickname = safeText(message.nickname, 24) || account?.nickname || "misafir";
   const color = normalizeYarisColor(message.color);
+  // Boya: hesaplıysa sunucu otoritesi (profildeki seçim), misafirse istemci seçimi (whitelist)
+  const paint = account
+    ? yarisProfileOf(account).selectedPaint
+    : normalizeYarisPaintId(message.paint) || "standart";
   const mode = safeText(message.mode, 20);
 
   let worldId = "public";
@@ -3454,7 +3621,16 @@ function joinYarisWorld(socket, message) {
 
   let world = yarisSehriWorlds.get(worldId);
   if (!world) {
-    world = createYarisWorld(worldId, partyCode);
+    // Public dünya klasik harita; parti kurarken host mapId seçebilir.
+    let mapId = YARIS_DEFAULT_MAP_ID;
+    if (mode === "party-create" && message.mapId != null) {
+      mapId = normalizeYarisMapId(message.mapId);
+      if (!mapId) {
+        sendYaris(socket, { type: "yaris-error", code: "unknown-map", message: "Böyle bir harita yok." });
+        return;
+      }
+    }
+    world = createYarisWorld(worldId, partyCode, mapId);
     yarisSehriWorlds.set(worldId, world);
   }
   if (world.players.size >= YARIS_LIMITS.maxPlayers) {
@@ -3472,10 +3648,14 @@ function joinYarisWorld(socket, message) {
       existing.nickname = nickname;
       existing.color = color;
       existing.sessionId = sessionId;
+      existing.paint = paint;
       sendYaris(socket, {
         type: "joined",
         worldId,
         partyCode: world.partyCode,
+        mapSeed: world.mapSeed,
+        mapId: world.mapId,
+        weather: world.weather,
         selfId: existing.id,
         players: [...world.players.values()].map(publicYarisPlayer),
         race: publicYarisRace(world),
@@ -3495,6 +3675,7 @@ function joinYarisWorld(socket, message) {
     sessionId,
     nickname,
     color,
+    paint,
     accountId: account?.id || "",
     isBot: false,
     h: 0,
@@ -3514,6 +3695,9 @@ function joinYarisWorld(socket, message) {
     type: "joined",
     worldId,
     partyCode: world.partyCode,
+    mapSeed: world.mapSeed,
+    mapId: world.mapId,
+    weather: world.weather,
     selfId: player.id,
     players: [...world.players.values()].map(publicYarisPlayer),
     race: publicYarisRace(world),
@@ -3701,6 +3885,7 @@ function finishYarisRace(world) {
     const profile = account ? yarisProfileOf(account) : null;
     if (!profile) return;
     profile.gold += gold;
+    addYarisSeasonGold(account, gold);
     profile.rating = Math.max(0, profile.rating + ratingDelta);
     item.newGold = profile.gold;
     item.newRating = profile.rating;
@@ -3708,6 +3893,13 @@ function finishYarisRace(world) {
     if (player.socket) sendYaris(player.socket, { type: "profile", profile });
   });
   if (accountsChanged) writeJson("accounts.json", accounts).catch(() => {});
+  // Sezon skoru: yarisci sezonunda birinciye +1 (açık dünya + dereceli ortak)
+  const seasonWinner = race.results[0];
+  if (seasonWinner && !seasonWinner.bot && seasonWinner.timeMs > 0) {
+    const winnerPlayer = world.players.get(seasonWinner.id);
+    const winnerAccount = winnerPlayer?.accountId ? accountById(winnerPlayer.accountId) : null;
+    if (winnerAccount) addYarisSeasonScore(winnerAccount, "yarisci", 1);
+  }
   broadcastYarisWorld(world, { type: "race-finish", race: publicYarisRace(world) });
 }
 
@@ -3733,6 +3925,7 @@ function yarisTimeTrialFinish(socket, message) {
       record = true;
     }
     profile.gold += gold;
+    addYarisSeasonGold(account, gold);
     writeJson("accounts.json", accounts).catch(() => {});
     sendYaris(socket, { type: "profile", profile });
   }
@@ -3750,6 +3943,26 @@ function leaveYarisWorld(socket) {
   const world = yarisSehriWorlds.get(worldId);
   if (!world) return;
   world.players.delete(playerId);
+  // Kovalamaca odasından çıkış: lobide host devri + yayın; maçta takımdan düşürme.
+  if (world.isChase && world.chase) {
+    const chase = world.chase;
+    if (chase.hostId === playerId) {
+      const nextHuman = [...world.players.values()].find((p) => !p.isBot);
+      chase.hostId = nextHuman?.id || "";
+    }
+    if (chase.phase === "lobby") {
+      broadcastYarisChaseLobby(world);
+    } else {
+      chase.cops = chase.cops.filter((id) => id !== playerId);
+      chase.robbers = chase.robbers.filter((id) => id !== playerId);
+      delete chase.contact[playerId];
+      broadcastYarisWorld(world, { type: "chase-update", chase: publicYarisChase(world) });
+    }
+    if (![...world.players.values()].some((p) => !p.isBot)) {
+      yarisSehriWorlds.delete(worldId);
+    }
+    return;
+  }
   const race = world.race;
   let raceChanged = false;
   if (race.state === "lobby" && race.lobby.includes(playerId)) {
@@ -3786,11 +3999,39 @@ function leaveYarisWorld(socket) {
 
 function tickYarisWorlds() {
   const now = Date.now();
+  checkYarisSeasonRollover(now);
+  const seasonIsArabaci = yarisSeason.objective === "arabaci";
   for (const [worldId, world] of yarisSehriWorlds) {
     if (world.players.size === 0) {
       yarisSehriWorlds.delete(worldId);
       continue;
     }
+    // Arabacı Sezonu: hesaplı oyuncunun bağlı olduğu süre sezon skoruna saniye yazılır
+    if (seasonIsArabaci) {
+      for (const player of world.players.values()) {
+        if (!player.socket || player.isBot || !player.accountId) continue;
+        player.timeAccum = (player.timeAccum || 0) + 0.1;
+        if (player.timeAccum >= 10) {
+          const seconds = Math.floor(player.timeAccum);
+          player.timeAccum -= seconds;
+          const account = accountById(player.accountId);
+          if (account) addYarisSeasonScore(account, "arabaci", seconds);
+        }
+      }
+    }
+    // Kovalamaca dünyasında insan kalmadıysa (botlar tutuyor olabilir) kapat.
+    if (world.isChase && ![...world.players.values()].some((p) => p.socket)) {
+      yarisSehriWorlds.delete(worldId);
+      continue;
+    }
+
+    // Hava durumu rotasyonu (2-4 dk): clear %60 / rain %30 / storm %10
+    if (now >= world.weatherNextAt) {
+      const roll = Math.random();
+      world.weather = roll < 0.6 ? "clear" : roll < 0.9 ? "rain" : "storm";
+      world.weatherNextAt = now + 120000 + Math.random() * 120000;
+    }
+
     const race = world.race;
     if (race.state === "lobby" && now >= race.lobbyDeadline) {
       if (race.lobby.length >= YARIS_LIMITS.raceMinPlayers) {
@@ -3825,13 +4066,136 @@ function tickYarisWorlds() {
     }
 
     if (world.isRanked) updateYarisRankedBots(world, now);
+    if (world.isChase) updateYarisChase(world, now, worldId);
 
     broadcastYarisWorld(world, {
       type: "state",
       t: now,
+      weather: world.weather,
       players: [...world.players.values()].map(publicYarisPlayer),
     });
   }
+}
+
+// ---------------------------------------------------------------------------
+// Sezon sistemi: 7 günlük sezonlar, "en çok yarış kazanan" tablosu.
+// Sayılan galibiyetler: açık dünya + dereceli yarış birincilikleri VE
+// kovalamaca kazanan takım üyeliği (hesaplı oyuncular; misafirler sayılmaz).
+// ---------------------------------------------------------------------------
+
+const YARIS_SEASON_MS = 7 * 24 * 60 * 60 * 1000;
+const YARIS_SEASON_REWARDS = [300, 200, 100];
+
+function yarisSeasonObjective(season) {
+  return YARIS_SEASON_OBJECTIVES[(Math.max(1, season) - 1) % YARIS_SEASON_OBJECTIVES.length];
+}
+
+function normalizeYarisSeason(value) {
+  const now = Date.now();
+  if (!value || typeof value !== "object" || !Number.isFinite(Number(value.season))) {
+    // Not: YARIS_SEASON_MS const'ı dosyanın ilerisinde; burada sabit yazılır (TDZ).
+    return { season: 1, objective: "arabaci", startedAt: new Date(now).toISOString(), endsAt: now + 7 * 24 * 60 * 60 * 1000, scores: {}, pastSeasons: [] };
+  }
+  const season = Math.max(1, Math.floor(Number(value.season)));
+  const scores = {};
+  if (value.scores && typeof value.scores === "object") {
+    for (const [accountId, entry] of Object.entries(value.scores)) {
+      // Eski kayıtlar wins alanı taşır -> score'a taşınır
+      const score = clamp(Math.floor(Number(entry?.score ?? entry?.wins) || 0), 0, 100000000);
+      if (score <= 0) continue;
+      scores[safeText(accountId, 80)] = {
+        nickname: safeText(entry?.nickname, 24) || "oyuncu",
+        score,
+        updatedAt: Number(entry?.updatedAt) || 0,
+      };
+    }
+  }
+  return {
+    season,
+    objective: yarisSeasonObjective(season).id,
+    startedAt: safeText(value.startedAt, 40) || new Date(now).toISOString(),
+    endsAt: Number(value.endsAt) || now + 7 * 24 * 60 * 60 * 1000,
+    scores,
+    pastSeasons: Array.isArray(value.pastSeasons) ? value.pastSeasons.slice(0, 10) : [],
+  };
+}
+
+// Tema dışı olaylar skora girmez: objectiveId yalnızca aktif temaysa yazılır.
+function addYarisSeasonScore(account, objectiveId, amount) {
+  if (!account || yarisSeason.objective !== objectiveId) return;
+  const value = Math.floor(Number(amount) || 0);
+  if (value <= 0) return;
+  const entry = yarisSeason.scores[account.id] || { nickname: account.nickname, score: 0, updatedAt: 0 };
+  entry.nickname = account.nickname;
+  entry.score += value;
+  entry.updatedAt = Date.now();
+  yarisSeason.scores[account.id] = entry;
+  writeJson("yaris-season.json", yarisSeason).catch(() => {});
+}
+
+function addYarisSeasonGold(account, amount) {
+  if (amount > 0) addYarisSeasonScore(account, "altin", amount);
+}
+
+// Genel sezon skoru rate limit'i: dakikada 30, günde 200 bildirim (bellek içi).
+const seasonScoreRate = new Map(); // accountId -> { minuteStart, minuteCount, dayStart, dayCount }
+
+function checkSeasonScoreRateLimit(accountId) {
+  const now = Date.now();
+  let entry = seasonScoreRate.get(accountId);
+  if (!entry) {
+    entry = { minuteStart: now, minuteCount: 0, dayStart: now, dayCount: 0 };
+    seasonScoreRate.set(accountId, entry);
+  }
+  if (now - entry.minuteStart > 60000) {
+    entry.minuteStart = now;
+    entry.minuteCount = 0;
+  }
+  if (now - entry.dayStart > 86400000) {
+    entry.dayStart = now;
+    entry.dayCount = 0;
+  }
+  if (entry.minuteCount >= 30 || entry.dayCount >= 200) return false;
+  entry.minuteCount += 1;
+  entry.dayCount += 1;
+  return true;
+}
+
+function checkYarisSeasonRollover(now) {
+  if (now < yarisSeason.endsAt) return;
+  const ranked = Object.entries(yarisSeason.scores)
+    .map(([accountId, entry]) => ({ accountId, ...entry }))
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score || a.updatedAt - b.updatedAt);
+  const top3 = ranked.slice(0, 3);
+  top3.forEach((entry, index) => {
+    const account = accountById(entry.accountId);
+    if (!account) return;
+    const profile = yarisProfileOf(account);
+    profile.gold += YARIS_SEASON_REWARDS[index] || 0;
+    profile.seasonWins = [{ season: yarisSeason.season, rank: index + 1 }, ...profile.seasonWins].slice(0, 50);
+  });
+  if (top3.length > 0) writeJson("accounts.json", accounts).catch(() => {});
+  const nextSeason = yarisSeason.season + 1;
+  yarisSeason = {
+    season: nextSeason,
+    objective: yarisSeasonObjective(nextSeason).id,
+    startedAt: new Date(now).toISOString(),
+    endsAt: now + YARIS_SEASON_MS,
+    scores: {},
+    pastSeasons: [
+      {
+        season: yarisSeason.season,
+        objective: yarisSeason.objective,
+        game: yarisSeasonObjective(yarisSeason.season).game,
+        endedAt: new Date(now).toISOString(),
+        top3: top3.map((entry, index) => ({ nickname: entry.nickname, score: entry.score, rank: index + 1 })),
+      },
+      ...yarisSeason.pastSeasons,
+    ].slice(0, 10),
+  };
+  writeJson("yaris-season.json", yarisSeason).catch(() => {});
+  console.log(`[yaris-sehri] sezon ${yarisSeason.season - 1} (${yarisSeason.pastSeasons[0]?.objective}) bitti, sezon ${yarisSeason.season} (${yarisSeason.objective}) başladı`);
 }
 
 // ---------------------------------------------------------------------------
@@ -3852,11 +4216,60 @@ const YARIS_RACE_GOLD = [30, 20, 15];
 const YARIS_RACE_RATING = [15, 10, 5];
 const YARIS_RANKED_LIMITS = { matchMinPlayers: 2, matchMaxPlayers: 5, soloWaitMs: 20000, baseWindow: 75, windowPerSecond: 25 };
 
+// Public dünya "klasik" harita; parti/dereceli/kovalamaca host seçimi veya rastgele.
+// Üretim parametreleri istemciyle birebir aynı olmalı (oyunlar/yaris-sehri/game.js YARIS_MAPS).
+const YARIS_MAPS = [
+  { id: "klasik", name: "Klasik Şehir", desc: "Her şeyden biraz: merkez, parklar, liman.", seed: 20260815, params: {} },
+  { id: "liman", name: "Büyük Liman", desc: "Geniş su ve uzun iskeleler.", seed: 20260816, params: { waterStart: 5000, piers: 6 } },
+  { id: "gokdelen", name: "Gökdelenler", desc: "Yoğun ve çok yüksek şehir merkezi.", seed: 20260817, params: { downtownRadius: 2, downtownH: [180, 330] } },
+  { id: "park-sehri", name: "Park Şehri", desc: "Her köşede park ve gölet.", seed: 20260818, params: { parkChance: 0.5, pondChance: 0.6 } },
+  { id: "sanayi", name: "Sanayi Bölgesi", desc: "Depolar, vinçler, geniş alanlar.", seed: 20260819, params: { industrialWide: true, craneChance: 0.85 } },
+  { id: "cift-stadyum", name: "Çift Stadyum", desc: "İki dev stadyumlu şehir.", seed: 20260820, params: { extraStadium: true } },
+  { id: "goletler", name: "Göletler Diyarı", desc: "Her parkta büyük göletler.", seed: 20260821, params: { parkChance: 0.35, pondChance: 1, pondScale: 1.6 } },
+  { id: "dar-sokaklar", name: "Dar Sokaklar", desc: "İncecik sokaklar, ustalık ister.", seed: 20260822, params: { roadHalf: 35 } },
+  { id: "bulvarlar", name: "Bulvarlar", desc: "Ultra geniş düz yollar — hız için.", seed: 20260823, params: { roadHalf: 100 } },
+  { id: "gece", name: "Gece Şehri", desc: "Karanlık tema, sokak lambaları parlar.", seed: 20260824, params: { night: true } },
+];
+const YARIS_DEFAULT_MAP_ID = "klasik";
+const YARIS_PUBLIC_SEED = 20260815;
+
+function yarisMapDef(mapId) {
+  return YARIS_MAPS.find((map) => map.id === mapId) || null;
+}
+
+function normalizeYarisMapId(value) {
+  const mapId = safeText(value, 24);
+  return YARIS_MAPS.some((map) => map.id === mapId) ? mapId : "";
+}
+
+// Araba boyaları (buy-car deseniyle satılır; "standart" bedava = araba kendi rengi)
+const YARIS_PAINTS = [
+  { id: "standart", name: "Standart", price: 0, type: "solid", color: "" },
+  { id: "mat-siyah", name: "Mat Siyah", price: 60, type: "solid", color: "#15181d" },
+  { id: "kar-beyazi", name: "Kar Beyazı", price: 60, type: "solid", color: "#e8eef6" },
+  { id: "ates-kirmizi", name: "Ateş Kırmızısı", price: 90, type: "solid", color: "#ff2a2a" },
+  { id: "gece-mavisi", name: "Gece Mavisi", price: 90, type: "solid", color: "#1a3aff" },
+  { id: "neon-pembe", name: "Neon Pembe", price: 90, type: "solid", color: "#ff4fd8" },
+  { id: "zumrut", name: "Zümrüt", price: 120, type: "solid", color: "#00b377" },
+  { id: "kamuflaj", name: "Kamuflaj", price: 150, type: "camo", color: "#3a4a2a" },
+  { id: "altin", name: "Altın Kaplama", price: 250, type: "solid", color: "#ffd700" },
+  { id: "gokkusagi", name: "Gökkuşağı", price: 300, type: "rainbow", color: "#ff8fd6" },
+];
+
+function normalizeYarisPaintId(value) {
+  const paintId = safeText(value, 24);
+  return YARIS_PAINTS.some((paint) => paint.id === paintId) ? paintId : "";
+}
+
 function createYarisProfile() {
   return {
     gold: 0,
     cars: ["minik"],
     selectedCar: "minik",
+    paints: ["standart"],
+    selectedPaint: "standart",
+    chaseCups: 0,
+    seasonWins: [],
     rating: 100,
     tutorialDone: false,
     ttBestMs: 0,
@@ -3873,10 +4286,24 @@ function normalizeYarisProfile(value) {
     : [];
   if (!cars.includes("minik")) cars.unshift("minik");
   const selectedCar = safeText(value.selectedCar, 24);
+  const paints = Array.isArray(value.paints)
+    ? [...new Set(value.paints.map((id) => safeText(id, 24)).filter((id) => YARIS_PAINTS.some((paint) => paint.id === id)))]
+    : [];
+  if (!paints.includes("standart")) paints.unshift("standart");
+  const selectedPaint = safeText(value.selectedPaint, 24);
   return {
     gold: clamp(Math.floor(Number(value.gold) || 0), 0, 1_000_000),
     cars,
     selectedCar: cars.includes(selectedCar) ? selectedCar : "minik",
+    paints,
+    selectedPaint: paints.includes(selectedPaint) ? selectedPaint : "standart",
+    chaseCups: clamp(Math.floor(Number(value.chaseCups) || 0), 0, 100000),
+    seasonWins: Array.isArray(value.seasonWins)
+      ? value.seasonWins
+          .map((entry) => ({ season: Math.floor(Number(entry?.season) || 0), rank: Math.floor(Number(entry?.rank) || 0) }))
+          .filter((entry) => entry.season > 0 && entry.rank >= 1 && entry.rank <= 3)
+          .slice(0, 50)
+      : [],
     rating: clamp(Math.floor(Number(value.rating) || 100), 0, 100000),
     tutorialDone: Boolean(value.tutorialDone),
     ttBestMs: clamp(Math.floor(Number(value.ttBestMs) || 0), 0, YARIS_LIMITS.ttMaxMs),
@@ -3923,6 +4350,7 @@ function joinYarisRankedQueue(socket, message) {
     sessionId,
     nickname,
     color: normalizeYarisColor(message.color),
+    paint: profile?.selectedPaint || normalizeYarisPaintId(message.paint) || "standart",
     rating: profile?.rating ?? 100,
     accountId: account?.id || "",
     queuedAt: Date.now(),
@@ -3977,7 +4405,8 @@ const YARIS_BOT_NAMES = ["Bot Efe", "Bot Zeynep", "Bot Can", "Bot Mert", "Bot Ad
 function startYarisRankedMatch(entries) {
   yarisRankedCounter += 1;
   const worldId = `ranked-${yarisRankedCounter}`;
-  const world = createYarisWorld(worldId, "");
+  const rankedMap = YARIS_MAPS[Math.floor(Math.random() * YARIS_MAPS.length)];
+  const world = createYarisWorld(worldId, "", rankedMap.id);
   world.isRanked = true;
   yarisSehriWorlds.set(worldId, world);
 
@@ -3987,6 +4416,7 @@ function startYarisRankedMatch(entries) {
       sessionId: entry.sessionId,
       nickname: entry.nickname,
       color: entry.color,
+      paint: entry.paint || "standart",
       accountId: entry.accountId,
       isBot: false,
       x: 0,
@@ -4048,6 +4478,9 @@ function startYarisRankedMatch(entries) {
       worldId,
       partyCode: "",
       ranked: true,
+      mapSeed: world.mapSeed,
+      mapId: world.mapId,
+      weather: world.weather,
       selfId: entry.playerId,
       players: [...world.players.values()].map(publicYarisPlayer),
       race: publicYarisRace(world),
@@ -4119,4 +4552,454 @@ function updateYarisRankedBots(world, now) {
     }
   }
   if (allFinished && race.progress.size > 0) finishYarisRace(world);
+}
+
+// ---------------------------------------------------------------------------
+// Polis Kovalamaca: parti kodlu oda, Polisler vs Kaçaklar (bot dolgulu)
+// ---------------------------------------------------------------------------
+
+const YARIS_CHASE_LIMITS = {
+  teamSizes: [2, 3, 4, 5],
+  headstartMs: 10000, // kaçak avansı
+  durationMs: 180000, // 3 dk
+  catchDist: 40,
+  catchMs: 2000, // temas mesafesinde kalma süresi
+  resultsMs: 15000,
+  winGold: 25,
+  loseGold: 10,
+  catchGold: 5,
+  botSpeedCop: 345,
+  botSpeedRobber: 330,
+};
+
+function createYarisChase() {
+  return {
+    hostId: "",
+    teamSize: 2,
+    phase: "lobby", // lobby | headstart | running | ended
+    cops: [],
+    robbers: [],
+    caught: [], // yakalanan kaçak id'leri
+    catches: {}, // copId -> yakalama sayısı
+    winner: "", // cops | robbers
+    headstartEndsAt: 0,
+    endsAt: 0,
+    resultsEndAt: 0,
+    contact: {}, // robberId -> temas süresi (ms)
+  };
+}
+
+function publicYarisChase(world) {
+  const chase = world.chase;
+  const describe = (id) => {
+    const player = world.players.get(id);
+    return player
+      ? { id, nickname: player.nickname, color: player.color, paint: player.paint || "standart", bot: Boolean(player.isBot) }
+      : null;
+  };
+  return {
+    hostId: chase.hostId,
+    teamSize: chase.teamSize,
+    mapId: world.mapId,
+    phase: chase.phase,
+    cops: chase.cops.map(describe).filter(Boolean),
+    robbers: chase.robbers.map(describe).filter(Boolean),
+    caught: chase.caught,
+    catches: chase.catches,
+    winner: chase.winner,
+    headstartEndsAt: chase.headstartEndsAt,
+    endsAt: chase.endsAt,
+    players: [...world.players.values()]
+      .filter((p) => !p.isBot)
+      .map((p) => ({ id: p.id, nickname: p.nickname, color: p.color, paint: p.paint || "standart" })),
+  };
+}
+
+function broadcastYarisChaseLobby(world) {
+  broadcastYarisWorld(world, { type: "chase-lobby", chase: publicYarisChase(world) });
+}
+
+function joinYarisChase(socket, message, create) {
+  const sessionId = safeText(message.sessionId, 120);
+  if (!sessionId) {
+    sendYaris(socket, { type: "yaris-error", code: "invalid-join", message: "Oturum bilgisi eksik." });
+    return;
+  }
+  const account = accountBySessionId(sessionId);
+  const nickname = safeText(message.nickname, 24) || account?.nickname || "misafir";
+  const color = normalizeYarisColor(message.color);
+  const paint = account
+    ? yarisProfileOf(account).selectedPaint
+    : normalizeYarisPaintId(message.paint) || "standart";
+
+  let world;
+  if (create) {
+    let code = "";
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const candidate = String(Math.floor(100000 + Math.random() * 900000));
+      if (!yarisSehriWorlds.has(`chase-${candidate}`)) {
+        code = candidate;
+        break;
+      }
+    }
+    if (!code) {
+      sendYaris(socket, { type: "yaris-error", code: "chase-create-failed", message: "Oda kurulamadı, tekrar dene." });
+      return;
+    }
+    let chaseMapId = YARIS_DEFAULT_MAP_ID;
+    if (message.mapId != null) {
+      chaseMapId = normalizeYarisMapId(message.mapId);
+      if (!chaseMapId) {
+        sendYaris(socket, { type: "yaris-error", code: "unknown-map", message: "Böyle bir harita yok." });
+        return;
+      }
+    }
+    world = createYarisWorld(`chase-${code}`, code, chaseMapId);
+    world.isChase = true;
+    world.chase = createYarisChase();
+    yarisSehriWorlds.set(world.id, world);
+  } else {
+    const code = safeText(message.code, 8).replace(/\D/g, "").slice(0, 6);
+    if (code.length !== 6) {
+      sendYaris(socket, { type: "yaris-error", code: "invalid-chase-code", message: "Oda kodu 6 haneli olmalı." });
+      return;
+    }
+    world = yarisSehriWorlds.get(`chase-${code}`);
+    if (!world || !world.isChase) {
+      sendYaris(socket, { type: "yaris-error", code: "chase-not-found", message: "Bu kodla bir kovalamaca odası bulunamadı." });
+      return;
+    }
+    if (world.chase.phase !== "lobby") {
+      sendYaris(socket, { type: "yaris-error", code: "chase-in-progress", message: "Maç çoktan başladı." });
+      return;
+    }
+    const humans = [...world.players.values()].filter((p) => !p.isBot).length;
+    if (humans >= 10) {
+      sendYaris(socket, { type: "yaris-error", code: "chase-full", message: "Oda dolu (en fazla 10 oyuncu)." });
+      return;
+    }
+  }
+
+  if (socket.yarisWorldId) leaveYarisWorld(socket);
+
+  yarisPlayerCounter += 1;
+  const player = {
+    id: `yp${yarisPlayerCounter}`,
+    sessionId,
+    nickname,
+    color,
+    paint,
+    accountId: account?.id || "",
+    isBot: false,
+    h: 0,
+    x: 3000 + (Math.random() * 120 - 60),
+    y: 3000 + (Math.random() * 120 - 60),
+    angle: 0,
+    speed: 0,
+    socket,
+    joinedAt: Date.now(),
+  };
+  world.players.set(player.id, player);
+  socket.yarisPlayerId = player.id;
+  socket.yarisWorldId = world.id;
+  socket.yarisLastPosAt = 0;
+  if (!world.chase.hostId) world.chase.hostId = player.id;
+
+  sendYaris(socket, {
+    type: "joined",
+    worldId: world.id,
+    partyCode: world.partyCode,
+    chase: true,
+    mapSeed: world.mapSeed,
+    mapId: world.mapId,
+    weather: world.weather,
+    selfId: player.id,
+    players: [...world.players.values()].map(publicYarisPlayer),
+    race: publicYarisRace(world),
+    ttScores: [],
+    routes: { race: YARIS_RACE_ROUTE, tt: YARIS_TT_ROUTE },
+    zones: YARIS_ZONES,
+    limits: { maxPlayers: YARIS_LIMITS.maxPlayers, raceMinPlayers: YARIS_LIMITS.raceMinPlayers, raceMaxPlayers: YARIS_LIMITS.raceMaxPlayers },
+    profile: account ? yarisProfileOf(account) : null,
+  });
+  broadcastYarisChaseLobby(world);
+}
+
+function setYarisChaseTeamSize(socket, message) {
+  const { world, player } = yarisPlayerOf(socket);
+  if (!world?.isChase || !player) return;
+  const chase = world.chase;
+  if (chase.phase !== "lobby" || chase.hostId !== player.id) return;
+  const size = Number(message.size);
+  if (!YARIS_CHASE_LIMITS.teamSizes.includes(size)) return;
+  chase.teamSize = size;
+  broadcastYarisChaseLobby(world);
+}
+
+function setYarisChaseMap(socket, message) {
+  const { world, player } = yarisPlayerOf(socket);
+  if (!world?.isChase || !player) return;
+  const chase = world.chase;
+  if (chase.phase !== "lobby" || chase.hostId !== player.id) return;
+  const mapId = normalizeYarisMapId(message.mapId);
+  if (!mapId) return;
+  const def = yarisMapDef(mapId);
+  world.mapId = def.id;
+  world.mapSeed = def.seed;
+  broadcastYarisChaseLobby(world);
+}
+
+function startYarisChaseBySocket(socket) {
+  const { world, player } = yarisPlayerOf(socket);
+  if (!world?.isChase || !player) return;
+  const chase = world.chase;
+  if (chase.phase !== "lobby" || chase.hostId !== player.id) return;
+  const humans = [...world.players.values()].filter((p) => !p.isBot);
+  if (humans.length < 2) {
+    sendYaris(socket, { type: "yaris-error", code: "chase-not-enough", message: "Başlatmak için en az 2 oyuncu gerekli." });
+    return;
+  }
+
+  // Takımlar: karıştır, sırayla polis/kaçak dağıt; botlarla teamSize'a tamamla.
+  const shuffled = [...humans].sort(() => Math.random() - 0.5);
+  chase.cops = [];
+  chase.robbers = [];
+  shuffled.forEach((p, index) => {
+    (index % 2 === 0 ? chase.cops : chase.robbers).push(p.id);
+  });
+  const botNames = ["Bot Polis Rıza", "Bot Polis Alev", "Bot Kaçak Tilki", "Bot Kaçak Gölge", "Bot Polis Şimşek", "Bot Kaçak Rüzgar"];
+  let botIndex = 0;
+  const addBot = (team) => {
+    yarisPlayerCounter += 1;
+    const botId = `yp${yarisPlayerCounter}`;
+    world.players.set(botId, {
+      id: botId,
+      sessionId: "",
+      nickname: botNames[botIndex++ % botNames.length],
+      color: team === "cops" ? "#4ea3ff" : "#ff9f43",
+      paint: "standart",
+      accountId: "",
+      isBot: true,
+      h: 0,
+      x: 3000,
+      y: 3000,
+      angle: Math.random() * Math.PI * 2,
+      speed: 0,
+      socket: null,
+      joinedAt: Date.now(),
+    });
+    (team === "cops" ? chase.cops : chase.robbers).push(botId);
+  };
+  while (chase.cops.length < chase.teamSize) addBot("cops");
+  while (chase.robbers.length < chase.teamSize) addBot("robbers");
+  // Eşitlik için: takımlar tam teamSize olur (insan fazlaysa bot eklenmez)
+
+  chase.caught = [];
+  chase.catches = {};
+  chase.contact = {};
+  chase.winner = "";
+  const now = Date.now();
+  chase.phase = "headstart";
+  chase.headstartEndsAt = now + YARIS_CHASE_LIMITS.headstartMs;
+  chase.endsAt = chase.headstartEndsAt + YARIS_CHASE_LIMITS.durationMs;
+
+  // Doğuş: kaçaklar merkezde, polisler yarış başlangıcında (kuzeybatı)
+  chase.robbers.forEach((id, i) => {
+    const p = world.players.get(id);
+    if (!p) return;
+    p.x = 3000 + (i % 3) * 80 - 80;
+    p.y = 3000 + Math.floor(i / 3) * 80 - 40;
+    p.angle = Math.PI / 2;
+  });
+  chase.cops.forEach((id, i) => {
+    const p = world.players.get(id);
+    if (!p) return;
+    p.x = 600 + (i % 3) * 70 - 70;
+    p.y = 600 + Math.floor(i / 3) * 70;
+    p.angle = Math.PI / 2;
+  });
+
+  broadcastYarisWorld(world, { type: "chase-start", chase: publicYarisChase(world) });
+}
+
+function updateYarisChase(world, now, worldId) {
+  const chase = world.chase;
+  if (!chase) return;
+
+  if (chase.phase === "headstart" && now >= chase.headstartEndsAt) {
+    chase.phase = "running";
+    broadcastYarisWorld(world, { type: "chase-update", chase: publicYarisChase(world) });
+  }
+
+  if (chase.phase === "running") {
+    updateYarisChaseBots(world);
+    updateYarisChaseCatches(world, now);
+    const freeRobbers = chase.robbers.filter((id) => !chase.caught.includes(id) && world.players.has(id));
+    if (freeRobbers.length === 0) {
+      finishYarisChase(world, "cops");
+    } else if (now >= chase.endsAt) {
+      finishYarisChase(world, "robbers");
+    }
+  }
+
+  if (chase.phase === "ended" && now >= chase.resultsEndAt) {
+    broadcastYarisWorld(world, { type: "chase-closed" });
+    for (const player of world.players.values()) {
+      if (player.socket) {
+        player.socket.yarisWorldId = "";
+        player.socket.yarisPlayerId = "";
+      }
+    }
+    yarisSehriWorlds.delete(worldId);
+  }
+}
+
+function updateYarisChaseBots(world) {
+  const chase = world.chase;
+  const dt = 0.1; // 100ms tick
+  for (const player of world.players.values()) {
+    if (!player.isBot) continue;
+    const isCop = chase.cops.includes(player.id);
+    const isRobber = chase.robbers.includes(player.id);
+    if (!isCop && !isRobber) continue;
+    if (isRobber && chase.caught.includes(player.id)) {
+      player.speed = 0;
+      continue;
+    }
+
+    let wantAngle = player.angle;
+    if (isCop) {
+      // En yakın serbest kaçağı kovala
+      let best = null;
+      let bestDist = Infinity;
+      for (const robberId of chase.robbers) {
+        if (chase.caught.includes(robberId)) continue;
+        const robber = world.players.get(robberId);
+        if (!robber) continue;
+        const d = Math.hypot(robber.x - player.x, robber.y - player.y);
+        if (d < bestDist) {
+          bestDist = d;
+          best = robber;
+        }
+      }
+      if (best) wantAngle = Math.atan2(best.y - player.y, best.x - player.x);
+    } else {
+      // En yakın polisten kaç + hafif sapma
+      let threat = null;
+      let threatDist = Infinity;
+      for (const copId of chase.cops) {
+        const cop = world.players.get(copId);
+        if (!cop) continue;
+        const d = Math.hypot(cop.x - player.x, cop.y - player.y);
+        if (d < threatDist) {
+          threatDist = d;
+          threat = cop;
+        }
+      }
+      if (threat) {
+        wantAngle = Math.atan2(player.y - threat.y, player.x - threat.x) + Math.sin(nowish() / 900 + player.joinedAt) * 0.5;
+      }
+    }
+    let diff = wantAngle - player.angle;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    player.angle += clamp(diff, -2.4 * dt, 2.4 * dt);
+    const top = isCop ? YARIS_CHASE_LIMITS.botSpeedCop : YARIS_CHASE_LIMITS.botSpeedRobber;
+    player.speed += (top - player.speed) * 0.6 * dt;
+    player.x = clamp(player.x + Math.cos(player.angle) * player.speed * dt, 60, YARIS_LIMITS.mapSize - 60);
+    player.y = clamp(player.y + Math.sin(player.angle) * player.speed * dt, 60, YARIS_LIMITS.mapSize - 60);
+  }
+}
+
+function nowish() {
+  return Date.now();
+}
+
+function updateYarisChaseCatches(world, now) {
+  const chase = world.chase;
+  const dtMs = 100;
+  for (const robberId of chase.robbers) {
+    if (chase.caught.includes(robberId)) continue;
+    const robber = world.players.get(robberId);
+    if (!robber) continue;
+    let nearestCop = null;
+    let nearestDist = Infinity;
+    for (const copId of chase.cops) {
+      const cop = world.players.get(copId);
+      if (!cop) continue;
+      const d = Math.hypot(cop.x - robber.x, cop.y - robber.y);
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearestCop = cop;
+      }
+    }
+    if (nearestCop && nearestDist <= YARIS_CHASE_LIMITS.catchDist) {
+      chase.contact[robberId] = (chase.contact[robberId] || 0) + dtMs;
+      if (chase.contact[robberId] >= YARIS_CHASE_LIMITS.catchMs) {
+        chase.caught.push(robberId);
+        chase.catches[nearestCop.id] = (chase.catches[nearestCop.id] || 0) + 1;
+        robber.speed = 0;
+        broadcastYarisWorld(world, { type: "chase-update", chase: publicYarisChase(world) });
+      }
+    } else {
+      chase.contact[robberId] = 0;
+    }
+  }
+}
+
+function finishYarisChase(world, winner) {
+  const chase = world.chase;
+  if (chase.phase === "ended") return;
+  chase.phase = "ended";
+  chase.winner = winner;
+  chase.resultsEndAt = Date.now() + YARIS_CHASE_LIMITS.resultsMs;
+
+  // Ödüller sunucuda: kazanan 25 + kupa, kaybeden 10, yakalama başına polise +5.
+  const results = [];
+  let accountsChanged = false;
+  for (const [team, ids] of [
+    ["cops", chase.cops],
+    ["robbers", chase.robbers],
+  ]) {
+    const won = winner === team;
+    for (const id of ids) {
+      const player = world.players.get(id);
+      if (!player) continue;
+      const catches = chase.catches[id] || 0;
+      const gold = player.isBot ? 0 : (won ? YARIS_CHASE_LIMITS.winGold : YARIS_CHASE_LIMITS.loseGold) + catches * YARIS_CHASE_LIMITS.catchGold;
+      const row = {
+        id,
+        nickname: player.nickname,
+        color: player.color,
+        team,
+        won,
+        bot: Boolean(player.isBot),
+        catches,
+        goldEarned: gold,
+        cupEarned: won && !player.isBot ? 1 : 0,
+      };
+      const account = player.accountId ? accountById(player.accountId) : null;
+      const profile = account ? yarisProfileOf(account) : null;
+      if (profile) {
+        profile.gold += gold;
+        addYarisSeasonGold(account, gold);
+        if (won) {
+          profile.chaseCups += 1;
+          addYarisSeasonScore(account, "polis", 1); // polis sezonunda galibiyet sayılır
+        }
+        row.newGold = profile.gold;
+        row.newCups = profile.chaseCups;
+        accountsChanged = true;
+        if (player.socket) sendYaris(player.socket, { type: "profile", profile });
+      }
+      results.push(row);
+    }
+  }
+  if (accountsChanged) writeJson("accounts.json", accounts).catch(() => {});
+  broadcastYarisWorld(world, {
+    type: "chase-end",
+    winner,
+    results,
+    chase: publicYarisChase(world),
+  });
 }

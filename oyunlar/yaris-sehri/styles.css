@@ -228,6 +228,71 @@ body {
   border-color: rgba(140, 220, 255, 0.5);
 }
 
+.teamsize-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.teamsize-row button.active {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.chase-players {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.chase-players li {
+  background: rgba(53, 210, 255, 0.08);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.paint-swatch {
+  width: 100%;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.map-select-label {
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+.map-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.map-grid button {
+  padding: 8px;
+  font-size: 0.8rem;
+  display: grid;
+  gap: 2px;
+}
+
+.map-grid button.active {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.map-grid button small {
+  font-weight: 400;
+  opacity: 0.75;
+  font-size: 0.68rem;
+}
+
 .countdown {
   position: fixed;
   inset: 0;

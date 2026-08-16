@@ -29,6 +29,43 @@ const CARS = [
 ];
 
 // Yerel kopya rotalar (sunucu joined'da gönderir; çevrimdışı modda bunlar kullanılır)
+// 10 seçilebilir harita (server.mjs YARIS_MAPS ile aynı — doğrulama sunucuda)
+const YARIS_MAPS = [
+  { id: "klasik", name: "Klasik Şehir", desc: "Her şeyden biraz: merkez, parklar, liman.", seed: 20260815, params: {} },
+  { id: "liman", name: "Büyük Liman", desc: "Geniş su ve uzun iskeleler.", seed: 20260816, params: { waterStart: 5000, piers: 6 } },
+  { id: "gokdelen", name: "Gökdelenler", desc: "Yoğun ve çok yüksek şehir merkezi.", seed: 20260817, params: { downtownRadius: 2, downtownH: [180, 330] } },
+  { id: "park-sehri", name: "Park Şehri", desc: "Her köşede park ve gölet.", seed: 20260818, params: { parkChance: 0.5, pondChance: 0.6 } },
+  { id: "sanayi", name: "Sanayi Bölgesi", desc: "Depolar, vinçler, geniş alanlar.", seed: 20260819, params: { industrialWide: true, craneChance: 0.85 } },
+  { id: "cift-stadyum", name: "Çift Stadyum", desc: "İki dev stadyumlu şehir.", seed: 20260820, params: { extraStadium: true } },
+  { id: "goletler", name: "Göletler Diyarı", desc: "Her parkta büyük göletler.", seed: 20260821, params: { parkChance: 0.35, pondChance: 1, pondScale: 1.6 } },
+  { id: "dar-sokaklar", name: "Dar Sokaklar", desc: "İncecik sokaklar, ustalık ister.", seed: 20260822, params: { roadHalf: 35 } },
+  { id: "bulvarlar", name: "Bulvarlar", desc: "Ultra geniş düz yollar — hız için.", seed: 20260823, params: { roadHalf: 100 } },
+  { id: "gece", name: "Gece Şehri", desc: "Karanlık tema, sokak lambaları parlar.", seed: 20260824, params: { night: true } },
+];
+const DEFAULT_MAP_ID = "klasik";
+
+function mapDefOf(mapId) {
+  return YARIS_MAPS.find((map) => map.id === mapId) || YARIS_MAPS[0];
+}
+
+// Boya kataloğu (server.mjs'deki YARIS_PAINTS ile aynı — fiyat doğrulaması sunucuda)
+const PAINTS = [
+  { id: "standart", name: "Standart", price: 0, type: "solid", color: "" },
+  { id: "mat-siyah", name: "Mat Siyah", price: 60, type: "solid", color: "#15181d" },
+  { id: "kar-beyazi", name: "Kar Beyazı", price: 60, type: "solid", color: "#e8eef6" },
+  { id: "ates-kirmizi", name: "Ateş Kırmızısı", price: 90, type: "solid", color: "#ff2a2a" },
+  { id: "gece-mavisi", name: "Gece Mavisi", price: 90, type: "solid", color: "#1a3aff" },
+  { id: "neon-pembe", name: "Neon Pembe", price: 90, type: "solid", color: "#ff4fd8" },
+  { id: "zumrut", name: "Zümrüt", price: 120, type: "solid", color: "#00b377" },
+  { id: "kamuflaj", name: "Kamuflaj", price: 150, type: "camo", color: "#3a4a2a" },
+  { id: "altin", name: "Altın Kaplama", price: 250, type: "solid", color: "#ffd700" },
+  { id: "gokkusagi", name: "Gökkuşağı", price: 300, type: "rainbow", color: "#ff8fd6" },
+];
+
+function paintOf(paintId) {
+  return PAINTS.find((item) => item.id === paintId) || PAINTS[0];
+}
+
 const LOCAL_RACE_ROUTE = [
   { x: 600, z: 600 },
   { x: 3000, z: 600 },
@@ -116,29 +153,37 @@ function rectsOverlap(a, b, pad = 0) {
 
 // Şehir bölgeleri: merkez (yüksek renkli), konut (alçak), endüstriyel (depo+vinç),
 // park/gölet, meydan (saat kulesi), stadyum, liman (doğu kenarı su + iskele).
-function districtOf(bi, bj) {
+// Harita parametreleri (params) bölge ağırlıklarını değiştirir.
+function districtOf(bi, bj, params = {}) {
   if (bi === 4 && bj === 4) return "plaza";
   if (bi === 2 && bj === 6) return "stadium";
-  if (bi >= 6 && bj <= 2) return "industrial";
+  if (params.extraStadium && bi === 6 && bj === 6) return "stadium";
+  if (params.industrialWide ? bi >= 4 && bj <= 3 : bi >= 6 && bj <= 2) return "industrial";
   const dist = Math.max(Math.abs(bi - 4), Math.abs(bj - 4));
-  if (dist <= 1) return "downtown";
+  if (dist <= (params.downtownRadius ?? 1)) return "downtown";
   return "residential";
 }
 
-function buildCityData() {
-  const rng = mulberry32(20260815);
+function buildCityData(seed = 20260815, params = {}) {
+  const rng = mulberry32(seed);
+  const roadHalf = params.roadHalf ?? ROAD_HALF;
+  const parkChance = params.parkChance ?? 0.3;
+  const pondChance = params.pondChance ?? 0.4;
+  const pondScale = params.pondScale ?? 1;
+  const craneChance = params.craneChance ?? 0.5;
+  const downtownH = params.downtownH ?? [130, 270];
   const buildings = [];
   const parks = [];
   const cranes = [];
   const landmarks = [];
-  const blockSize = ROAD_STEP - ROAD_HALF * 2 - 30; // 450
+  const blockSize = ROAD_STEP - roadHalf * 2 - 30;
   for (let bi = 0; bi < 9; bi += 1) {
     for (let bj = 0; bj < 9; bj += 1) {
-      const x0 = bi * ROAD_STEP + ROAD_HALF + 15;
-      const z0 = bj * ROAD_STEP + ROAD_HALF + 15;
+      const x0 = bi * ROAD_STEP + roadHalf + 15;
+      const z0 = bj * ROAD_STEP + roadHalf + 15;
       const block = { x: x0, z: z0, w: blockSize, h: blockSize };
       if (rectsOverlap(block, LOCAL_ZONES.race, 60) || rectsOverlap(block, LOCAL_ZONES.tt, 60)) continue;
-      const district = districtOf(bi, bj);
+      const district = districtOf(bi, bj, params);
 
       if (district === "plaza") {
         // Saat kulesi meydanı: açık alan + simge kule
@@ -150,7 +195,7 @@ function buildCityData() {
         landmarks.push({ kind: "stadium", x: x0 + blockSize / 2, z: z0 + blockSize / 2 });
         continue;
       }
-      if (district === "residential" && rng() < 0.3) {
+      if (district === "residential" && rng() < parkChance) {
         // Park (bazısında gölet)
         const trees = [];
         const treeCount = 8 + Math.floor(rng() * 7);
@@ -162,8 +207,8 @@ function buildCityData() {
           });
         }
         const park = { x: x0, z: z0, w: blockSize, h: blockSize, trees };
-        if (rng() < 0.4) {
-          park.pond = { x: x0 + blockSize / 2, z: z0 + blockSize / 2, r: 60 + rng() * 40 };
+        if (rng() < pondChance) {
+          park.pond = { x: x0 + blockSize / 2, z: z0 + blockSize / 2, r: (60 + rng() * 40) * pondScale };
         }
         parks.push(park);
         continue;
@@ -182,7 +227,7 @@ function buildCityData() {
               x: bx, z: bz,
               w: cell - 60 - rng() * 30,
               h: cell - 60 - rng() * 30,
-              height: 130 + rng() * 140,
+              height: downtownH[0] + rng() * (downtownH[1] - downtownH[0]),
               hue: 0.52 + rng() * 0.35,
               sat: 0.45 + rng() * 0.3,
               light: 0.3 + rng() * 0.2,
@@ -212,22 +257,28 @@ function buildCityData() {
           }
         }
       }
-      if (district === "industrial" && rng() < 0.5) {
+      if (district === "industrial" && rng() < craneChance) {
         cranes.push({ x: x0 + 60 + rng() * (blockSize - 120), z: z0 + 60 + rng() * (blockSize - 120) });
       }
     }
   }
-  return { buildings, parks, cranes, landmarks };
+  return { buildings, parks, cranes, landmarks, params };
 }
 
-const cityData = buildCityData();
+const cityDataCache = new Map();
+
+function cityDataFor(mapId) {
+  const def = mapDefOf(mapId);
+  if (!cityDataCache.has(def.id)) cityDataCache.set(def.id, buildCityData(def.seed, def.params));
+  return cityDataCache.get(def.id);
+}
 
 // ---------------------------------------------------------------------------
 // Durum
 // ---------------------------------------------------------------------------
 
 function defaultProfile() {
-  return { gold: 0, cars: ["minik"], selectedCar: "minik", rating: 100, tutorialDone: false, ttBestMs: 0, stuntBest: 0, iceBest: 0 };
+  return { gold: 0, cars: ["minik"], selectedCar: "minik", paints: ["standart"], selectedPaint: "standart", chaseCups: 0, seasonWins: [], rating: 100, tutorialDone: false, ttBestMs: 0, stuntBest: 0, iceBest: 0 };
 }
 
 const state = {
@@ -256,6 +307,10 @@ const state = {
   pointerLocked: false,
   camYawOffset: 0,
   camYawTarget: 0,
+  mapSeed: 20260815,
+  mapId: "klasik",
+  weather: "clear",
+  weatherNextAtLocal: 0,
 };
 
 const car = {
@@ -296,6 +351,22 @@ const tt = {
 const stunt = { score: 0, lastFlush: 0 };
 const tutorial = { step: 0, done: false };
 const ice = { tiles: [], broken: 0, deaths: 0, survivedMs: 0, lastTick: 0, lastFlush: 0, fallingTiles: [] };
+const chase = {
+  code: "",
+  hostId: "",
+  teamSize: 2,
+  phase: "",
+  myTeam: "",
+  cops: [],
+  robbers: [],
+  caught: [],
+  catches: {},
+  endsAt: 0,
+  headstartEndsAt: 0,
+  winner: "",
+  results: [],
+  rewardApplied: false,
+};
 const input = { gas: false, brake: false, left: false, right: false };
 
 let socket = null;
@@ -363,6 +434,7 @@ function showScreen(name) {
   } else {
     touchControls.hidden = true;
     chatPanel.hidden = true;
+    document.querySelector("#chaseScreen").hidden = true;
   }
 }
 
@@ -403,15 +475,20 @@ function onRoad(x, z) {
   if (state.map !== "city") return true;
   const mx = ((x % ROAD_STEP) + ROAD_STEP) % ROAD_STEP;
   const mz = ((z % ROAD_STEP) + ROAD_STEP) % ROAD_STEP;
-  const near = (m) => m <= ROAD_HALF + 8 || m >= ROAD_STEP - ROAD_HALF - 8;
+  const near = (m) => {
+    const rh = active?.cityData?.params?.roadHalf ?? ROAD_HALF;
+    return m <= rh + 8 || m >= ROAD_STEP - rh - 8;
+  };
   if (near(mx) || near(mz)) return true;
   return inZone(x, z, state.zones.race, 40) || inZone(x, z, state.zones.tt, 40);
 }
 
 function hitBuilding(nx, nz) {
   if (state.map !== "city" || car.h > 4) return null; // havada bina çarpışması yok
+  const data = active?.cityData;
+  if (!data) return null;
   const r = 5;
-  for (const b of cityData.buildings) {
+  for (const b of data.buildings) {
     if (nx > b.x - r && nx < b.x + b.w + r && nz > b.z - r && nz < b.z + b.h + r) {
       return b;
     }
@@ -467,10 +544,18 @@ function normalizeProfile(value) {
   if (!value || typeof value !== "object") return base;
   const cars = Array.isArray(value.cars) ? value.cars.filter((id) => CARS.some((c) => c.id === id)) : [];
   if (!cars.includes("minik")) cars.unshift("minik");
+  const paints = Array.isArray(value.paints) ? value.paints.filter((id) => PAINTS.some((p) => p.id === id)) : [];
+  if (!paints.includes("standart")) paints.unshift("standart");
   return {
     gold: clamp(Math.floor(Number(value.gold) || 0), 0, 1000000),
     cars: [...new Set(cars)],
     selectedCar: cars.includes(value.selectedCar) ? value.selectedCar : "minik",
+    paints: [...new Set(paints)],
+    selectedPaint: paints.includes(value.selectedPaint) ? value.selectedPaint : "standart",
+    chaseCups: Math.floor(Number(value.chaseCups) || 0),
+    seasonWins: Array.isArray(value.seasonWins)
+      ? value.seasonWins.filter((w) => w && w.season > 0 && w.rank >= 1 && w.rank <= 3).slice(0, 50)
+      : [],
     rating: clamp(Math.floor(Number(value.rating) || 100), 0, 100000),
     tutorialDone: Boolean(value.tutorialDone),
     ttBestMs: Math.floor(Number(value.ttBestMs) || 0),
@@ -482,9 +567,10 @@ function normalizeProfile(value) {
 function applyProfile(profile) {
   if (!profile) return;
   const previousCar = state.profile.selectedCar;
+  const previousPaint = state.profile.selectedPaint;
   state.profile = normalizeProfile(profile);
   refreshGoldDisplays();
-  if (state.profile.selectedCar !== previousCar) rebuildSelfCar();
+  if (state.profile.selectedCar !== previousCar || state.profile.selectedPaint !== previousPaint) rebuildSelfCar();
 }
 
 function refreshGoldDisplays() {
@@ -493,6 +579,7 @@ function refreshGoldDisplays() {
   document.querySelector("#galleryGold").textContent = `🪙 ${state.profile.gold}`;
   document.querySelector("#modeRating").textContent = `Puan: ${state.profile.rating}`;
   document.querySelector("#modeCar").textContent = `Araba: ${carStats().name}`;
+  document.querySelector("#modeSeasonWins").textContent = seasonWinsText() || "Sezon kupası yok";
 }
 
 function loadGuestProfile() {
@@ -570,8 +657,10 @@ function makeBaseScene() {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(SKY_COLOR);
   scene.fog = new THREE.Fog(SKY_COLOR, FOG_NEAR, FOG_FAR);
+  scene.userData.baseSky = SKY_COLOR;
   const hemi = new THREE.HemisphereLight(0xb8d4ff, 0x2a3018, 1.15);
   scene.add(hemi);
+  scene.userData.hemi = hemi;
   const sun = new THREE.DirectionalLight(0xfff2cc, 1.1);
   sun.position.set(0.4, 1, 0.25);
   scene.add(sun);
@@ -584,12 +673,111 @@ function applyFog(scene) {
   scene.fog.far = state.lowQuality ? FOG_FAR_LOW : FOG_FAR;
 }
 
+// --- Hava durumu görselleri (yağmur partikülleri, koyu gökyüzü, şimşek) -----
+
+const WEATHER_SKY = { clear: 0, rain: 0x141c28, storm: 0x0c1220 };
+let rainLines = null;
+let rainPositions = null;
+const RAIN_COUNT = 320;
+let lightningAt = 0;
+let lightningOffAt = 0;
+
+function applyWeatherVisuals() {
+  if (!active) return;
+  const scene = active.scene;
+  const base = scene.userData.baseSky ?? SKY_COLOR;
+  const sky = state.weather === "clear" ? base : WEATHER_SKY[state.weather] || base;
+  scene.background = new THREE.Color(sky);
+  if (scene.fog) scene.fog.color.set(sky);
+  if (state.weather === "rain" || state.weather === "storm") {
+    if (!rainLines) buildRain();
+    if (rainLines.parent !== scene) scene.add(rainLines);
+  } else if (rainLines?.parent === scene) {
+    scene.remove(rainLines);
+  }
+}
+
+function buildRain() {
+  rainPositions = new Float32Array(RAIN_COUNT * 6);
+  for (let i = 0; i < RAIN_COUNT; i += 1) resetRainDrop(i, true);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(rainPositions, 3));
+  rainLines = new THREE.LineSegments(
+    geo,
+    new THREE.LineBasicMaterial({ color: 0x9db8d8, transparent: true, opacity: 0.55 }),
+  );
+  rainLines.frustumCulled = false;
+}
+
+function resetRainDrop(i, randomY = false) {
+  const base = i * 6;
+  const x = camPos.x + (Math.random() - 0.5) * 240;
+  const z = camPos.z + (Math.random() - 0.5) * 240;
+  const y = randomY ? Math.random() * 90 : 70 + Math.random() * 30;
+  rainPositions[base] = x;
+  rainPositions[base + 1] = y;
+  rainPositions[base + 2] = z;
+  rainPositions[base + 3] = x + 0.6;
+  rainPositions[base + 4] = y - 5;
+  rainPositions[base + 5] = z + 0.3;
+}
+
+function updateWeatherFx(dt, nowMs) {
+  // Çevrimdışı/tek kişilik modlarda hava istemci tarafında 2-4 dk'da bir değişir
+  if (!state.online && nowMs > state.weatherNextAtLocal) {
+    const roll = Math.random();
+    state.weather = roll < 0.6 ? "clear" : roll < 0.9 ? "rain" : "storm";
+    state.weatherNextAtLocal = nowMs + 120000 + Math.random() * 120000;
+    applyWeatherVisuals();
+  }
+
+  if (rainLines && rainLines.parent) {
+    const fall = 260 * dt;
+    for (let i = 0; i < RAIN_COUNT; i += 1) {
+      const base = i * 6;
+      rainPositions[base + 1] -= fall;
+      rainPositions[base + 4] -= fall;
+      if (rainPositions[base + 1] < 0) resetRainDrop(i);
+    }
+    rainLines.geometry.attributes.position.needsUpdate = true;
+  }
+
+  // Fırtınada şimşek flaşı
+  const hemi = active?.scene?.userData?.hemi;
+  if (hemi) {
+    if (state.weather === "storm") {
+      if (nowMs > lightningAt) {
+        hemi.intensity = 3.2;
+        lightningOffAt = nowMs + 120;
+        lightningAt = nowMs + 3000 + Math.random() * 6000;
+      } else if (lightningOffAt && nowMs > lightningOffAt) {
+        hemi.intensity = 1.15;
+        lightningOffAt = 0;
+      }
+    } else if (hemi.intensity !== 1.15) {
+      hemi.intensity = 1.15;
+    }
+  }
+}
+
 // --- Şehir sahnesi ---------------------------------------------------------
 
-function buildCityScene() {
+function buildCityScene(mapId) {
+  const def = mapDefOf(mapId);
+  const data = cityDataFor(def.id);
+  const params = def.params || {};
+  const roadHalf = params.roadHalf ?? ROAD_HALF;
   const scene = makeBaseScene();
   const refs = { rings: { race: [], tt: [] } };
   const half = CITY_SIZE / 2;
+
+  // Gece Şehri teması
+  if (params.night) {
+    scene.background = new THREE.Color(0x0a0f18);
+    scene.fog.color.set(0x0a0f18);
+    scene.userData.baseSky = 0x0a0f18;
+    scene.userData.hemi.intensity = 0.55;
+  }
 
   // Zemin
   const ground = new THREE.Mesh(
@@ -603,8 +791,8 @@ function buildCityScene() {
   // Yollar (uzun ince kutular) + orta çizgiler
   const roadMat = new THREE.MeshLambertMaterial({ color: 0x232b38 });
   const lineMat = new THREE.MeshBasicMaterial({ color: 0x8a7a3a });
-  const roadGeoH = new THREE.BoxGeometry(CITY_SIZE, 0.3, ROAD_HALF * 2);
-  const roadGeoV = new THREE.BoxGeometry(ROAD_HALF * 2, 0.3, CITY_SIZE);
+  const roadGeoH = new THREE.BoxGeometry(CITY_SIZE, 0.3, roadHalf * 2);
+  const roadGeoV = new THREE.BoxGeometry(roadHalf * 2, 0.3, CITY_SIZE);
   const lineGeoH = new THREE.BoxGeometry(CITY_SIZE, 0.35, 2);
   const lineGeoV = new THREE.BoxGeometry(2, 0.35, CITY_SIZE);
   for (let k = 0; k <= CITY_SIZE / ROAD_STEP; k += 1) {
@@ -627,7 +815,7 @@ function buildCityScene() {
   const plazaMat = new THREE.MeshLambertMaterial({ color: 0x3a3f4a });
   const pondMat = new THREE.MeshLambertMaterial({ color: 0x1b4d6e });
   const treeItems = [];
-  for (const park of cityData.parks) {
+  for (const park of data.parks) {
     const parkMesh = new THREE.Mesh(
       new THREE.BoxGeometry(park.w, 0.4, park.h),
       park.plaza ? plazaMat : parkMat,
@@ -657,9 +845,9 @@ function buildCityScene() {
   // Binalar (InstancedMesh + bölgeye göre renk varyasyonu)
   const boxGeo = new THREE.BoxGeometry(1, 1, 1);
   const buildingMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
-  const buildingMesh = new THREE.InstancedMesh(boxGeo, buildingMat, Math.max(1, cityData.buildings.length));
+  const buildingMesh = new THREE.InstancedMesh(boxGeo, buildingMat, Math.max(1, data.buildings.length));
   const color = new THREE.Color();
-  cityData.buildings.forEach((b, i) => {
+  data.buildings.forEach((b, i) => {
     dummy.position.set(b.x + b.w / 2, b.height / 2, b.z + b.h / 2);
     dummy.scale.set(b.w, b.height, b.h);
     dummy.rotation.y = 0;
@@ -670,24 +858,28 @@ function buildCityScene() {
   });
   scene.add(buildingMesh);
 
-  // Liman: doğu kenarı su + iskeleler + rıhtım
+  // Liman: doğu kenarı su + iskeleler + rıhtım (harita paramına göre genişlik/adet)
+  const waterStart = params.waterStart ?? 5460;
   const water = new THREE.Mesh(
-    new THREE.PlaneGeometry(CITY_SIZE - 5460, CITY_SIZE),
+    new THREE.PlaneGeometry(CITY_SIZE - waterStart, CITY_SIZE),
     new THREE.MeshLambertMaterial({ color: 0x1b4d6e }),
   );
   water.rotation.x = -Math.PI / 2;
-  water.position.set(5460 + (CITY_SIZE - 5460) / 2, 0.12, half);
+  water.position.set(waterStart + (CITY_SIZE - waterStart) / 2, 0.12, half);
   scene.add(water);
   const dockMat = new THREE.MeshLambertMaterial({ color: 0x4a4238 });
-  for (const pierZ of [800, 2200, 3600, 5000]) {
-    const pier = new THREE.Mesh(new THREE.BoxGeometry(320, 4, 46), dockMat);
-    pier.position.set(5460 + 160, 2, pierZ);
+  const pierCount = params.piers ?? 4;
+  const pierLength = Math.min(320, CITY_SIZE - waterStart - 60);
+  for (let p = 0; p < pierCount; p += 1) {
+    const pierZ = 800 + p * (4200 / Math.max(1, pierCount - 1));
+    const pier = new THREE.Mesh(new THREE.BoxGeometry(pierLength, 4, 46), dockMat);
+    pier.position.set(waterStart + pierLength / 2, 2, pierZ);
     scene.add(pier);
   }
 
   // Endüstriyel vinçler (süs)
   const craneMat = new THREE.MeshLambertMaterial({ color: 0xc2703a });
-  for (const crane of cityData.cranes) {
+  for (const crane of data.cranes) {
     const mast = new THREE.Mesh(new THREE.BoxGeometry(6, 90, 6), craneMat);
     mast.position.set(crane.x, 45, crane.z);
     scene.add(mast);
@@ -697,7 +889,7 @@ function buildCityScene() {
   }
 
   // Simge yapılar: saat kulesi + stadyum
-  for (const landmark of cityData.landmarks) {
+  for (const landmark of data.landmarks) {
     if (landmark.kind === "clockTower") {
       const tower = new THREE.Mesh(
         new THREE.BoxGeometry(34, 150, 34),
@@ -748,7 +940,7 @@ function buildCityScene() {
   const curbs = new THREE.InstancedMesh(curbGeo, curbMat, curbCount);
   let curbIndex = 0;
   for (let k = 0; k <= CITY_SIZE / ROAD_STEP; k += 1) {
-    for (const off of [-ROAD_HALF - 7, ROAD_HALF + 7]) {
+    for (const off of [-roadHalf - 7, roadHalf + 7]) {
       dummy.scale.set(CITY_SIZE, 1, 12);
       dummy.position.set(half, 0.25, k * ROAD_STEP + off);
       dummy.updateMatrix();
@@ -794,7 +986,7 @@ function buildCityScene() {
   refs.rings.race = state.routes.race.map((p, i) => addRing(scene, p.x, 0, p.z, 45, i === 0 ? 0xffffff : 0x35d2ff));
   refs.rings.tt = state.routes.tt.map((p, i) => addRing(scene, p.x, 0, p.z, 45, i === 0 ? 0xffffff : 0xffd166));
 
-  return { scene, refs };
+  return { scene, refs, cityData: data };
 }
 
 function addZoneMesh(scene, zone, colorHex, label) {
@@ -952,6 +1144,7 @@ function buildIceScene() {
   const scene = makeBaseScene();
   scene.background = new THREE.Color(0x0e2030);
   scene.fog = new THREE.Fog(0x0e2030, FOG_NEAR, FOG_FAR);
+  scene.userData.baseSky = 0x0e2030;
   const refs = { tiles: null };
 
   // Su (pistin altı/çevresi)
@@ -1049,14 +1242,16 @@ const sceneCache = {};
 let active = null; // { scene, refs }
 
 function setActiveMap(mapKey) {
-  if (!sceneCache[mapKey]) {
-    if (mapKey === "city") sceneCache.city = buildCityScene();
+  const cacheKey = mapKey === "city" ? `city-${state.mapId || DEFAULT_MAP_ID}` : mapKey;
+  if (!sceneCache[cacheKey]) {
+    if (mapKey === "city") sceneCache[cacheKey] = buildCityScene(state.mapId || DEFAULT_MAP_ID);
     else if (mapKey === "stunt") sceneCache.stunt = buildStuntScene();
     else if (mapKey === "ice") sceneCache.ice = buildIceScene();
     else sceneCache.tutorial = buildTutorialScene();
   }
-  active = sceneCache[mapKey];
+  active = sceneCache[cacheKey];
   applyFog(active.scene);
+  applyWeatherVisuals();
   // Araba meshleri aktif sahneye taşınır
   if (selfCar.mesh) active.scene.add(selfCar.mesh);
   if (selfCar.shadow) active.scene.add(selfCar.shadow);
@@ -1067,18 +1262,48 @@ function setActiveMap(mapKey) {
 
 // --- Araba modelleri --------------------------------------------------------
 
-function buildCarMesh(carId, colorHex) {
+let camoTexture = null;
+
+function getCamoTexture() {
+  if (camoTexture) return camoTexture;
+  const c = document.createElement("canvas");
+  c.width = 128;
+  c.height = 64;
+  const g = c.getContext("2d");
+  g.fillStyle = "#3a4a2a";
+  g.fillRect(0, 0, 128, 64);
+  const blobs = ["#2a3a1f", "#4a5a35", "#1f2a18", "#55663d"];
+  let s = 42;
+  const rand = () => {
+    s = (s * 16807) % 2147483647;
+    return s / 2147483647;
+  };
+  for (let i = 0; i < 26; i += 1) {
+    g.fillStyle = blobs[i % blobs.length];
+    g.beginPath();
+    g.ellipse(rand() * 128, rand() * 64, 6 + rand() * 14, 4 + rand() * 9, rand() * Math.PI, 0, Math.PI * 2);
+    g.fill();
+  }
+  camoTexture = new THREE.CanvasTexture(c);
+  return camoTexture;
+}
+
+function buildCarMesh(carId, colorHex, paintId = "standart") {
   const stats = CARS.find((item) => item.id === carId) || CARS[0];
+  const paint = paintOf(paintId);
   const body = stats.body;
   const group = new THREE.Group();
-  const mainColor = new THREE.Color(colorHex || stats.color);
+  const mainColor = new THREE.Color(paint.type === "solid" && paint.color ? paint.color : colorHex || stats.color);
 
-  const bodyMesh = new THREE.Mesh(
-    new THREE.BoxGeometry(body.len, body.hei, body.wid),
-    new THREE.MeshLambertMaterial({ color: mainColor }),
-  );
+  const bodyMaterial = new THREE.MeshLambertMaterial({ color: mainColor });
+  if (paint.type === "camo") {
+    bodyMaterial.map = getCamoTexture();
+    bodyMaterial.color.set(0xffffff);
+  }
+  const bodyMesh = new THREE.Mesh(new THREE.BoxGeometry(body.len, body.hei, body.wid), bodyMaterial);
   bodyMesh.position.y = 1.3;
   group.add(bodyMesh);
+  if (paint.type === "rainbow") group.userData.rainbowBody = bodyMaterial;
 
   const cabin = new THREE.Mesh(
     new THREE.BoxGeometry(body.len * 0.45, body.cab, body.wid * 0.8),
@@ -1151,18 +1376,20 @@ function makeBlobShadow() {
   return mesh;
 }
 
-const selfCar = { mesh: null, tag: null, shadow: null, carId: "" };
+const selfCar = { mesh: null, tag: null, shadow: null, carId: "", paintId: "" };
 
 function rebuildSelfCar() {
   const carId = state.profile.selectedCar;
-  if (selfCar.carId === carId && selfCar.mesh) return;
+  const paintId = state.profile.selectedPaint;
+  if (selfCar.carId === carId && selfCar.paintId === paintId && selfCar.mesh) return;
   if (selfCar.mesh) {
     selfCar.mesh.parent?.remove(selfCar.mesh);
     selfCar.tag?.parent?.remove(selfCar.tag);
     selfCar.shadow?.parent?.remove(selfCar.shadow);
   }
   selfCar.carId = carId;
-  selfCar.mesh = buildCarMesh(carId, carStats().color);
+  selfCar.paintId = paintId;
+  selfCar.mesh = buildCarMesh(carId, carStats().color, paintId);
   selfCar.tag = makeNameTag(state.nickname || "Ben", true);
   selfCar.shadow = makeBlobShadow();
   if (active) {
@@ -1174,7 +1401,7 @@ function rebuildSelfCar() {
 
 function attachRemoteMeshes(remote) {
   if (!remote.mesh) {
-    remote.mesh = buildCarMesh(remote.carId || "minik", remote.color);
+    remote.mesh = buildCarMesh(remote.carId || "minik", remote.color, remote.paint || "standart");
     remote.tag = makeNameTag(remote.nickname, false);
     remote.shadow = makeBlobShadow();
   }
@@ -1490,6 +1717,16 @@ function updateModeSelect() {
   refreshGoldDisplays();
 }
 
+// --- Sezon kupası rozetleri (profil satırında görünür) -----------------------
+
+const SEASON_MEDALS = ["🥇", "🥈", "🥉"];
+
+function seasonWinsText() {
+  const wins = state.profile.seasonWins || [];
+  if (!wins.length) return "";
+  return wins.map((w) => `${SEASON_MEDALS[w.rank - 1] || "🏆"} S${w.season}`).join("  ");
+}
+
 // ---------------------------------------------------------------------------
 // Mod seçimi + galeri
 // ---------------------------------------------------------------------------
@@ -1502,8 +1739,13 @@ function bindModeUI() {
     openWorldBox.hidden = !openWorldBox.hidden;
     rankedBox.hidden = true;
   });
+  // Parti harita seçici (host seçer)
+  const partyMapSelect = document.querySelector("#partyMapSelect");
+  partyMapSelect.innerHTML = YARIS_MAPS.map((map) => `<option value="${map.id}">${map.name}</option>`).join("");
   document.querySelector("#publicBtn").addEventListener("click", () => startGame("open", { joinMode: "public" }));
-  document.querySelector("#partyCreateBtn").addEventListener("click", () => startGame("open", { joinMode: "party-create" }));
+  document.querySelector("#partyCreateBtn").addEventListener("click", () =>
+    startGame("open", { joinMode: "party-create", mapId: partyMapSelect.value || DEFAULT_MAP_ID }),
+  );
   document.querySelector("#partyJoinBtn").addEventListener("click", () => {
     const code = document.querySelector("#partyCodeInput").value.replace(/\D/g, "").slice(0, 6);
     if (code.length !== 6) {
@@ -1537,9 +1779,58 @@ function bindModeUI() {
 
   document.querySelector("#modeStuntBtn").addEventListener("click", () => startGame("stunt"));
   document.querySelector("#modeIceBtn").addEventListener("click", () => startGame("ice"));
+  document.querySelector("#modeChaseBtn").addEventListener("click", () => {
+    const box = document.querySelector("#chaseBox");
+    box.hidden = !box.hidden;
+    openWorldBox.hidden = true;
+    rankedBox.hidden = true;
+  });
+  document.querySelector("#chaseCreateBtn").addEventListener("click", () => {
+    menuError.textContent = "";
+    connectChase("chase-create");
+  });
+  document.querySelector("#chaseJoinBtn").addEventListener("click", () => {
+    const code = document.querySelector("#chaseCodeInput").value.replace(/\D/g, "").slice(0, 6);
+    if (code.length !== 6) {
+      menuError.textContent = "Oda kodu 6 haneli olmalı.";
+      return;
+    }
+    menuError.textContent = "";
+    connectChase("chase-join", code);
+  });
+  document.querySelector("#chaseStartBtn").addEventListener("click", () => sendWs({ type: "chase-start" }));
+  document.querySelector("#chaseLeaveBtn").addEventListener("click", () => exitToModes());
+  for (const btn of document.querySelectorAll("#chaseTeamSizes button")) {
+    btn.addEventListener("click", () => sendWs({ type: "chase-teamsize", size: Number(btn.dataset.size) }));
+  }
+  // Kovalamaca harita kartları (host seçer, sunucu doğrular)
+  const chaseMapGrid = document.querySelector("#chaseMapGrid");
+  chaseMapGrid.innerHTML = "";
+  for (const map of YARIS_MAPS) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.dataset.mapId = map.id;
+    btn.innerHTML = `${map.name}<small>${map.desc}</small>`;
+    btn.addEventListener("click", () => sendWs({ type: "chase-map", mapId: map.id }));
+    chaseMapGrid.appendChild(btn);
+  }
   document.querySelector("#galleryBtn").addEventListener("click", () => {
     renderGallery();
+    renderPaints();
     showScreen("gallery");
+  });
+  document.querySelector("#galleryTabCars").addEventListener("click", () => {
+    document.querySelector("#galleryTabCars").classList.add("active");
+    document.querySelector("#galleryTabPaints").classList.remove("active");
+    document.querySelector("#carGrid").hidden = false;
+    document.querySelector("#paintGrid").hidden = true;
+  });
+  document.querySelector("#galleryTabPaints").addEventListener("click", () => {
+    document.querySelector("#galleryTabPaints").classList.add("active");
+    document.querySelector("#galleryTabCars").classList.remove("active");
+    document.querySelector("#carGrid").hidden = true;
+    document.querySelector("#paintGrid").hidden = false;
+    renderPaints();
   });
   document.querySelector("#galleryBackBtn").addEventListener("click", () => showScreen("modes"));
   document.querySelector("#tutorialReplayBtn").addEventListener("click", () => startGame("tutorial"));
@@ -1631,6 +1922,84 @@ async function selectCar(carId) {
   renderGallery();
 }
 
+// --- Boyalar (galeri sekmesi) ------------------------------------------------
+
+function paintSwatchStyle(paint) {
+  if (paint.type === "camo") {
+    return "background: repeating-linear-gradient(45deg, #3a4a2a 0 8px, #2a3a1f 8px 16px, #4a5a35 16px 24px, #1f2a18 24px 32px);";
+  }
+  if (paint.type === "rainbow") {
+    return "background: linear-gradient(90deg, #ff5b6e, #ff9f43, #ffd166, #69d18b, #4ea3ff, #b67dff);";
+  }
+  return `background: ${paint.color || "#8892a0"};`;
+}
+
+function renderPaints() {
+  const grid = document.querySelector("#paintGrid");
+  const galleryError = document.querySelector("#galleryError");
+  galleryError.textContent = "";
+  refreshGoldDisplays();
+  grid.innerHTML = "";
+  for (const paint of PAINTS) {
+    const owned = state.profile.paints.includes(paint.id);
+    const selected = state.profile.selectedPaint === paint.id;
+    const card = document.createElement("div");
+    card.className = "car-card" + (selected ? " selected" : "");
+    card.innerHTML = `
+      <div class="paint-swatch" style="${paintSwatchStyle(paint)}"></div>
+      <div class="car-name">${paint.name}</div>
+      <div class="car-price">${owned ? "Sende var" : `🪙 ${paint.price}`}</div>
+    `;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    if (owned) {
+      btn.textContent = selected ? "Seçili ✓" : "Bu Boyayı Seç";
+      btn.disabled = selected;
+      btn.addEventListener("click", () => selectPaint(paint.id));
+    } else {
+      btn.textContent = `Satın Al — 🪙${paint.price}`;
+      btn.disabled = state.profile.gold < paint.price;
+      btn.addEventListener("click", () => buyPaint(paint.id));
+    }
+    card.appendChild(btn);
+    grid.appendChild(card);
+  }
+}
+
+async function buyPaint(paintId) {
+  const galleryError = document.querySelector("#galleryError");
+  galleryError.textContent = "";
+  if (account) {
+    const result = await postProfileAction("/api/yaris-sehri/buy-paint", { paintId });
+    if (result?.error) {
+      galleryError.textContent = result.error;
+      return;
+    }
+  } else {
+    const paint = paintOf(paintId);
+    if (state.profile.gold < paint.price || state.profile.paints.includes(paintId)) return;
+    state.profile.gold -= paint.price;
+    state.profile.paints.push(paintId);
+    state.profile.selectedPaint = paintId;
+    saveGuestProfile();
+  }
+  renderPaints();
+}
+
+async function selectPaint(paintId) {
+  if (account) {
+    const result = await postProfileAction("/api/yaris-sehri/select-paint", { paintId });
+    if (result?.error) {
+      document.querySelector("#galleryError").textContent = result.error;
+      return;
+    }
+  } else if (state.profile.paints.includes(paintId)) {
+    state.profile.selectedPaint = paintId;
+    saveGuestProfile();
+  }
+  renderPaints();
+}
+
 // ---------------------------------------------------------------------------
 // Mod başlatma / çıkış
 // ---------------------------------------------------------------------------
@@ -1639,6 +2008,7 @@ function startGame(mode, opts = {}) {
   menuError.textContent = "";
   state.mode = mode;
   state.map = mode === "stunt" ? "stunt" : mode === "tutorial" ? "tutorial" : mode === "ice" ? "ice" : "city";
+  if (mode === "open" && opts.mapId) state.pendingMapId = opts.mapId;
   const spawn = MAPS[state.map].spawn;
   car.x = spawn.x;
   car.z = spawn.z;
@@ -1729,6 +2099,11 @@ function exitToModes(note = "") {
   resetRace();
   tt.running = false;
   clearChat();
+  chase.phase = "";
+  chase.myTeam = "";
+  chase.selfCaught = false;
+  chase.caught = [];
+  document.querySelector("#chaseScreen").hidden = true;
   tutorialPanel.hidden = true;
   stuntPanel.hidden = true;
   icePanel.hidden = true;
@@ -1787,15 +2162,26 @@ function bindSocket({ purpose }) {
   let joinedOnce = false;
   socket.addEventListener("open", () => {
     if (purpose === "ranked") {
-      sendWs({ type: "ranked-queue", sessionId, nickname: state.nickname, color: selectedCarColor() });
+      sendWs({ type: "ranked-queue", sessionId, nickname: state.nickname, color: selectedCarColor(), paint: state.profile.selectedPaint });
+    } else if (purpose === "chase-create" || purpose === "chase-join") {
+      sendWs({
+        type: purpose,
+        sessionId,
+        nickname: state.nickname,
+        color: selectedCarColor(),
+        paint: state.profile.selectedPaint,
+        code: state.chaseJoinCode || "",
+      });
     } else {
       sendWs({
         type: "join",
         sessionId,
         nickname: state.nickname,
         color: selectedCarColor(),
+        paint: state.profile.selectedPaint,
         mode: state.joinMode,
         code: state.joinCode,
+        mapId: state.pendingMapId || undefined,
       });
     }
   });
@@ -1810,14 +2196,22 @@ function bindSocket({ purpose }) {
     handleServerMessage(message);
   });
   const onLost = () => {
-    if (state.screen !== "game" && purpose !== "ranked") return;
+    if (state.screen !== "game" && purpose === "open") return;
     if (purpose === "ranked" && !joinedOnce) {
       document.querySelector("#rankedBox").hidden = true;
       menuError.textContent = "Sunucuya bağlanılamadı, dereceli şu an oynanamaz.";
       return;
     }
+    if ((purpose === "chase-create" || purpose === "chase-join") && !joinedOnce) {
+      menuError.textContent = "Sunucuya bağlanılamadı, kovalamaca şu an oynanamaz.";
+      return;
+    }
     if (purpose === "ranked" && state.mode === "ranked") {
       exitToModes("Bağlantı koptu, maç bitti.");
+      return;
+    }
+    if ((purpose === "chase-create" || purpose === "chase-join") && state.mode === "chase") {
+      exitToModes("Bağlantı koptu, kovalamaca bitti.");
       return;
     }
     if (joinedOnce && state.mode === "open") {
@@ -1865,8 +2259,21 @@ function handleServerMessage(message) {
       state.ranked = Boolean(message.ranked);
       if (message.routes?.race?.length) state.routes.race = convertRoute(message.routes.race);
       if (message.routes?.tt?.length) state.routes.tt = convertRoute(message.routes.tt);
-      const zones = convertZones(message.zones);
-      if (zones) state.zones = zones;
+      if (message.zones?.race) {
+        const zones = convertZones(message.zones);
+        if (zones) state.zones = zones;
+      }
+      if (Number.isFinite(message.mapSeed)) state.mapSeed = message.mapSeed;
+      if (message.mapId && YARIS_MAPS.some((m) => m.id === message.mapId)) {
+        state.mapId = message.mapId;
+        state.mapSeed = mapDefOf(message.mapId).seed;
+      }
+      if (message.weather) {
+        state.weather = message.weather;
+        applyWeatherVisuals();
+      }
+      // Açık dünyada sahne joined'dan ÖNCE kuruldu; tohum değiştiyse şehri doğru tohumla kur
+      if (state.mode === "open" && state.map === "city") setActiveMap("city");
       if (message.profile) applyProfile(message.profile);
       for (const remote of state.remotes.values()) removeRemoteMeshes(remote);
       state.remotes.clear();
@@ -1898,6 +2305,18 @@ function handleServerMessage(message) {
         showBanner("🖱️ Fare kilitlendiyse kamerayı fareyle çevir; değilse ekrana tıkla. ESC ile çıkılır.");
         startGame.hintTimer = setTimeout(() => showBanner(""), 3500);
       }
+      if (message.chase) {
+        // Kovalamaca odasına girildi: lobiyi bekle
+        state.mode = "chase";
+        state.map = "city";
+        chase.phase = "lobby";
+        chase.rewardApplied = false;
+        rebuildSelfCar();
+        setActiveMap("city");
+        showScreen("game");
+        document.querySelector("#chaseScreen").hidden = false;
+        document.querySelector("#chaseCodeLabel").textContent = state.partyCode;
+      }
       if (state.partyCode) {
         hudParty.textContent = `Parti kodu: ${state.partyCode}`;
         hudParty.hidden = false;
@@ -1907,6 +2326,10 @@ function handleServerMessage(message) {
       break;
     }
     case "state": {
+      if (message.weather && message.weather !== state.weather) {
+        state.weather = message.weather;
+        applyWeatherVisuals();
+      }
       const seen = new Set();
       for (const player of message.players || []) {
         if (player.id === state.selfId) continue;
@@ -1968,6 +2391,21 @@ function handleServerMessage(message) {
     case "chat":
       handleChatMessage(message);
       break;
+    case "chase-lobby":
+      applyChaseLobby(message.chase);
+      break;
+    case "chase-start":
+      applyChaseStart(message.chase);
+      break;
+    case "chase-update":
+      applyChaseUpdate(message.chase);
+      break;
+    case "chase-end":
+      applyChaseEnd(message);
+      break;
+    case "chase-closed":
+      exitToModes("Kovalamaca bitti!");
+      break;
     case "yaris-error":
       showBanner(message.message || "Bir hata oluştu.");
       setTimeout(() => showBanner(""), 2500);
@@ -1986,6 +2424,7 @@ function upsertRemote(player) {
     existing.ta = player.a;
     existing.nickname = player.nickname;
     existing.color = player.color;
+    existing.paint = player.paint || "standart";
   } else {
     const remote = {
       x: player.x,
@@ -1998,6 +2437,7 @@ function upsertRemote(player) {
       ta: player.a,
       nickname: player.nickname,
       color: player.color,
+      paint: player.paint || "standart",
       mesh: null,
       tag: null,
       shadow: null,
@@ -2117,6 +2557,7 @@ function applyRaceRewards() {
 function showRaceResults() {
   resultsPanel.hidden = false;
   countdownEl.hidden = true;
+  document.querySelector("#resultsPanel h2").textContent = "Yarış Bitti!";
   raceResults.innerHTML = race.results
     .map((item, index) => {
       const me = item.id === state.selfId ? " me" : "";
@@ -2136,7 +2577,7 @@ function showRaceResults() {
 }
 
 function raceTick() {
-  if (!state.joined || state.mode === "stunt" || state.mode === "tutorial" || state.mode === "ice") {
+  if (!state.joined || state.mode === "stunt" || state.mode === "tutorial" || state.mode === "ice" || state.mode === "chase") {
     countdownEl.hidden = true;
     return;
   }
@@ -2466,6 +2907,149 @@ function updateBots(dt) {
 }
 
 // ---------------------------------------------------------------------------
+// Polis Kovalamaca (istemci)
+// ---------------------------------------------------------------------------
+
+function connectChase(action, code = "") {
+  clearTimeout(state.reconnectTimer);
+  if (location.protocol === "file:") {
+    menuError.textContent = "Kovalamaca için sunucu bağlantısı gerekli.";
+    return;
+  }
+  try {
+    socket = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/yaris-sehri`);
+  } catch {
+    menuError.textContent = "Sunucuya bağlanılamadı.";
+    return;
+  }
+  state.chaseJoinCode = code;
+  bindSocket({ purpose: action });
+}
+
+function applyChaseLobby(data) {
+  if (!data || state.mode !== "chase") return;
+  chase.hostId = data.hostId;
+  chase.teamSize = data.teamSize;
+  chase.phase = data.phase;
+  // Host harita değiştirdiyse şehri yeni haritayla kur
+  if (data.mapId && YARIS_MAPS.some((m) => m.id === data.mapId) && data.mapId !== state.mapId) {
+    state.mapId = data.mapId;
+    state.mapSeed = mapDefOf(data.mapId).seed;
+    if (state.map === "city") setActiveMap("city");
+  }
+  if (data.phase !== "lobby") return;
+  const screen = document.querySelector("#chaseScreen");
+  screen.hidden = false;
+  document.querySelector("#chaseCodeLabel").textContent = state.partyCode;
+  document.querySelector("#chasePlayerList").innerHTML = (data.players || [])
+    .map((p) => `<li><span style="color:${p.color}">●</span> ${escapeHtml(p.nickname)}${p.id === data.hostId ? " 👑" : ""}</li>`)
+    .join("");
+  for (const btn of document.querySelectorAll("#chaseTeamSizes button")) {
+    btn.classList.toggle("active", Number(btn.dataset.size) === data.teamSize);
+  }
+  for (const btn of document.querySelectorAll("#chaseMapGrid button")) {
+    btn.classList.toggle("active", btn.dataset.mapId === data.mapId);
+  }
+  const isHost = data.hostId === state.selfId;
+  document.querySelector("#chaseStartBtn").disabled = !isHost;
+  document.querySelector("#chaseStartBtn").textContent = isHost ? "Başlat!" : "Oda sahibi başlatacak…";
+}
+
+function applyChaseStart(data) {
+  if (!data) return;
+  chase.phase = data.phase;
+  chase.cops = data.cops.map((p) => p.id);
+  chase.robbers = data.robbers.map((p) => p.id);
+  chase.caught = [];
+  chase.catches = {};
+  chase.selfCaught = false;
+  chase.winner = "";
+  chase.results = [];
+  chase.rewardApplied = false;
+  chase.headstartEndsAt = data.headstartEndsAt;
+  chase.endsAt = data.endsAt;
+  chase.myTeam = chase.cops.includes(state.selfId) ? "cops" : "robbers";
+  document.querySelector("#chaseScreen").hidden = true;
+
+  // Doğuş noktaları (sunucuyla aynı formül)
+  const team = chase.myTeam === "cops" ? data.cops : data.robbers;
+  const index = Math.max(0, team.findIndex((p) => p.id === state.selfId));
+  if (chase.myTeam === "cops") {
+    car.x = 600 + (index % 3) * 70 - 70;
+    car.z = 600 + Math.floor(index / 3) * 70;
+  } else {
+    car.x = 3000 + (index % 3) * 80 - 80;
+    car.z = 3000 + Math.floor(index / 3) * 80 - 40;
+  }
+  car.angle = Math.PI / 2;
+  car.speed = 0;
+  car.h = 0;
+  car.vh = 0;
+  snapCamera();
+  showScorePop(chase.myTeam === "cops" ? "Polissin! 🚔" : "Kaçaksın! Kaç! 🏃");
+}
+
+function applyChaseUpdate(data) {
+  if (!data) return;
+  chase.phase = data.phase;
+  chase.caught = data.caught || [];
+  chase.catches = data.catches || {};
+  if (chase.caught.includes(state.selfId) && !chase.selfCaught) {
+    chase.selfCaught = true;
+    showBanner("Yakalandın! Artık izleyicisin 👮");
+  }
+}
+
+function applyChaseEnd(message) {
+  chase.phase = "ended";
+  chase.winner = message.winner;
+  chase.results = message.results || [];
+  showBanner("");
+  // Misafirler ödülü yerel uygular (hesaplılara sunucu yazdı + profile push)
+  const mine = chase.results.find((item) => item.id === state.selfId);
+  if (!account && mine && !chase.rewardApplied) {
+    chase.rewardApplied = true;
+    state.profile.gold += mine.goldEarned || 0;
+    if (mine.cupEarned) state.profile.chaseCups += 1;
+    saveGuestProfile();
+    refreshGoldDisplays();
+  }
+  resultsPanel.hidden = false;
+  document.querySelector("#resultsPanel h2").textContent =
+    message.winner === "cops" ? "🚔 Polisler Kazandı!" : "🏃 Kaçaklar Kazandı!";
+  raceResults.innerHTML = chase.results
+    .map((item) => {
+      const me = item.id === state.selfId ? " me" : "";
+      const teamTag = item.team === "cops" ? "🚔" : "🏃";
+      const reward = item.bot ? "" : ` · 🪙${item.goldEarned}${item.cupEarned ? " +🏆" : ""}${item.catches ? ` (${item.catches} yakalama)` : ""}`;
+      return `<li class="${me.trim()}">${teamTag} <span style="color:${item.color}">●</span> ${escapeHtml(item.nickname)}${item.bot ? " 🤖" : ""}${reward}</li>`;
+    })
+    .join("");
+  raceReward.textContent = mine && !mine.bot ? `Kazandın: 🪙${mine.goldEarned}${mine.cupEarned ? " · Kovalamaca Kupası 🏆" : ""}` : "";
+}
+
+function chaseTick(nowMs) {
+  if (state.mode !== "chase") return;
+  if (chase.phase === "headstart") {
+    // Polisler avans süresince donuk kalır
+    if (chase.myTeam === "cops") {
+      car.speed = 0;
+      car.vx = 0;
+      car.vz = 0;
+    }
+    const left = Math.max(0, Math.ceil((chase.headstartEndsAt - nowMs) / 1000));
+    hudEvent.textContent = chase.myTeam === "cops" ? `🚔 Serbest bırakılmaya ${left} sn` : `🏃 Kaç! Polisler ${left} sn sonra çıkıyor`;
+  } else if (chase.phase === "running") {
+    const left = Math.max(0, chase.endsAt - nowMs);
+    const mins = Math.floor(left / 60000);
+    const secs = String(Math.floor((left % 60000) / 1000)).padStart(2, "0");
+    const free = chase.robbers.filter((id) => !chase.caught.includes(id)).length;
+    const role = chase.myTeam === "cops" ? "🚔 Polis" : chase.caught.includes(state.selfId) ? "👮 Yakalandın" : "🏃 Kaçak";
+    hudEvent.textContent = `${role} · ${mins}:${secs} · serbest kaçak: ${free}`;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Hazır mesaj sohbeti (whitelist — serbest yazı yok)
 // ---------------------------------------------------------------------------
 
@@ -2706,7 +3290,9 @@ function updateCar(dt) {
   car.speed = clamp(car.speed, -200, maxSpeed);
 
   const steer = (input.left ? -1 : 0) + (input.right ? 1 : 0);
-  const steerPower = stats.grip * Math.min(1, Math.abs(car.speed) / 150);
+  // Yağmur/fırtınada yol tutuşu %30 düşer (kaygan asfalt)
+  const wetGrip = state.map === "city" && state.weather !== "clear" ? 0.7 : 1;
+  const steerPower = stats.grip * wetGrip * Math.min(1, Math.abs(car.speed) / 150);
   car.angle += steer * steerPower * dt * (car.speed < 0 ? -1 : 1);
 
   const nx = clamp(car.x + Math.cos(car.angle) * car.speed * dt, 20, mapSize.w - 20);
@@ -2985,11 +3571,15 @@ function updateHud(nowMs) {
       ? "Tek Mod"
       : state.mode === "ice"
         ? "Buzlu Zemin"
-        : state.mode === "tutorial"
-          ? "Öğretici"
-          : state.online
-            ? `${driverCount} sürücü çevrimiçi`
-            : `${driverCount} sürücü (yerel)`;
+        : state.mode === "chase"
+          ? "Polis Kovalamaca"
+          : state.mode === "tutorial"
+            ? "Öğretici"
+            : state.online
+              ? `${driverCount} sürücü çevrimiçi`
+              : `${driverCount} sürücü (yerel)`;
+
+  if (state.mode === "chase") return; // hudEvent'i chaseTick yönetir
 
   if (race.phase === "lobby" && isInRace()) {
     const left = Math.max(0, Math.ceil((race.lobbyDeadline - Date.now()) / 1000));
@@ -3017,6 +3607,17 @@ function showScorePop(text) {
   }, 1400);
 }
 
+// Gökkuşağı boyası: renk sürekli döner
+function updateRainbowPaints(nowMs) {
+  const hue = (nowMs / 2500) % 1;
+  if (selfCar.mesh?.userData.rainbowBody) {
+    selfCar.mesh.userData.rainbowBody.color.setHSL(hue, 0.8, 0.55);
+  }
+  for (const remote of state.remotes.values()) {
+    remote.mesh?.userData.rainbowBody?.color.setHSL(hue, 0.8, 0.55);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Ana döngü
 // ---------------------------------------------------------------------------
@@ -3036,6 +3637,9 @@ function frame(nowMs) {
     tutorialTick();
     stuntTick(nowMs);
     iceTick(nowMs, dt);
+    chaseTick(nowMs);
+    updateWeatherFx(dt, nowMs);
+    updateRainbowPaints(nowMs);
     syncSelfCar();
     updateChatBubbles(nowMs);
     updateRingVisibility(nowMs);

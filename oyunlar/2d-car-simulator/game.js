@@ -388,7 +388,24 @@ function winLevel() {
   progress = Math.max(progress, levelIndex + 1);
   localStorage.setItem(SAVE_KEY, String(progress));
   lastNewBadges = checkBadges();
+  reportSeasonLevelComplete();
   showWin();
+}
+
+// Sezon bildirimi (2D Car Simulator Sezonu): site oturumu varsa sunucuya haber ver.
+// Fire-and-forget: ağ hatası/oturum yokluğu oyunu asla etkilemez.
+function reportSeasonLevelComplete() {
+  try {
+    if (typeof fetch !== "function") return;
+    const sessionId = localStorage.getItem("hakorocks-session-id");
+    const authToken = localStorage.getItem("hakorocks-auth-token");
+    if (!sessionId || !authToken) return;
+    fetch("/api/season-score", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId, authToken, game: "2d-car-simulator", kind: "level-complete", amount: 1 }),
+    }).catch(() => {});
+  } catch {}
 }
 
 // ---------- Ses ----------

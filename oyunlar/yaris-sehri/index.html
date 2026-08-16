@@ -146,6 +146,7 @@
           <span id="modeGold" class="hud-gold">🪙 0</span>
           <span id="modeRating">Puan: 100</span>
           <span id="modeCar"></span>
+          <span id="modeSeasonWins"></span>
         </div>
         <p id="guestWarning" class="guest-warning" hidden>Misafir modundasın: altın ve arabalar yalnızca bu cihazda saklanır.</p>
 
@@ -153,6 +154,8 @@
           <button id="modeOpenBtn" type="button" class="primary">🌍 Açık Dünya</button>
           <div id="openWorldBox" hidden>
             <button id="publicBtn" type="button">Herkese Açık Dünyaya Gir</button>
+            <label class="map-select-label" for="partyMapSelect">Parti haritası:</label>
+            <select id="partyMapSelect"></select>
             <button id="partyCreateBtn" type="button">Parti Kur</button>
             <div class="party-join">
               <input id="partyCodeInput" type="text" inputmode="numeric" maxlength="6" placeholder="Parti kodu" />
@@ -166,6 +169,14 @@
           </div>
           <button id="modeStuntBtn" type="button" class="primary">🚀 Tek Mod (Akrobasi)</button>
           <button id="modeIceBtn" type="button" class="primary">🧊 Buzlu Zemin</button>
+          <button id="modeChaseBtn" type="button" class="primary">🚔 Polis Kovalamaca</button>
+          <div id="chaseBox" hidden>
+            <button id="chaseCreateBtn" type="button">Oda Kur</button>
+            <div class="party-join">
+              <input id="chaseCodeInput" type="text" inputmode="numeric" maxlength="6" placeholder="Oda kodu" />
+              <button id="chaseJoinBtn" type="button">Odaya Katıl</button>
+            </div>
+          </div>
           <button id="galleryBtn" type="button">🚗 Araba Galerisi</button>
           <button id="tutorialReplayBtn" type="button">🎓 Öğreticiyi Tekrar Oyna</button>
           <p id="menuError" class="auth-error"></p>
@@ -181,9 +192,35 @@
       <div class="menu-card gallery-card">
         <h1>Araba Galerisi</h1>
         <p class="profile-row"><span id="galleryGold" class="hud-gold">🪙 0</span></p>
+        <div class="auth-tabs">
+          <button id="galleryTabCars" type="button" class="active">🚗 Arabalar</button>
+          <button id="galleryTabPaints" type="button">🎨 Boyalar</button>
+        </div>
         <div id="carGrid" class="car-grid"></div>
+        <div id="paintGrid" class="car-grid" hidden></div>
         <p id="galleryError" class="auth-error"></p>
         <button id="galleryBackBtn" type="button">← Mod Seçimine Dön</button>
+      </div>
+    </div>
+
+    <!-- Kovalamaca lobisi -->
+    <div class="menu" id="chaseScreen" hidden>
+      <div class="menu-card">
+        <h1>🚔 Polis Kovalamaca</h1>
+        <p class="tagline">Oda kodu: <strong id="chaseCodeLabel" class="hud-party"></strong> — arkadaşların bu kodla katılır</p>
+        <div class="teamsize-row" id="chaseTeamSizes">
+          <span>Takım boyutu:</span>
+          <button type="button" data-size="2">2v2</button>
+          <button type="button" data-size="3">3v3</button>
+          <button type="button" data-size="4">4v4</button>
+          <button type="button" data-size="5">5v5</button>
+        </div>
+        <p class="hint-line" style="margin:0">Harita (oda sahibi seçer):</p>
+        <div class="map-grid" id="chaseMapGrid"></div>
+        <ul id="chasePlayerList" class="chase-players"></ul>
+        <button id="chaseStartBtn" type="button" class="primary">Başlat!</button>
+        <button id="chaseLeaveBtn" type="button">Odadan Çık</button>
+        <p class="hint-line">Kaçaklar 10 sn avansla başlar. Polis 2 sn yakında kalırsa yakalar. Süre dolarsa kaçaklar kazanır! Eksik oyuncu botla dolar.</p>
       </div>
     </div>
 

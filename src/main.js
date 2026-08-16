@@ -682,6 +682,11 @@ let latestHealth = createFallbackHealth();
 let latestSocial = createFallbackSocial();
 let latestVoice = createFallbackVoice();
 let latestClickGame = createFallbackClickGame();
+let latestSeason = createFallbackSeason();
+
+function createFallbackSeason() {
+  return { season: 0, objective: null, game: null, startedAt: "", endsAt: 0, top: [], pastSeasons: [] };
+}
 let notificationPermission =
   typeof Notification !== "undefined" && Notification && typeof Notification.permission === "string"
     ? Notification.permission
@@ -862,6 +867,17 @@ document.querySelector("#app").innerHTML = `
 
     <section class="section daily-game-section" aria-label="Günün oyunu">
       ${renderDailyGame()}
+    </section>
+
+    <section class="section" id="yaris-sezon" aria-labelledby="season-title">
+      <div class="section-heading">
+        <p class="eyebrow">Hakorocks Studio</p>
+        <h2 id="season-title">Sezon Tablosu</h2>
+        <p class="section-note">Her sezon 7 gün sürer; sırası gelen oyunun temasında en iyi olan ilk 3 oyuncu altın ödül kapar.</p>
+      </div>
+      <div data-season-panel>
+        ${renderYarisSeason()}
+      </div>
     </section>
 
     <section class="section launcher-section" id="launcher" aria-labelledby="launcher-title">
@@ -1967,6 +1983,75 @@ function getPulseFeedItems() {
 function renderStudioPulsePanel() {
   const panel = document.querySelector("[data-pulse-panel]");
   if (panel) panel.innerHTML = renderStudioPulse();
+}
+
+const SEASON_OBJECTIVE_UNITS = {
+  time: (v) => {
+    const hours = Math.floor(v / 3600);
+    const mins = Math.floor((v % 3600) / 60);
+    return hours > 0 ? `${hours} saat ${mins} dk` : `${mins} dk`;
+  },
+  win: (v) => `${v} galibiyet`,
+  point: (v) => `${v} puan`,
+  gold: (v) => `🪙${v}`,
+};
+
+function formatSeasonScore(objectiveId, score) {
+  const formatter = SEASON_OBJECTIVE_UNITS[objectiveId === "arabaci" ? "time" : objectiveId === "yarisci" || objectiveId === "polis" ? "win" : objectiveId === "altin" ? "gold" : "point"];
+  return formatter ? formatter(score) : String(score);
+}
+
+function renderYarisSeason() {
+  const medals = ["🥇", "🥈", "🥉"];
+  const objective = latestSeason.objective || null;
+  const objectiveId = objective?.id || "yarisci";
+  const gameSlug = latestSeason.game?.slug || "yaris-sehri";
+  const gameName = latestSeason.game?.name || "Hakorocks Şehri";
+  const top = (latestSeason.top || []).slice(0, 20);
+  const left = Math.max(0, Number(latestSeason.endsAt) - Date.now());
+  const days = Math.floor(left / 86400000);
+  const hours = Math.floor((left % 86400000) / 3600000);
+  const rows = top.length
+    ? top
+        .map(
+          (entry, index) => `
+          <article>
+            <span>${medals[index] || `${index + 1}.`}</span>
+            <strong>${escapeHtml(entry.nickname)}</strong>
+            <small>${formatSeasonScore(objectiveId, entry.score)}</small>
+          </article>`,
+        )
+        .join("")
+    : `<article><span>🏁</span><strong>Henüz skor yok</strong><small>Bu haftanın temasını ilk sen kazan!</small></article>`;
+  const past = (latestSeason.pastSeasons || [])
+    .slice(0, 5)
+    .map(
+      (s) =>
+        `<article><span>S${s.season}</span><strong>${(s.top3 || [])
+          .map((t) => `${medals[t.rank - 1] || ""} ${escapeHtml(t.nickname)}`)
+          .join(" · ")}</strong><small>${escapeHtml(s.game?.name || "Hakorocks Şehri")} — ${(s.top3 || []).map((t) => formatSeasonScore(s.objective, t.score)).join(" / ")}</small></article>`,
+    )
+    .join("");
+  return `
+    <div class="pulse-feed-panel season-panel">
+      <div class="account-box-head">
+        <h3>${objective ? escapeHtml(objective.name) : `Sezon ${latestSeason.season || "—"}`} — ${days} gün ${hours} saat kaldı</h3>
+        <a class="button primary" href="/oyunlar/${escapeHtml(gameSlug)}/">Oyna</a>
+      </div>
+      ${objective ? `<p class="section-note" style="margin:0 0 8px">${escapeHtml(gameName)} · ${escapeHtml(objective.desc)}</p>` : ""}
+      <div class="pulse-feed season-top">${rows}</div>
+      ${past ? `<div class="account-box-head" style="margin-top:12px"><h3>Geçmiş sezonlar</h3></div><div class="pulse-feed">${past}</div>` : ""}
+      <p class="section-note" style="margin:10px 0 0">
+        Sezonlar 7 gün sürer ve sırayla döner — Hakorocks Şehri temaları ve diğer oyunların sezonları.
+        Sezon ödülleri: 1. 🪙300 · 2. 🪙200 · 3. 🪙100.
+      </p>
+    </div>
+  `;
+}
+
+function renderYarisSeasonPanel() {
+  const panel = document.querySelector("[data-season-panel]");
+  if (panel) panel.innerHTML = renderYarisSeason();
 }
 
 function renderClickGame() {
@@ -5667,7 +5752,7 @@ async function refreshLiveData() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    const [statsResponse, photosResponse, ratingsResponse, guestbookResponse, feedbackResponse, announcementsResponse, commentsResponse, votesResponse, healthResponse, accountResponse, voiceResponse, clickGameResponse] = await Promise.all([
+    const [statsResponse, photosResponse, ratingsResponse, guestbookResponse, feedbackResponse, announcementsResponse, commentsResponse, votesResponse, healthResponse, accountResponse, voiceResponse, clickGameResponse, seasonResponse] = await Promise.all([
       fetch("/api/stats"),
       fetch("/api/photos"),
       fetch("/api/ratings"),
@@ -5680,6 +5765,7 @@ async function refreshLiveData() {
       fetch(`/api/account?sessionId=${encodeURIComponent(sessionId)}`),
       fetch(`/api/voice?sessionId=${encodeURIComponent(sessionId)}`),
       fetch(`/api/click-game?sessionId=${encodeURIComponent(sessionId)}`),
+      fetch("/api/seasons/leaderboard"),
     ]);
     latestStats = await statsResponse.json();
     latestPhotos = await photosResponse.json();
@@ -5693,6 +5779,7 @@ async function refreshLiveData() {
     latestSocial = await accountResponse.json();
     latestVoice = await voiceResponse.json();
     latestClickGame = await clickGameResponse.json();
+    latestSeason = await seasonResponse.json();
     if (latestVoice.roomId) {
       selectedVoiceRoomId = latestVoice.roomId;
       localStorage.setItem("hakorocks-voice-room", selectedVoiceRoomId);
@@ -5705,6 +5792,7 @@ async function refreshLiveData() {
     latestSocial = createFallbackSocial();
     latestVoice = createFallbackVoice();
     latestClickGame = createFallbackClickGame();
+    latestSeason = createFallbackSeason();
   }
 
   renderLiveData();
@@ -5745,6 +5833,7 @@ function renderLiveData() {
   renderEnrichedStatsPanel();
   renderLauncherPanel();
   renderStudioPulsePanel();
+  renderYarisSeasonPanel();
   if (!clickGameState.running) renderClickGamePanel();
 }
 
