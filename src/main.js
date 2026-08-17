@@ -17,6 +17,38 @@ import {
 
 const games = [
   {
+    slug: "vespera",
+    title: "Vespera",
+    path: "/oyunlar/vespera/",
+    type: "Uzay Hikaye",
+    status: "Oynanabilir",
+    description: "Soluk Gezegen'de yürü, görev parçalarını topla, ters köşeyi gör ve çekirdeği kapat.",
+    longDescription: "Vespera tek gezegen üzerinde uzun bir hikaye macerası. Sekiz adlı bölge, sıralı görevler, NPC konuşmaları ve kayıtlı ilerleme var. Sessiz Krater'de arşiv açılınca Mira'nın rolü tersine döner; hedef kurtarma olmaktan çıkar.",
+    accent: "nova",
+    controls: "WASD yürü, E konuş/topla, J/Boşluk ateş · dokunmatik",
+    mobileStatus: "Mobil uyumlu",
+    mobileNote: "Ekran altı hareket, E ve ateş düğmeleri ile telefonda oynanır.",
+    achievements: ["KAIA ile konuş", "Ters köşeyi gör", "Çekirdeği kapat"],
+    updates: ["Tek gezegen açık dünya", "Sekiz bölge ve kayıt", "Mira ters köşesi"],
+    stockBase: 184,
+  },
+  {
+    slug: "hako-vurus",
+    title: "Hako Vuruş",
+    path: "/oyunlar/hako-vurus/",
+    type: "Aksiyon Arenası",
+    status: "Oynanabilir",
+    description: "Yumrukla, atıl, combo patlat. Gece arenasında dalga dalga gelen düşmanları ez.",
+    longDescription: "Hako Vuruş — hızlı 2D aksiyon. A/D ile koş, W ile zıpla, J veya boşluk ile vur, K veya Shift ile atıl. 6 combo birikince özel vuruş açılır. Her 5 dalgada boss gelir; kalpleri topla, rekorunu kır.",
+    accent: "crimson",
+    controls: "WASD/oklar, J/Boşluk vur, K/Shift atıl · dokunmatik",
+    mobileStatus: "Mobil uyumlu",
+    mobileNote: "Ekran altı hareket, vur ve atıl düğmeleri ile telefonda oynanır.",
+    achievements: ["İlk dalgayı bitir", "6 combo özel vuruş yap", "5. dalga bossunu yen"],
+    updates: ["Dalga dalga aksiyon arenası", "Combo ve özel vuruş", "Boss, can ve yıldız toplanır"],
+    stockBase: 176,
+  },
+  {
     slug: "annenden-kac",
     title: "Annenden Kaç",
     path: "/oyunlar/annenden-kac/",
@@ -288,7 +320,7 @@ const games = [
 ];
 
 const FUSION_GAME_PATH = "/oyunlar/birlesim-arenasi/";
-const NEW_GAME_SLUGS = new Set(["hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "2d-car-simulator", "yaris-sehri"]);
+const NEW_GAME_SLUGS = new Set(["hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "2d-car-simulator", "yaris-sehri", "hako-vurus", "vespera"]);
 /** Only games the Birleşim Arenası client actually implements. */
 const FUSION_GAME_SLUGS = new Set([
   "annenden-kac",
@@ -358,6 +390,16 @@ const mobileFeatures = [
 ];
 
 const newsItems = [
+  {
+    date: "Yeni",
+    title: "Vespera yayında",
+    description: "Tek gezegen, uzun hikaye, kayıt ve ters köşe: Mira sandığın kişi değil.",
+  },
+  {
+    date: "Yeni",
+    title: "Hako Vuruş yayında",
+    description: "Yeni aksiyon arenası: yumrukla, atıl, combo patlat ve boss dalgalarını ez.",
+  },
   {
     date: "Mobil",
     title: "Oyunlara mobil kontrol modu geldi",
@@ -507,6 +549,12 @@ const badgeDefinitions = [
     description: "1 dakikalık kare oyununda skor yaptın.",
     isUnlocked: (state) => (Number(state.clickGameBest) || 0) > 0,
   },
+  {
+    id: "hako-striker",
+    title: "Hako Vurucu",
+    description: "Hako Vuruş arenasına girdin.",
+    isUnlocked: (state) => state.playedGames.includes("hako-vurus"),
+  },
 ];
 
 const dailyBadgePool = [
@@ -581,6 +629,12 @@ const dailyBadgePool = [
     title: "Rozet Toplayıcı",
     description: "En az üç farklı oyunu açarak günlük koleksiyonu büyüt.",
     isUnlocked: (state) => state.playedGames.length >= 3,
+  },
+  {
+    id: "daily-vurus",
+    title: "Gece Vurucu",
+    description: "Hako Vuruş'u aç ve ilk dalgayı ez.",
+    isUnlocked: (state) => state.playedGames.includes("hako-vurus"),
   },
 ];
 
@@ -836,8 +890,8 @@ document.querySelector("#app").innerHTML = `
       <span>Hakorocks Studio</span>
     </a>
     <nav class="nav" aria-label="Ana menü">
-      <a href="#launcher">Launcher</a>
       <a href="#oyunlar">Oyunlar</a>
+      <a href="#launcher">Launcher</a>
       <a href="#bot">HakoBot</a>
       <a href="#pulse">Pulse</a>
       <a href="#mini-oyun">Mini oyun</a>
@@ -852,23 +906,34 @@ document.querySelector("#app").innerHTML = `
     <section class="hero" aria-labelledby="hero-title">
       <div class="hero-media" aria-hidden="true"></div>
       <canvas class="hero-stars" aria-hidden="true"></canvas>
-      <div class="hero-content">
-        <p class="eyebrow">Tarayıcıda oynanan oyunlar ve yaratıcı kod</p>
-        <h1 id="hero-title">Hakorocks Studio</h1>
-        <p class="hero-copy">
-          Ben Hakan Umut Akadal. Oyunlar, 3D dünyalar ve web projeleri tek merkezde.
-          Burada tarayıcıda açılan oyunlar, canlı özellikler ve yeni denemeler bir araya geliyor.
-        </p>
-        <div class="hero-actions">
-          <a class="button primary" href="#launcher">Launcher'ı aç</a>
-          <a class="button secondary" href="#bot">HakoBot'a sor</a>
-          <button class="button secondary" type="button" data-random-game>Rastgele oyun</button>
+      <div class="hero-intro">
+        <div class="hero-content">
+          <p class="eyebrow">Tarayıcıda oynanan oyunlar ve yaratıcı kod</p>
+          <h1 id="hero-title">Hakorocks Studio</h1>
+          <p class="hero-copy">
+            Ben Hakan Umut Akadal. Oyunlar burada, hemen altında.
+            Bir karta bas, tarayıcıda oyna.
+          </p>
+          <div class="hero-actions">
+            <button class="button primary" type="button" data-random-game>Rastgele oyun</button>
+            <a class="button secondary" href="#launcher">Launcher'ı aç</a>
+            <a class="button secondary" href="#bot">HakoBot'a sor</a>
+          </div>
+        </div>
+        <aside class="hero-panel" aria-label="Stüdyo özeti">
+          <strong>${games.length} oyun</strong>
+          <span>Tek domain altında yayında</span>
+        </aside>
+      </div>
+      <div class="hero-games games-section" id="oyunlar" aria-labelledby="games-title">
+        <div class="section-heading">
+          <p class="eyebrow">Oyun vitrini</p>
+          <h2 id="games-title">Oyunun üstüne bas, hemen oyna.</h2>
+        </div>
+        <div class="game-grid">
+          ${renderGameCards()}
         </div>
       </div>
-      <aside class="hero-panel" aria-label="Stüdyo özeti">
-        <strong>14 oyun</strong>
-        <span>Tek domain altında yayında</span>
-      </aside>
     </section>
 
     <section class="section daily-game-section" aria-label="Günün oyunu">
@@ -1272,16 +1337,6 @@ document.querySelector("#app").innerHTML = `
       </div>
       <div class="badge-grid" data-badge-grid>
         ${renderBadges()}
-      </div>
-    </section>
-
-    <section class="section games-section" id="oyunlar" aria-labelledby="games-title">
-      <div class="section-heading">
-        <p class="eyebrow">Oyun vitrini</p>
-        <h2 id="games-title">Oyunun üstüne bas, +team tarzı detay ekranı açılsın.</h2>
-      </div>
-      <div class="game-grid">
-        ${renderGameCards()}
       </div>
     </section>
 

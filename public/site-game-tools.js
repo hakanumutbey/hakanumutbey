@@ -18,6 +18,8 @@ const gameTitles = {
   hentw3: "HENTW 3",
   "hentw-premium": "HENTW Premium",
   "siber-polis": "Siber Polis",
+  "hako-vurus": "Hako Vuruş",
+  vespera: "Vespera",
 };
 
 const keyBindings = {
@@ -93,6 +95,22 @@ const mobileControlConfigs = {
     hint: "Space Arena kendi dokunmatik paneline sahip (yumruk / tekme / zıpla).",
     look: false,
     actions: [],
+  },
+  "hako-vurus": {
+    hint: "Sol taraf hareket, W zıpla. Vur ve Atıl düğmeleri sağda.",
+    look: false,
+    actions: [
+      { label: "Vur", code: "Space" },
+      { label: "Atıl", code: "ShiftLeft" },
+    ],
+  },
+  vespera: {
+    hint: "Sol taraf yürü. E konuş/topla, ateş sağda.",
+    look: false,
+    actions: [
+      { label: "E", code: "KeyE" },
+      { label: "Ateş", code: "Space" },
+    ],
   },
 };
 

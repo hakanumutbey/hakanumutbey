@@ -33,6 +33,8 @@ await copyStaticGame("siber-polis", ["package.json", "js/gameLogic.test.js"]);
 await copyStaticGame("space-arena");
 await copyStaticGame("2d-car-simulator", ["game.test.mjs"]);
 await copyStaticGame("yaris-sehri");
+await copyStaticGame("hako-vurus");
+await copyStaticGame("vespera", ["vespera.test.mjs", "browser-load.test.mjs", "site-wiring.test.mjs"]);
 await copyRobotAvcisi();
 await copyStaticProject("sesli-parti");
 console.log("[build-games] all games ready");

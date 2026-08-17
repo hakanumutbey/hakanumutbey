@@ -130,10 +130,11 @@ a {
 
 .hero {
   position: relative;
-  min-height: 92vh;
+  min-height: 0;
   display: grid;
-  align-items: end;
-  padding: 112px clamp(18px, 5vw, 64px) 56px;
+  align-items: start;
+  gap: 36px;
+  padding: 112px clamp(18px, 5vw, 64px) 48px;
   overflow: hidden;
   isolation: isolate;
 }
@@ -160,8 +161,8 @@ a {
   z-index: -1;
   content: "";
   background:
-    linear-gradient(90deg, rgba(11, 13, 16, 0.98), rgba(11, 13, 16, 0.54) 58%, rgba(11, 13, 16, 0.92)),
-    linear-gradient(0deg, rgba(11, 13, 16, 1), rgba(11, 13, 16, 0) 42%);
+    linear-gradient(180deg, rgba(11, 13, 16, 0.62) 0%, rgba(11, 13, 16, 0.88) 38%, rgba(11, 13, 16, 0.97) 100%),
+    linear-gradient(90deg, rgba(11, 13, 16, 0.92), rgba(11, 13, 16, 0.42) 58%, rgba(11, 13, 16, 0.88));
 }
 
 .hero-media {
@@ -174,8 +175,36 @@ a {
   filter: saturate(1.05) contrast(1.02);
 }
 
+.hero-intro {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
 .hero-content {
   width: min(760px, 100%);
+}
+
+.hero-games {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  scroll-margin-top: 96px;
+}
+
+.hero-games .section-heading {
+  margin-bottom: 22px;
+}
+
+.hero-games .section-heading h2 {
+  max-width: 18ch;
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
 }
 
 .eyebrow {
@@ -252,12 +281,10 @@ h3 {
 }
 
 .hero-panel {
-  position: absolute;
-  right: clamp(18px, 5vw, 64px);
-  bottom: 42px;
+  position: static;
   display: grid;
   gap: 4px;
-  width: min(260px, calc(100% - 36px));
+  width: min(220px, 100%);
   padding: 18px;
   border: 1px solid rgba(53, 210, 255, 0.28);
   border-radius: 8px;
@@ -3977,7 +4004,7 @@ h3 {
   }
 
   .hero {
-    min-height: 88vh;
+    min-height: 0;
     padding-top: 142px;
   }
 

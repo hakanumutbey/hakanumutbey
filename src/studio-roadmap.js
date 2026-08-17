@@ -157,6 +157,32 @@ export const gameExtras = {
     },
     changelog: ["Sonsuz harita", "İnşa sistemi", "Dokunmatik kontroller"],
   },
+  "hako-vurus": {
+    progress: 72,
+    difficulty: "Orta",
+    averagePlayTime: "7 dk",
+    lastUpdated: "Yeni aksiyon arenası",
+    hiddenAchievements: ["10 combo", "Bossu hasarsız geç"],
+    wiki: {
+      characters: ["Hako savaşçısı", "Gölge düşmanlar", "Arena bossu"],
+      weapons: ["Yumruk", "Atılma", "Özel vuruş"],
+      craft: ["6 combo + vuruş = özel patlama"],
+    },
+    changelog: ["Dalga sistemi", "Combo ve özel vuruş", "Mobil kontrol"],
+  },
+  vespera: {
+    progress: 40,
+    difficulty: "Orta",
+    averagePlayTime: "çok oturum",
+    lastUpdated: "Yeni uzay hikaye gezegeni",
+    hiddenAchievements: ["Arşivi ilk bakışta aç", "Bossu hasarsız kapat"],
+    wiki: {
+      characters: ["Kaşif", "KAIA", "Mira"],
+      weapons: ["Işık mermisi", "Gölge anahtarları"],
+      craft: ["Parçalar + arşiv = ters köşe"],
+    },
+    changelog: ["Sekiz adlı bölge", "Kayıtlı ilerleme", "Mira rol değişimi"],
+  },
 };
 
 export const devDiaryEntries = [

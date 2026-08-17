@@ -41,7 +41,7 @@ Bu repo `hakanumutbey` GitHub profil reposu ve ayni zamanda `https://hakorocks.a
 
 ## Dikkat edilmesi gerekenler
 
-- Mevcut oyunlar: `annenden-kac`, `bardak`, `essiz-zindan`, `skeleton-wars`, `rhgpo`, `siyah-adam`, `vale`, `robot-avcisi`, `birlesim-arenasi`, `hentw`, `hentw2`, `hentw3`, `hentw-premium`, `siber-polis`, `space-arena`, `2d-car-simulator`, `yaris-sehri`.
+- Mevcut oyunlar: `annenden-kac`, `bardak`, `essiz-zindan`, `skeleton-wars`, `rhgpo`, `siyah-adam`, `vale`, `robot-avcisi`, `birlesim-arenasi`, `hentw`, `hentw2`, `hentw3`, `hentw-premium`, `siber-polis`, `space-arena`, `2d-car-simulator`, `yaris-sehri`, `hako-vurus`, `vespera`.
 - Mevcut projeler: `sesli-parti` (yakinlik sesli sohbet; WebSocket yolu `/sesli-parti`, canli adres `/projeler/sesli-parti/`).
 - Oyunlarin browser erisimi bozulmamalidir.
 - Root `README.md` GitHub profil karşılama ekranidir; sik, Turkce ve proje durumunu anlatan bir vitrin olarak korunmalidir.
