@@ -62,10 +62,24 @@ async function copyStaticProject(slug) {
 
 async function buildViteGame(slug) {
   const cwd = join(gamesRoot, slug);
+  const prebuilt = join(cwd, "prebuilt");
+  const target = join(distGamesRoot, slug);
+
+  // Coolify/Docker: ikinci Vite+Babylon paketi (Vale) transform sırasında
+  // süreç 255 ile kesiliyor. Hazır prebuilt varsa kopyala, Vite çalıştırma.
+  if (inDocker && existsSync(join(prebuilt, "index.html"))) {
+    console.log(`[build-games] ${slug}: docker prebuilt copy`);
+    await rm(target, { recursive: true, force: true });
+    await cp(prebuilt, target, { recursive: true });
+    await injectGameTools(join(target, "index.html"));
+    console.log(`[build-games] ${slug}: done`);
+    return;
+  }
+
   console.log(`[build-games] ${slug}: ensure deps + vite build`);
   await ensureNodeModules(cwd);
-  run("npx", ["vite", "build", "--base", `/oyunlar/${slug}/`, "--outDir", join(distGamesRoot, slug), "--emptyOutDir"], cwd);
-  await injectGameTools(join(distGamesRoot, slug, "index.html"));
+  run("npx", ["vite", "build", "--base", `/oyunlar/${slug}/`, "--outDir", target, "--emptyOutDir"], cwd);
+  await injectGameTools(join(target, "index.html"));
   // Free disk/RAM during Coolify/Docker builds (two heavy vite games in a row).
   if (inDocker) {
     await rm(join(cwd, "node_modules"), { recursive: true, force: true });
