@@ -27,7 +27,7 @@ const voiceRooms = new Map();
 const siyahAdamRooms = new Map();
 const sesliPartiRooms = new Map();
 const yarisSehriWorlds = new Map();
-const games = ["annenden-kac", "bardak", "essiz-zindan", "skeleton-wars", "rhgpo", "siyah-adam", "birlesim-arenasi", "vale", "robot-avcisi", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "space-arena", "2d-car-simulator", "yaris-sehri", "hako-vurus", "vespera"];
+const games = ["annenden-kac", "bardak", "essiz-zindan", "skeleton-wars", "rhgpo", "siyah-adam", "birlesim-arenasi", "vale", "robot-avcisi", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "space-arena", "2d-car-simulator", "yaris-sehri", "hako-vurus"];
 const baseValues = {
   "annenden-kac": 128,
   bardak: 96,
@@ -46,7 +46,6 @@ const baseValues = {
   "2d-car-simulator": 99,
   "yaris-sehri": 195,
   "hako-vurus": 176,
-  vespera: 184,
 };
 const averagePlayMinutes = {
   "annenden-kac": 6,
@@ -66,7 +65,6 @@ const averagePlayMinutes = {
   "2d-car-simulator": 8,
   "yaris-sehri": 12,
   "hako-vurus": 7,
-  vespera: 16,
 };
 const voteOptionIds = ["uzay-yarisi", "market-savasi", "okul-gorevi"];
 
@@ -102,7 +100,6 @@ const YARIS_SEASON_OBJECTIVES = [
   { id: "hentw3", name: "🔥 HENTW 3 Sezonu", desc: "HENTW 3'te ateş hattında en çok kalan kazanır.", unit: "time", kind: "game-time", game: { slug: "hentw3", name: "HENTW 3" } },
   { id: "hentw-premium", name: "💎 HENTW Premium Sezonu", desc: "HENTW Premium'da en çok malzeme toplayan kazanır.", unit: "time", kind: "game-time", game: { slug: "hentw-premium", name: "HENTW Premium" } },
   { id: "hako-vurus", name: "👊 Hako Vuruş Sezonu", desc: "Hako Vuruş arenasında en uzun süre dövüşen kazanır.", unit: "time", kind: "game-time", game: { slug: "hako-vurus", name: "Hako Vuruş" } },
-  { id: "vespera", name: "🌑 Vespera Sezonu", desc: "Soluk Gezegen'de en uzun süre yürüyen kaşif kazanır.", unit: "time", kind: "game-time", game: { slug: "vespera", name: "Vespera" } },
 ];
 
 const mimeTypes = {

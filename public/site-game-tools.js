@@ -19,7 +19,6 @@ const gameTitles = {
   "hentw-premium": "HENTW Premium",
   "siber-polis": "Siber Polis",
   "hako-vurus": "Hako Vuruş",
-  vespera: "Vespera",
 };
 
 const keyBindings = {
@@ -102,14 +101,6 @@ const mobileControlConfigs = {
     actions: [
       { label: "Vur", code: "Space" },
       { label: "Atıl", code: "ShiftLeft" },
-    ],
-  },
-  vespera: {
-    hint: "3D aksiyon: sol taraf koş, A/D dön. E konuş/topla, ateş sağda.",
-    look: false,
-    actions: [
-      { label: "E", code: "KeyE" },
-      { label: "Ateş", code: "Space" },
     ],
   },
 };

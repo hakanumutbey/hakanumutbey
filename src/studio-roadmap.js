@@ -170,19 +170,6 @@ export const gameExtras = {
     },
     changelog: ["Dalga sistemi", "Combo ve özel vuruş", "Mobil kontrol"],
   },
-  vespera: {
-    progress: 40,
-    difficulty: "Orta",
-    averagePlayTime: "çok oturum",
-    lastUpdated: "3D aksiyon gezegeni",
-    hiddenAchievements: ["Arşivi ilk bakışta aç", "Bossu hasarsız kapat"],
-    wiki: {
-      characters: ["Kaşif", "KAIA", "Mira"],
-      weapons: ["Lazer", "Atılma", "Gölge anahtarları"],
-      craft: ["Parçalar + arşiv = ters köşe"],
-    },
-    changelog: ["Sekiz adlı bölge", "Kayıtlı ilerleme", "Mira rol değişimi"],
-  },
 };
 
 export const devDiaryEntries = [

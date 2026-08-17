@@ -17,22 +17,6 @@ import {
 
 const games = [
   {
-    slug: "vespera",
-    title: "Vespera",
-    path: "/oyunlar/vespera/",
-    type: "3D Uzay Aksiyonu",
-    status: "Oynanabilir",
-    description: "3D gezegende koş, drone'ları parçala, parçaları kap ve Mira'nın ters köşesine dayan.",
-    longDescription: "Vespera — üçüncü şahıs 3D aksiyon. WASD ile koş, fare ile bak, atıl ve lazerle vur. Sekiz adlı bölge, kayıtlı hikaye ve Sessiz Krater'de Mira'nın rol değişimi duruyor; şimdi her bölgede savaş da var.",
-    accent: "nova",
-    controls: "WASD koş, fare bakış, Shift atıl, tık/J ateş, E konuş · dokunmatik",
-    mobileStatus: "Mobil uyumlu",
-    mobileNote: "Ekran altı hareket, E ve ateş düğmeleri ile telefonda oynanır.",
-    achievements: ["İlk drone'u düşür", "Ters köşeyi gör", "Çekirdeği kapat"],
-    updates: ["3D üçüncü şahıs aksiyon", "Bölge drone savaşları", "Mira ters köşesi + kayıt"],
-    stockBase: 184,
-  },
-  {
     slug: "hako-vurus",
     title: "Hako Vuruş",
     path: "/oyunlar/hako-vurus/",
@@ -320,7 +304,7 @@ const games = [
 ];
 
 const FUSION_GAME_PATH = "/oyunlar/birlesim-arenasi/";
-const NEW_GAME_SLUGS = new Set(["hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "2d-car-simulator", "yaris-sehri", "hako-vurus", "vespera"]);
+const NEW_GAME_SLUGS = new Set(["hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "2d-car-simulator", "yaris-sehri", "hako-vurus"]);
 /** Only games the Birleşim Arenası client actually implements. */
 const FUSION_GAME_SLUGS = new Set([
   "annenden-kac",
@@ -390,11 +374,6 @@ const mobileFeatures = [
 ];
 
 const newsItems = [
-  {
-    date: "Yeni",
-    title: "Vespera yayında",
-    description: "Tek gezegen, uzun hikaye, kayıt ve ters köşe: Mira sandığın kişi değil.",
-  },
   {
     date: "Yeni",
     title: "Hako Vuruş yayında",
