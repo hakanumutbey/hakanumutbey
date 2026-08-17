@@ -1177,7 +1177,7 @@ document.querySelector("#app").innerHTML = `
       <div class="section-heading">
         <p class="eyebrow">Hesap merkezi</p>
         <h2 id="social-title">Profil, arkadaş, davet ve hesap yönetimi.</h2>
-        <p class="section-note">İsim, takma ad ve şifre ile hesap oluştur. Profil resmi eklersen görünür; eklemezsen adının baş harfi kullanılır.</p>
+        <p class="section-note">İsim, takma ad ve şifre ile hesap oluştur. Bildirimleri açarsan yeni oyun, günün oyunu, duyuru ve sezon haberini masaüstünde söyleriz.</p>
       </div>
       <div class="account-layout">
         <article class="account-panel">
@@ -5682,8 +5682,85 @@ async function requestNotificationPermission() {
   const status = document.querySelector("[data-account-status]");
   if (status) {
     status.textContent = notificationPermission === "granted"
-      ? "Masaüstü bildirimleri açıldı."
+      ? "Bildirimler açık: yeni oyun, günün oyunu, duyuru ve sezon."
       : "Bildirim izni verilmedi.";
+  }
+  if (notificationPermission === "granted") {
+    notifyStudio(
+      "Hakorocks Studio",
+      "Bildirimler açık. Yeni oyun, günün oyunu ve duyuruları buradan söyleriz.",
+      "welcome"
+    );
+    maybeNotifyStudioNews({ greetDaily: true });
+  }
+}
+
+function notifyStudio(title, body, tag) {
+  if (typeof Notification === "undefined" || notificationPermission !== "granted") return;
+  try {
+    new Notification(title, {
+      body,
+      tag: tag ? `hakorocks-${tag}` : undefined,
+    });
+  } catch (error) {
+    console.warn("Bildirim atlandı:", error);
+  }
+}
+
+function readSeenSet(key) {
+  try {
+    const raw = JSON.parse(localStorage.getItem(key) || "[]");
+    return new Set(Array.isArray(raw) ? raw : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function writeSeenSet(key, set) {
+  try {
+    localStorage.setItem(key, JSON.stringify([...set]));
+  } catch {}
+}
+
+function maybeNotifyStudioNews({ greetDaily = false } = {}) {
+  if (typeof Notification === "undefined" || notificationPermission !== "granted") return;
+
+  const seenGames = readSeenSet("hakorocks-seen-games");
+  if (seenGames.size === 0) {
+    writeSeenSet("hakorocks-seen-games", new Set(games.map((game) => game.slug)));
+  } else {
+    for (const game of games) {
+      if (seenGames.has(game.slug)) continue;
+      notifyStudio("Yeni oyun", `${game.title} yayında. ${game.description}`, `game-${game.slug}`);
+      seenGames.add(game.slug);
+    }
+    writeSeenSet("hakorocks-seen-games", seenGames);
+  }
+
+  const seenNotes = readSeenSet("hakorocks-seen-announcements");
+  const noteIds = (latestAnnouncements || []).map((item) => item.id || `${item.createdAt || ""}:${item.title || ""}`);
+  if (seenNotes.size === 0) {
+    writeSeenSet("hakorocks-seen-announcements", new Set(noteIds));
+  } else {
+    for (const item of latestAnnouncements || []) {
+      const id = item.id || `${item.createdAt || ""}:${item.title || ""}`;
+      if (!id || seenNotes.has(id)) continue;
+      notifyStudio("Yeni duyuru", `${item.title || "Duyuru"}: ${item.message || ""}`.slice(0, 140), `note-${id}`);
+      seenNotes.add(id);
+    }
+    writeSeenSet("hakorocks-seen-announcements", seenNotes);
+  }
+
+  const today = dailyBadgeKey();
+  const dailySeen = localStorage.getItem("hakorocks-daily-notify") || "";
+  if (greetDaily || dailySeen !== today) {
+    const daily = getDailyGame();
+    if (daily && dailySeen !== today) {
+      notifyStudio("Günün oyunu", `Bugün ${daily.title}. ${daily.description}`, `daily-${today}`);
+      try {
+        localStorage.setItem("hakorocks-daily-notify", today);
+      } catch {}
+    }
   }
 }
 
@@ -5853,6 +5930,7 @@ async function refreshLiveData() {
   renderSocialDashboard();
   maybeNotifySocialChanges();
   maybeNotifySeasonChange();
+  maybeNotifyStudioNews();
   refreshPublicState();
   refreshBanStatus();
   const gameModal = document.querySelector("[data-game-modal]");
@@ -6015,6 +6093,17 @@ function maybeNotifySeasonChange() {
     seen = Number(localStorage.getItem("hakorocks-season-seen") || 0);
   } catch {}
   if (latestSeason.season <= seen) return;
+  try {
+    const seasonNotified = Number(localStorage.getItem("hakorocks-season-notify") || 0);
+    if (seasonNotified < latestSeason.season) {
+      notifyStudio(
+        "Yeni sezon",
+        latestSeason.objective?.name || `Sezon ${latestSeason.season} başladı.`,
+        `season-${latestSeason.season}`
+      );
+      localStorage.setItem("hakorocks-season-notify", String(latestSeason.season));
+    }
+  } catch {}
   if (document.querySelector("[data-season-toast]")) return;
   const objective = latestSeason.objective;
   const toast = document.createElement("div");
