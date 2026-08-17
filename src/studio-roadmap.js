@@ -174,11 +174,11 @@ export const gameExtras = {
     progress: 40,
     difficulty: "Orta",
     averagePlayTime: "çok oturum",
-    lastUpdated: "Yeni uzay hikaye gezegeni",
+    lastUpdated: "3D aksiyon gezegeni",
     hiddenAchievements: ["Arşivi ilk bakışta aç", "Bossu hasarsız kapat"],
     wiki: {
       characters: ["Kaşif", "KAIA", "Mira"],
-      weapons: ["Işık mermisi", "Gölge anahtarları"],
+      weapons: ["Lazer", "Atılma", "Gölge anahtarları"],
       craft: ["Parçalar + arşiv = ters köşe"],
     },
     changelog: ["Sekiz adlı bölge", "Kayıtlı ilerleme", "Mira rol değişimi"],

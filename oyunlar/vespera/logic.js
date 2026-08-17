@@ -41,11 +41,26 @@
   ];
 
   const HAZARDS = [
-    { id: "dust-1", x: 480, y: 400, r: 28, dmg: 6, fromBeat: 1 },
-    { id: "dust-2", x: 1880, y: 360, r: 30, dmg: 8, fromBeat: 3 },
-    { id: "ice-1", x: 260, y: 1080, r: 26, dmg: 7, fromBeat: 4 },
-    { id: "shadow-1", x: 900, y: 1960, r: 32, dmg: 10, fromBeat: 7 },
-    { id: "core-ring", x: 2480, y: 2040, r: 46, dmg: 12, fromBeat: 8 },
+    { id: "dust-1", x: 480, y: 400, r: 22, dmg: 7, fromBeat: 1 },
+    { id: "dust-1b", x: 360, y: 620, r: 20, dmg: 7, fromBeat: 1 },
+    { id: "dust-1c", x: 700, y: 280, r: 20, dmg: 7, fromBeat: 1 },
+    { id: "glass-1", x: 980, y: 260, r: 22, dmg: 8, fromBeat: 2 },
+    { id: "glass-2", x: 1280, y: 520, r: 22, dmg: 8, fromBeat: 2 },
+    { id: "dust-2", x: 1880, y: 360, r: 22, dmg: 9, fromBeat: 3 },
+    { id: "dust-2b", x: 2140, y: 640, r: 22, dmg: 9, fromBeat: 3 },
+    { id: "dust-2c", x: 2300, y: 240, r: 22, dmg: 9, fromBeat: 3 },
+    { id: "ice-1", x: 260, y: 1080, r: 22, dmg: 8, fromBeat: 4 },
+    { id: "ice-2", x: 620, y: 1380, r: 22, dmg: 8, fromBeat: 4 },
+    { id: "red-1", x: 1320, y: 1040, r: 22, dmg: 9, fromBeat: 5 },
+    { id: "red-2", x: 1760, y: 1420, r: 22, dmg: 9, fromBeat: 5 },
+    { id: "crater-1", x: 2480, y: 980, r: 24, dmg: 10, fromBeat: 6 },
+    { id: "crater-2", x: 2860, y: 1360, r: 24, dmg: 10, fromBeat: 6 },
+    { id: "shadow-1", x: 900, y: 1960, r: 24, dmg: 11, fromBeat: 7 },
+    { id: "shadow-2", x: 420, y: 2140, r: 24, dmg: 11, fromBeat: 7 },
+    { id: "shadow-3", x: 1400, y: 1880, r: 24, dmg: 11, fromBeat: 7 },
+    { id: "core-ring", x: 2480, y: 2040, r: 36, dmg: 13, fromBeat: 8 },
+    { id: "core-a", x: 2220, y: 1880, r: 24, dmg: 12, fromBeat: 8 },
+    { id: "core-b", x: 2720, y: 2180, r: 24, dmg: 12, fromBeat: 8 },
   ];
 
   const BEATS = [

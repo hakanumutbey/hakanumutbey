@@ -93,14 +93,16 @@ h1 {
   border: 2px solid var(--line);
   border-radius: 14px;
   overflow: hidden;
-  background: #0a0814;
+  background: #05040a;
   box-shadow: 0 16px 44px rgba(0, 0, 0, 0.45);
+  min-height: min(62vh, 620px);
 }
 
 canvas {
   display: block;
   width: 100%;
-  height: auto;
+  height: min(62vh, 620px);
+  cursor: crosshair;
 }
 
 .hud {

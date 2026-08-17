@@ -1,5 +1,6 @@
 (() => {
   const V = typeof window !== "undefined" ? window.Vespera : null;
+  const THREE = typeof window !== "undefined" ? window.THREE : null;
   const api = {
     ready: Boolean(V),
     mode: "boot",
@@ -24,56 +25,68 @@
   const hpFill = typeof document !== "undefined" ? document.getElementById("hpFill") : null;
   const storyLog = typeof document !== "undefined" ? document.getElementById("storyLog") : null;
   const fileHint = typeof document !== "undefined" ? document.getElementById("fileHint") : null;
-  const ctx = canvas && canvas.getContext ? canvas.getContext("2d") : null;
-  const W = canvas ? canvas.width : 960;
-  const H = canvas ? canvas.height : 540;
-  const keys = new Set();
-  const shots = [];
-  const motes = [];
   const storage = typeof localStorage !== "undefined" ? localStorage : null;
+  const keys = new Set();
 
   let state = V.createState();
-  let camX = state.x - W / 2;
-  let camY = state.y - H / 2;
   let last = 0;
   let logTimer = 0;
   let lastBeat = "";
+  let yaw = 0;
+  let pitch = 0.28;
+  let dash = 0;
+  let dashCd = 0;
+  let shootCd = 0;
+  let world = null;
 
   if (typeof document !== "undefined" && document.location && document.location.protocol === "file:") {
-    if (fileHint) {
-      fileHint.textContent = "Bu oyun file:// ile de açılır. Sitede yol: /oyunlar/vespera/";
-    }
+    if (fileHint) fileHint.textContent = "Bu oyun file:// ile de açılır. Sitede yol: /oyunlar/vespera/";
   }
 
-  if (!canvas || !ctx) {
+  if (!canvas || !THREE) {
     api.mode = "headless";
     return;
   }
 
+  world = buildWorld();
   showMenu();
   requestAnimationFrame(loop);
+  bindInput();
 
-  window.addEventListener("keydown", (event) => {
-    if (["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName)) return;
-    if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) {
-      event.preventDefault();
-    }
-    keys.add(event.code);
-    if (api.mode === "playing") {
-      if (event.code === "KeyE") doInteract();
-      if (event.code === "Space" || event.code === "KeyJ") shoot();
-    } else if ((api.mode === "menu" || api.mode === "ended") && (event.code === "Enter" || event.code === "Space")) {
-      startNew();
-    }
-  });
-  window.addEventListener("keyup", (event) => keys.delete(event.code));
-  overlay?.addEventListener("click", (event) => {
-    const btn = event.target.closest("[data-act]");
-    if (!btn) return;
-    if (btn.dataset.act === "new") startNew();
-    if (btn.dataset.act === "continue") continueSave();
-    if (btn.dataset.act === "menu") showMenu();
-  });
+  function bindInput() {
+    window.addEventListener("keydown", (event) => {
+      if (["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName)) return;
+      if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) event.preventDefault();
+      keys.add(event.code);
+      if (api.mode === "playing") {
+        if (event.code === "KeyE") doInteract();
+        if (event.code === "Space" || event.code === "KeyJ") shoot();
+        if (event.code === "ShiftLeft" || event.code === "ShiftRight" || event.code === "KeyK") tryDash();
+      } else if ((api.mode === "menu" || api.mode === "ended") && (event.code === "Enter" || event.code === "Space")) {
+        startNew();
+      }
+    });
+    window.addEventListener("keyup", (event) => keys.delete(event.code));
+    overlay?.addEventListener("click", (event) => {
+      const btn = event.target.closest("[data-act]");
+      if (!btn) return;
+      if (btn.dataset.act === "new") startNew();
+      if (btn.dataset.act === "continue") continueSave();
+      if (btn.dataset.act === "menu") showMenu();
+    });
+    canvas.addEventListener("click", () => {
+      if (api.mode === "playing") {
+        canvas.requestPointerLock?.();
+        shoot();
+      }
+    });
+    document.addEventListener("mousemove", (event) => {
+      if (document.pointerLockElement !== canvas || api.mode !== "playing") return;
+      yaw -= event.movementX * 0.0024;
+      pitch = clamp(pitch - event.movementY * 0.0018, 0.08, 0.7);
+    });
+    window.addEventListener("resize", fitRenderer);
+  }
 
   function showMenu() {
     api.mode = "menu";
@@ -83,9 +96,9 @@
     const has = V.hasSave(storage);
     overlayCard.innerHTML = `
       <h2>Vespera</h2>
-      <p>Roket Soluk Gezegen'e düştü. Bölgeleri yürü, parçaları topla, insanlarla konuş. Bu yol kısa bir oturumda bitmez.</p>
+      <p>3D gezegende koş ve ateş et. Drone'lar peşinde. Hikaye uzun; Mira sandığın kişi değil.</p>
       <div class="actions">
-        <button class="go" type="button" data-act="new">Yeni macera</button>
+        <button class="go" type="button" data-act="new">Dövüşe gir</button>
         ${has ? '<button class="ghost" type="button" data-act="continue">Yarıda devam</button>' : ""}
       </div>
     `;
@@ -93,9 +106,9 @@
 
   function startNew() {
     state = V.createState();
-    shots.length = 0;
+    resetWorld();
     lastBeat = "";
-    beginPlay("KAIA: Uyandın. Burası Vespera. Önce beni dinle.");
+    beginPlay("KAIA: Uyandın. Burası Vespera. Silahın hazır, önce beni dinle.");
   }
 
   function continueSave() {
@@ -109,38 +122,36 @@
       startNew();
       return;
     }
-    shots.length = 0;
+    resetWorld();
     lastBeat = V.getCurrentBeat(state).id;
-    beginPlay("Kayıt yüklendi. Kaldığın yerden devam.");
+    beginPlay("Kayıt yüklendi. Silahı çek, kaldığın yerden devam.");
   }
 
   function beginPlay(line) {
     api.mode = "playing";
     if (overlay) overlay.hidden = true;
     if (hud) hud.hidden = false;
-    camX = Math.max(0, Math.min(V.PLANET.w - W, state.x - W / 2));
-    camY = Math.max(0, Math.min(V.PLANET.h - H, state.y - H / 2));
     say(line);
     paintHud();
+    syncMeshes();
     V.saveTo(state, storage);
   }
 
   function endPlay() {
     api.mode = "ended";
     if (overlay) overlay.hidden = false;
+    document.exitPointerLock?.();
     V.saveTo(state, storage);
     if (V.isWon(state)) {
       overlayCard.innerHTML = `
-        <h2>Gezegen durdu</h2>
-        <p>Mira çekirdekti. Sinyal bir tuzakmış. Vespera sustu; eve dönüş yolu açıldı.</p>
-        <div class="actions">
-          <button class="go" type="button" data-act="menu">Menü</button>
-        </div>
+        <h2>Çekirdek kapandı</h2>
+        <p>Mira gezegenin kendisiydi. Savaş bitti. Eve dönüş yolu açık.</p>
+        <div class="actions"><button class="go" type="button" data-act="menu">Menü</button></div>
       `;
     } else {
       overlayCard.innerHTML = `
-        <h2>Tozun içinde kaldın</h2>
-        <p>Canın bitti. Kayıt durduğu yerde. Tekrar dene, yarıdan devam et.</p>
+        <h2>Düştün</h2>
+        <p>Drone'lar seni yere serdi. Yarıdan devam et, bu kez daha hızlı ateş et.</p>
         <div class="actions">
           <button class="go" type="button" data-act="continue">Yarıda devam</button>
           <button class="ghost" type="button" data-act="new">Baştan</button>
@@ -155,30 +166,44 @@
     const result = V.interact(state);
     if (result.ok) {
       if (result.kind === "talk") say(lineFor(result.npcId));
-      if (result.kind === "collect") say("Parça yerini buldu. " + V.getObjective(state));
-      if (result.kind === "event") say("Arşiv: Mira kurtarıcı değil. Koloni yapay zekâsı. Çekirdek uyanıyor.");
+      if (result.kind === "collect") say("Parça alındı. " + V.getObjective(state));
+      if (result.kind === "event") say("Arşiv: Mira kurtarıcı değil. Koloni yapay zekâsı. Savaş!");
       if (result.kind === "boss-hit") say("Çekirdek sarsıldı.");
       if (V.getCurrentBeat(state).id !== before) V.saveTo(state, storage);
       paintHud();
+      syncMeshes();
       if (V.getOutcome(state) !== "playing") endPlay();
     }
     return result;
   }
 
+  function tryDash() {
+    if (dash > 0 || dashCd > 0 || api.mode !== "playing") return;
+    dash = 0.18;
+    dashCd = 0.7;
+  }
+
   function shoot() {
-    if (api.mode !== "playing" || V.getOutcome(state) !== "playing") return;
-    shots.push({
-      x: state.x + state.facing * 18,
-      y: state.y,
-      vx: state.facing * 420,
-      vy: 0,
+    if (api.mode !== "playing" || V.getOutcome(state) !== "playing" || shootCd > 0) return;
+    shootCd = 0.14;
+    const dirX = Math.sin(yaw);
+    const dirZ = Math.cos(yaw);
+    const bolt = {
+      x: state.x + dirX * 18,
+      z: state.y + dirZ * 18,
+      vx: dirX * 920,
+      vz: dirZ * 920,
       life: 0.7,
-    });
+      mesh: makeBolt(),
+    };
+    bolt.mesh.position.set(bolt.x, 1.4, bolt.z);
+    world.scene.add(bolt.mesh);
+    world.shots.push(bolt);
   }
 
   function lineFor(npcId) {
-    if (npcId === "kaia") return "KAIA: İşaret parçalarını topla. Ben kurtarma kanalını açacağım.";
-    if (npcId === "mira") return "Mira: Ben de düştüm. İstasyondaki hücreler lazım. Sana yol göstereceğim.";
+    if (npcId === "kaia") return "KAIA: İşaretleri topla. Drone'lar uyanıyor, ateş etmeyi unutma.";
+    if (npcId === "mira") return "Mira: Birlikte sinyal kuralım. İstasyondaki hücreler lazım.";
     return V.getObjective(state);
   }
 
@@ -186,14 +211,14 @@
     if (!storyLog) return;
     storyLog.hidden = false;
     storyLog.textContent = text;
-    logTimer = 6;
+    logTimer = 5.5;
   }
 
   function loop(now) {
     const dt = Math.min(0.033, (now - last) / 1000 || 0.016);
     last = now;
     if (api.mode === "playing") step(dt);
-    draw();
+    render();
     requestAnimationFrame(loop);
   }
 
@@ -202,57 +227,73 @@
       endPlay();
       return;
     }
-    let dx = 0;
-    let dy = 0;
-    if (keys.has("KeyA") || keys.has("ArrowLeft")) dx -= 1;
-    if (keys.has("KeyD") || keys.has("ArrowRight")) dx += 1;
-    if (keys.has("KeyW") || keys.has("ArrowUp")) dy -= 1;
-    if (keys.has("KeyS") || keys.has("ArrowDown")) dy += 1;
-    if (dx || dy) {
-      const len = Math.hypot(dx, dy) || 1;
-      V.tryMove(state, (dx / len) * 210 * dt, (dy / len) * 210 * dt);
-    }
+    dash = Math.max(0, dash - dt);
+    dashCd = Math.max(0, dashCd - dt);
+    shootCd = Math.max(0, shootCd - dt);
     V.tickIFrames(state);
-    for (const hazard of V.HAZARDS) V.resolveHazardHit(state, hazard);
 
-    for (let i = shots.length - 1; i >= 0; i -= 1) {
-      const shot = shots[i];
+    let ax = 0;
+    let az = 0;
+    if (keys.has("KeyW") || keys.has("ArrowUp")) az += 1;
+    if (keys.has("KeyS") || keys.has("ArrowDown")) az -= 1;
+    if (keys.has("KeyA") || keys.has("ArrowLeft")) ax -= 1;
+    if (keys.has("KeyD") || keys.has("ArrowRight")) ax += 1;
+    if (document.pointerLockElement !== canvas) {
+      if (keys.has("KeyA") || keys.has("ArrowLeft")) {
+        yaw += 2.2 * dt;
+        ax = 0;
+      }
+      if (keys.has("KeyD") || keys.has("ArrowRight")) {
+        yaw -= 2.2 * dt;
+        ax = 0;
+      }
+    }
+    if (ax || az) {
+      const len = Math.hypot(ax, az) || 1;
+      ax /= len;
+      az /= len;
+      const fx = Math.sin(yaw);
+      const fz = Math.cos(yaw);
+      const rx = Math.cos(yaw);
+      const rz = -Math.sin(yaw);
+      const speed = (dash > 0 ? 620 : 340) * dt;
+      V.tryMove(state, (fx * az + rx * ax) * speed, (fz * az + rz * ax) * speed);
+    }
+    if (dash > 0) state.iFrames = Math.max(state.iFrames, 4);
+
+    for (const enemy of world.enemies) tickEnemy(enemy, dt);
+    for (let i = world.shots.length - 1; i >= 0; i -= 1) {
+      const shot = world.shots[i];
       shot.x += shot.vx * dt;
-      shot.y += shot.vy * dt;
+      shot.z += shot.vz * dt;
       shot.life -= dt;
+      shot.mesh.position.set(shot.x, 1.4, shot.z);
+      let hit = false;
+      for (const enemy of world.enemies) {
+        if (!enemy.alive || state.beatIndex < enemy.fromBeat) continue;
+        if (Math.hypot(shot.x - enemy.x, shot.z - enemy.z) < 22) {
+          enemy.hp -= 12;
+          hit = true;
+          if (enemy.hp <= 0) {
+            enemy.alive = false;
+            enemy.mesh.visible = false;
+          }
+        }
+      }
       const beat = V.getCurrentBeat(state);
       if (beat.type === "boss") {
         const boss = V.NPCS.find((npc) => npc.id === "mira-core");
-        if (boss && V.overlapCircles(shot.x, shot.y, 6, boss.x, boss.y, 36)) {
-          V.applyBossDamage(state, 10);
-          shot.life = 0;
+        if (boss && Math.hypot(shot.x - boss.x, shot.z - boss.y) < 38) {
+          V.applyBossDamage(state, 9);
+          hit = true;
         }
       }
-      if (shot.life <= 0) shots.splice(i, 1);
+      if (hit || shot.life <= 0) {
+        world.scene.remove(shot.mesh);
+        world.shots.splice(i, 1);
+      }
     }
 
-    if (Math.random() < dt * 8) {
-      motes.push({
-        x: camX + Math.random() * W,
-        y: camY + Math.random() * H,
-        vx: -20 - Math.random() * 30,
-        vy: 10 + Math.random() * 20,
-        life: 1.4,
-        c: Math.random() < 0.5 ? "#c48cff" : "#35d2ff",
-      });
-    }
-    for (let i = motes.length - 1; i >= 0; i -= 1) {
-      const mote = motes[i];
-      mote.x += mote.vx * dt;
-      mote.y += mote.vy * dt;
-      mote.life -= dt;
-      if (mote.life <= 0) motes.splice(i, 1);
-    }
-
-    camX += (state.x - W / 2 - camX) * Math.min(1, dt * 5);
-    camY += (state.y - H / 2 - camY) * Math.min(1, dt * 5);
-    camX = Math.max(0, Math.min(V.PLANET.w - W, camX));
-    camY = Math.max(0, Math.min(V.PLANET.h - H, camY));
     if (logTimer > 0) {
       logTimer -= dt;
       if (logTimer <= 0 && storyLog) storyLog.hidden = true;
@@ -263,7 +304,27 @@
       V.saveTo(state, storage);
     }
     paintHud();
+    syncMeshes();
     if (V.getOutcome(state) !== "playing") endPlay();
+  }
+
+  function tickEnemy(enemy, dt) {
+    if (!enemy.alive || state.beatIndex < enemy.fromBeat) {
+      enemy.mesh.visible = false;
+      return;
+    }
+    enemy.mesh.visible = true;
+    const dx = state.x - enemy.x;
+    const dz = state.y - enemy.z;
+    const dist = Math.hypot(dx, dz) || 1;
+    const speed = enemy.id === "core-ring" ? 40 : 95;
+    enemy.x += (dx / dist) * speed * dt;
+    enemy.z += (dz / dist) * speed * dt;
+    enemy.mesh.position.set(enemy.x, 1.2 + Math.sin(performance.now() / 180 + enemy.x) * 0.15, enemy.z);
+    enemy.mesh.rotation.y += dt * 3;
+    if (V.overlapCircles(state.x, state.y, V.PLAYER_R, enemy.x, enemy.z, enemy.r)) {
+      V.applyPlayerDamage(state, enemy.dmg);
+    }
   }
 
   function paintHud() {
@@ -273,289 +334,228 @@
     if (hpFill) hpFill.style.width = `${Math.max(0, (state.hp / state.maxHp) * 100)}%`;
   }
 
-  function draw() {
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    drawSky();
-    ctx.save();
-    ctx.translate(-camX, -camY);
-    drawGround();
-    drawLandmarks();
-    for (const item of V.ITEMS) {
-      if (state.collected[item.id]) continue;
-      drawItem(item);
+  function syncMeshes() {
+    if (!world) return;
+    world.player.position.set(state.x, 0, state.y);
+    world.player.rotation.y = yaw;
+    for (const item of world.items) {
+      item.mesh.visible = !state.collected[item.id];
+      item.mesh.rotation.y += 0.03;
+      item.mesh.position.y = 1.1 + Math.sin(performance.now() / 250 + item.x) * 0.18;
     }
-    for (const npc of V.NPCS) drawNpc(npc);
-    for (const hazard of V.HAZARDS) {
-      if (state.beatIndex >= (hazard.fromBeat || 0)) drawHazard(hazard);
+    for (const npc of world.npcs) {
+      const beat = V.getCurrentBeat(state);
+      if (npc.id === "mira-core") npc.mesh.visible = beat.type === "boss" || beat.id === "done";
+      if (npc.id === "mira") {
+        const mat = npc.mesh.userData.body.material;
+        mat.color.set(state.miraRole === "enemy" ? 0xff4d6d : 0x8fff6a);
+      }
     }
-    for (const shot of shots) {
-      ctx.fillStyle = "#fff6c8";
-      ctx.shadowColor = "#ffd166";
-      ctx.shadowBlur = 12;
-      ctx.fillRect(shot.x - 5, shot.y - 2, 10, 4);
-      ctx.shadowBlur = 0;
-    }
-    drawPlayer();
-    ctx.restore();
-    for (const mote of motes) {
-      ctx.globalAlpha = Math.max(0, mote.life);
-      ctx.fillStyle = mote.c;
-      ctx.fillRect(mote.x - camX, mote.y - camY, 2, 2);
-      ctx.globalAlpha = 1;
-    }
-    drawVignette();
-    if (api.mode === "playing") drawCompass();
+    updateCamera();
   }
 
-  function drawSky() {
-    const sky = ctx.createLinearGradient(0, 0, 0, H);
-    sky.addColorStop(0, "#12081c");
-    sky.addColorStop(0.45, "#1a102c");
-    sky.addColorStop(1, "#2a1430");
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = "#fff4d8";
-    ctx.beginPath();
-    ctx.arc(W - 120, 70, 38, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#1a102c";
-    ctx.beginPath();
-    ctx.arc(W - 104, 62, 30, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.55)";
-    for (let i = 0; i < 48; i += 1) {
-      const sx = ((i * 97 + camX * 0.08) % W + W) % W;
-      const sy = ((i * 53 + camY * 0.04) % 180 + 180) % 180;
-      ctx.fillRect(sx, sy, i % 7 === 0 ? 2 : 1, i % 7 === 0 ? 2 : 1);
+  function updateCamera() {
+    const back = 28;
+    const height = 14 + pitch * 18;
+    const cx = state.x - Math.sin(yaw) * back;
+    const cz = state.y - Math.cos(yaw) * back;
+    world.camera.position.lerp(new THREE.Vector3(cx, height, cz), 0.18);
+    world.camera.lookAt(state.x, 1.6, state.y);
+  }
+
+  function render() {
+    if (!world) return;
+    world.renderer.render(world.scene, world.camera);
+  }
+
+  function resetWorld() {
+    yaw = 0;
+    pitch = 0.28;
+    dash = 0;
+    world.shots.splice(0).forEach((shot) => world.scene.remove(shot.mesh));
+    for (const enemy of world.enemies) {
+      const src = V.HAZARDS.find((item) => item.id === enemy.id);
+      enemy.x = src.x;
+      enemy.z = src.y;
+      enemy.hp = 28;
+      enemy.alive = true;
+      enemy.mesh.visible = state.beatIndex >= enemy.fromBeat;
+      enemy.mesh.position.set(enemy.x, 1.2, enemy.z);
     }
-    ctx.fillStyle = "rgba(196,140,255,0.12)";
-    ctx.beginPath();
-    ctx.ellipse(W * 0.3, 90, 180, 40, 0.2, 0, Math.PI * 2);
-    ctx.fill();
   }
 
-  function hash(x, y) {
-    const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
-    return n - Math.floor(n);
+  function buildWorld() {
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x070614);
+    scene.fog = new THREE.FogExp2(0x0b0816, 0.0016);
+    const camera = new THREE.PerspectiveCamera(62, 16 / 9, 0.4, 4200);
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.6));
+    renderer.shadowMap.enabled = true;
+    fitRenderer.renderer = renderer;
+    fitRenderer.camera = camera;
+    fitRenderer();
+
+    scene.add(new THREE.HemisphereLight(0xb8d4ff, 0x221018, 0.7));
+    const sun = new THREE.DirectionalLight(0xffe0c0, 1.15);
+    sun.position.set(600, 420, 200);
+    sun.castShadow = true;
+    scene.add(sun);
+    const rim = new THREE.PointLight(0x9d4edd, 1.4, 1800);
+    rim.position.set(2480, 80, 2040);
+    scene.add(rim);
+
+    addStars(scene);
+    addGround(scene);
+    addLandmarks(scene);
+
+    const player = makePlayer();
+    scene.add(player);
+    const items = V.ITEMS.map((item) => {
+      const mesh = makeCrystal(0xffd166);
+      mesh.position.set(item.x, 1.1, item.y);
+      scene.add(mesh);
+      return { ...item, mesh };
+    });
+    const npcs = V.NPCS.map((npc) => {
+      const mesh = makeNpc(npc);
+      mesh.position.set(npc.x, 0, npc.y);
+      scene.add(mesh);
+      return { ...npc, mesh };
+    });
+    const enemies = V.HAZARDS.map((hazard) => {
+      const mesh = makeDrone(hazard.id.includes("core") ? 0xff4d6d : 0xc46cff);
+      mesh.position.set(hazard.x, 1.2, hazard.y);
+      scene.add(mesh);
+      return { ...hazard, z: hazard.y, hp: 28, alive: true, mesh };
+    });
+
+    return { scene, camera, renderer, player, items, npcs, enemies, shots: [] };
   }
 
-  function drawGround() {
+  function addStars(scene) {
+    const count = 700;
+    const pos = new Float32Array(count * 3);
+    for (let i = 0; i < count; i += 1) {
+      pos[i * 3] = Math.random() * 3600 - 200;
+      pos[i * 3 + 1] = 80 + Math.random() * 280;
+      pos[i * 3 + 2] = Math.random() * 2800 - 200;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    scene.add(new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xffffff, size: 1.6 })));
+  }
+
+  function addGround(scene) {
+    const w = V.PLANET.w;
+    const h = V.PLANET.h;
+    const geo = new THREE.PlaneGeometry(w, h, 32, 24);
+    geo.rotateX(-Math.PI / 2);
+    const colors = [];
+    const pos = geo.attributes.position;
+    for (let i = 0; i < pos.count; i += 1) {
+      const x = pos.getX(i) + w / 2;
+      const z = pos.getZ(i) + h / 2;
+      const region = V.regionAt(x, z) || V.REGIONS[0];
+      const c = new THREE.Color(region.ground);
+      colors.push(c.r, c.g, c.b);
+    }
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0.08 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(w / 2, 0, h / 2);
+    mesh.receiveShadow = true;
+    scene.add(mesh);
     for (const region of V.REGIONS) {
-      ctx.fillStyle = region.ground;
-      ctx.fillRect(region.x, region.y, region.w, region.h);
-      ctx.strokeStyle = "rgba(255,255,255,0.06)";
-      ctx.strokeRect(region.x + 8, region.y + 8, region.w - 16, region.h - 16);
-      ctx.fillStyle = region.accent + "33";
-      for (let i = 0; i < 28; i += 1) {
-        const px = region.x + 20 + hash(i, region.x) * (region.w - 40);
-        const py = region.y + 20 + hash(region.y, i) * (region.h - 40);
-        ctx.beginPath();
-        ctx.arc(px, py, 6 + hash(i, 3) * 16, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.strokeStyle = region.accent + "55";
-      ctx.lineWidth = 2;
-      for (let i = 0; i < 5; i += 1) {
-        const y = region.y + 80 + i * (region.h / 6);
-        ctx.beginPath();
-        ctx.moveTo(region.x + 24, y);
-        ctx.quadraticCurveTo(region.x + region.w * 0.5, y + (hash(i, 9) - 0.5) * 40, region.x + region.w - 24, y);
-        ctx.stroke();
-      }
-      ctx.lineWidth = 1;
-      if (!V.isRegionUnlocked(state, region.id)) {
-        ctx.fillStyle = "rgba(4,3,8,0.45)";
-        ctx.fillRect(region.x, region.y, region.w, region.h);
-      }
+      const line = new THREE.Mesh(
+        new THREE.BoxGeometry(region.w - 20, 0.4, 2),
+        new THREE.MeshBasicMaterial({ color: region.accent, transparent: true, opacity: 0.35 })
+      );
+      line.position.set(region.x + region.w / 2, 0.2, region.y + 12);
+      scene.add(line);
     }
   }
 
-  function drawLandmarks() {
-    drawWreck(168, 360);
-    drawTrees(1040, 200);
-    drawStation(1980, 160);
-    drawIce(360, 1040);
-    drawCrater(2580, 1180);
-    drawCity(700, 1860);
-    drawCore(2480, 2040);
-  }
-
-  function drawWreck(x, y) {
-    ctx.fillStyle = "#6b7380";
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + 90, y + 18);
-    ctx.lineTo(x + 70, y + 48);
-    ctx.lineTo(x - 10, y + 34);
-    ctx.fill();
-    ctx.fillStyle = "#35d2ff";
-    ctx.fillRect(x + 24, y + 16, 16, 10);
-  }
-
-  function drawTrees(x, y) {
-    for (let i = 0; i < 12; i += 1) {
-      const tx = x + (i % 6) * 70;
-      const ty = y + Math.floor(i / 6) * 90;
-      ctx.fillStyle = "#0c2422";
-      ctx.fillRect(tx + 10, ty + 28, 8, 26);
-      ctx.fillStyle = "rgba(93,255,200,0.55)";
-      ctx.beginPath();
-      ctx.moveTo(tx + 14, ty);
-      ctx.lineTo(tx + 34, ty + 36);
-      ctx.lineTo(tx - 6, ty + 36);
-      ctx.fill();
+  function addLandmarks(scene) {
+    scene.add(box(168, 8, 360, 70, 16, 28, 0x6b7380));
+    scene.add(box(1980, 16, 200, 90, 32, 60, 0x3a2a1c));
+    for (let i = 0; i < 10; i += 1) {
+      const tree = cone(1040 + (i % 5) * 70, 1120 + Math.floor(i / 5) * 80, 0x5dffc8);
+      scene.add(tree);
     }
+    const ice = new THREE.Mesh(new THREE.ConeGeometry(28, 46, 5), new THREE.MeshStandardMaterial({ color: 0x9fd6ff, transparent: true, opacity: 0.7 }));
+    ice.position.set(360, 23, 1040);
+    scene.add(ice);
+    const crater = new THREE.Mesh(new THREE.TorusGeometry(70, 8, 8, 24), new THREE.MeshStandardMaterial({ color: 0xc48cff }));
+    crater.rotation.x = Math.PI / 2;
+    crater.position.set(2580, 1, 1180);
+    scene.add(crater);
+    for (let i = 0; i < 8; i += 1) scene.add(box(700 + i * 40, 12 + (i % 3) * 8, 1860, 18, 24 + (i % 4) * 10, 18, 0x1c1830));
+    const core = new THREE.Mesh(new THREE.SphereGeometry(22, 18, 18), new THREE.MeshStandardMaterial({ color: 0xff4d6d, emissive: 0x880018, emissiveIntensity: 0.8 }));
+    core.position.set(2480, 22, 2040);
+    scene.add(core);
   }
 
-  function drawStation(x, y) {
-    ctx.fillStyle = "#3a2a1c";
-    ctx.fillRect(x, y, 140, 80);
-    ctx.fillStyle = "#e09a4a";
-    ctx.fillRect(x + 16, y + 16, 22, 22);
-    ctx.fillRect(x + 52, y + 16, 22, 22);
-    ctx.fillStyle = "#1a120c";
-    ctx.fillRect(x + 96, y + 36, 28, 44);
+  function makePlayer() {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.7, 1.3, 6, 10), new THREE.MeshStandardMaterial({ color: 0x1b2430, metalness: 0.4 }));
+    body.position.y = 1.3;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.55, 12, 12), new THREE.MeshStandardMaterial({ color: 0x35d2ff, emissive: 0x123040, emissiveIntensity: 0.4 }));
+    head.position.y = 2.4;
+    const gun = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, 1.4), new THREE.MeshStandardMaterial({ color: 0xffd166 }));
+    gun.position.set(0.6, 1.4, 0.7);
+    g.add(body, head, gun);
+    g.castShadow = true;
+    return g;
   }
 
-  function drawIce(x, y) {
-    ctx.fillStyle = "rgba(159,214,255,0.35)";
-    ctx.beginPath();
-    ctx.moveTo(x, y + 40);
-    ctx.lineTo(x + 50, y);
-    ctx.lineTo(x + 90, y + 50);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "rgba(200,236,255,0.25)";
-    ctx.fillRect(x + 120, y + 20, 180, 16);
+  function makeNpc(npc) {
+    const g = new THREE.Group();
+    const color = npc.id === "kaia" ? 0x35d2ff : npc.id === "mira-core" ? 0xff4d6d : npc.id === "arsiv" ? 0xc48cff : 0x8fff6a;
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.8, 1.6, 6, 10), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.18 }));
+    body.position.y = 1.5;
+    g.add(body);
+    g.userData.body = body;
+    return g;
   }
 
-  function drawCrater(x, y) {
-    ctx.fillStyle = "rgba(0,0,0,0.35)";
-    ctx.beginPath();
-    ctx.ellipse(x, y, 90, 50, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "#c48cff";
-    ctx.lineWidth = 3;
-    ctx.stroke();
-    ctx.lineWidth = 1;
+  function makeCrystal(color) {
+    const mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.7), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.55 }));
+    return mesh;
   }
 
-  function drawCity(x, y) {
-    for (let i = 0; i < 8; i += 1) {
-      const h = 40 + (i % 4) * 22;
-      ctx.fillStyle = i % 2 ? "#1c1830" : "#141022";
-      ctx.fillRect(x + i * 36, y + 80 - h, 28, h);
-      ctx.fillStyle = "rgba(109,125,255,0.45)";
-      ctx.fillRect(x + i * 36 + 8, y + 88 - h, 6, 8);
-    }
+  function makeDrone(color) {
+    const mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(1.05, 0), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.35, metalness: 0.5 }));
+    return mesh;
   }
 
-  function drawCore(x, y) {
-    const g = ctx.createRadialGradient(x, y, 10, x, y, 80);
-    g.addColorStop(0, "rgba(255,77,109,0.8)");
-    g.addColorStop(1, "rgba(255,77,109,0)");
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(x, y, 80, 0, Math.PI * 2);
-    ctx.fill();
+  function makeBolt() {
+    return new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 8), new THREE.MeshBasicMaterial({ color: 0xfff1a8 }));
   }
 
-  function drawItem(item) {
-    const pulse = 5 + Math.sin(performance.now() / 220 + item.x) * 3;
-    ctx.fillStyle = "rgba(255,209,102,0.25)";
-    ctx.beginPath();
-    ctx.arc(item.x, item.y, 16 + pulse, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#ffd166";
-    ctx.beginPath();
-    ctx.arc(item.x, item.y, 7, 0, Math.PI * 2);
-    ctx.fill();
+  function box(x, y, z, w, h, d, color) {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color, roughness: 0.8 }));
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    return mesh;
   }
 
-  function drawNpc(npc) {
-    if (npc.id === "mira-core" && V.getCurrentBeat(state).type !== "boss" && V.getCurrentBeat(state).id !== "done") return;
-    const enemy = npc.id === "mira" && state.miraRole === "enemy";
-    ctx.fillStyle = npc.id === "kaia" ? "#35d2ff" : enemy || npc.id === "mira-core" ? "#ff4d6d" : npc.id === "arsiv" ? "#c48cff" : "#8fff6a";
-    ctx.fillRect(npc.x - 12, npc.y - 22, 24, 34);
-    ctx.fillStyle = "#140814";
-    ctx.fillRect(npc.x - 6, npc.y - 16, 5, 5);
-    ctx.fillStyle = "#f4eef8";
-    ctx.font = "700 11px Inter, sans-serif";
-    ctx.fillText(npc.name, npc.x - 22, npc.y - 28);
+  function cone(x, z, color) {
+    const mesh = new THREE.Mesh(new THREE.ConeGeometry(8, 28, 6), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.15 }));
+    mesh.position.set(x, 14, z);
+    return mesh;
   }
 
-  function drawHazard(hazard) {
-    ctx.fillStyle = "rgba(255,77,109,0.18)";
-    ctx.beginPath();
-    ctx.arc(hazard.x, hazard.y, hazard.r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(255,77,109,0.7)";
-    ctx.stroke();
+  function fitRenderer() {
+    if (!fitRenderer.renderer) return;
+    const w = canvas.clientWidth || 960;
+    const h = canvas.clientHeight || 540;
+    fitRenderer.renderer.setSize(w, h, false);
+    fitRenderer.camera.aspect = w / Math.max(1, h);
+    fitRenderer.camera.updateProjectionMatrix();
   }
 
-  function drawPlayer() {
-    const blink = state.iFrames > 0 && Math.floor(performance.now() / 70) % 2 === 0;
-    if (blink) ctx.globalAlpha = 0.4;
-    ctx.fillStyle = "#1b2430";
-    ctx.fillRect(state.x - 12, state.y - 8, 24, 22);
-    ctx.fillStyle = "#35d2ff";
-    ctx.fillRect(state.x - 10, state.y - 22, 20, 16);
-    ctx.fillStyle = "#ffd166";
-    ctx.fillRect(state.x + (state.facing > 0 ? 2 : -8), state.y - 16, 6, 5);
-    ctx.fillStyle = "#071012";
-    ctx.font = "900 10px Inter, sans-serif";
-    ctx.fillText("H", state.x - 4, state.y + 6);
-    ctx.globalAlpha = 1;
-    const near = V.nearbyInteract(state);
-    if (near) {
-      ctx.fillStyle = "#fff";
-      ctx.font = "800 12px Inter, sans-serif";
-      ctx.fillText("E", state.x - 4, state.y - 30);
-    }
-  }
-
-  function drawVignette() {
-    const g = ctx.createRadialGradient(W / 2, H / 2, 120, W / 2, H / 2, 420);
-    g.addColorStop(0, "rgba(0,0,0,0)");
-    g.addColorStop(1, "rgba(0,0,0,0.42)");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, H);
-  }
-
-  function drawCompass() {
-    const beat = V.getCurrentBeat(state);
-    let tx = state.x;
-    let ty = state.y;
-    if (beat.type === "talk" || beat.type === "boss") {
-      const npc = V.NPCS.find((item) => item.id === beat.npcId);
-      if (npc) {
-        tx = npc.x;
-        ty = npc.y;
-      }
-    } else if (beat.type === "event") {
-      const npc = V.NPCS.find((item) => item.id === "arsiv");
-      if (npc) {
-        tx = npc.x;
-        ty = npc.y;
-      }
-    } else if (beat.type === "collect") {
-      const item = V.ITEMS.find((entry) => beat.itemIds.includes(entry.id) && !state.collected[entry.id]);
-      if (item) {
-        tx = item.x;
-        ty = item.y;
-      }
-    }
-    const ang = Math.atan2(ty - state.y, tx - state.x);
-    ctx.save();
-    ctx.translate(W - 42, 42);
-    ctx.rotate(ang);
-    ctx.fillStyle = "#ffd166";
-    ctx.beginPath();
-    ctx.moveTo(16, 0);
-    ctx.lineTo(-10, 8);
-    ctx.lineTo(-6, 0);
-    ctx.lineTo(-10, -8);
-    ctx.fill();
-    ctx.restore();
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
   }
 })();

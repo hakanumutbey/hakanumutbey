@@ -11,9 +11,9 @@
     <main class="wrap">
       <header class="top">
         <div>
-          <p class="eyebrow">Hakorocks · Uzay hikaye</p>
+          <p class="eyebrow">Hakorocks · 3D uzay aksiyon</p>
           <h1>Vespera</h1>
-          <p class="tag">Tek gezegen. Uzun yol. Ters köşe.</p>
+          <p class="tag">Koş, ateş et, gezegeni temizle. Hikaye uzun, ters köşe var.</p>
         </div>
         <div class="region-box" aria-live="polite">
           <span>Bölge</span>
@@ -22,7 +22,7 @@
       </header>
 
       <section class="stage">
-        <canvas id="game" width="960" height="540" aria-label="Vespera gezegeni"></canvas>
+        <canvas id="game" width="960" height="540" aria-label="Vespera 3D gezegen"></canvas>
         <div class="hud" id="hud" hidden>
           <div class="hp-wrap">
             <span>Can</span>
@@ -40,10 +40,11 @@
       </section>
 
       <p class="hint" id="fileHint">
-        <strong>WASD</strong> yürü · <strong>E</strong> konuş / topla ·
-        <strong>J / Boşluk</strong> ateş · ilerleme kaydedilir
+        <strong>WASD</strong> koş · fare ile bak · <strong>Shift</strong> atıl ·
+        <strong>E</strong> konuş/topla · <strong>J / tık / Boşluk</strong> ateş
       </p>
     </main>
+    <script src="lib/three.min.js"></script>
     <script src="logic.js"></script>
     <script src="game.js"></script>
   </body>

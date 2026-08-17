@@ -105,7 +105,7 @@ const mobileControlConfigs = {
     ],
   },
   vespera: {
-    hint: "Sol taraf yürü. E konuş/topla, ateş sağda.",
+    hint: "3D aksiyon: sol taraf koş, A/D dön. E konuş/topla, ateş sağda.",
     look: false,
     actions: [
       { label: "E", code: "KeyE" },
