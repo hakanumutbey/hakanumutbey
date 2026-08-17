@@ -317,9 +317,14 @@
     const dx = state.x - enemy.x;
     const dz = state.y - enemy.z;
     const dist = Math.hypot(dx, dz) || 1;
-    const speed = enemy.id === "core-ring" ? 40 : 95;
-    enemy.x += (dx / dist) * speed * dt;
-    enemy.z += (dz / dist) * speed * dt;
+    const chase = dist < 220;
+    const speed = chase
+      ? (enemy.id === "core-ring" ? 22 : 38)
+      : 10;
+    if (chase || dist > 40) {
+      enemy.x += (dx / dist) * speed * dt;
+      enemy.z += (dz / dist) * speed * dt;
+    }
     enemy.mesh.position.set(enemy.x, 1.2 + Math.sin(performance.now() / 180 + enemy.x) * 0.15, enemy.z);
     enemy.mesh.rotation.y += dt * 3;
     if (V.overlapCircles(state.x, state.y, V.PLAYER_R, enemy.x, enemy.z, enemy.r)) {
