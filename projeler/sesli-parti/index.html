@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sesli Parti — Hakorocks Studio</title>
+  <meta name="description" content="Parti koduyla arkadaşlarınla buluş, kareli alanda gezin ve yakınlaştıkça birbirinizi duyun." />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app">
+    <!-- 1. Takma ad ekranı -->
+    <section class="screen" id="screen-name">
+      <div class="panel">
+        <h1 class="logo">🎉 Sesli Parti</h1>
+        <p class="hint">Lütfen takma adını gir</p>
+        <input id="nickname-input" type="text" maxlength="16" placeholder="Takma adın..." autocomplete="off" />
+        <p class="error" id="name-error"></p>
+        <button class="primary" id="name-continue" type="button">Devam Et</button>
+      </div>
+    </section>
+
+    <!-- 2. Parti ekranı -->
+    <section class="screen hidden" id="screen-party">
+      <div class="panel">
+        <h2>Parti Zamanı!</h2>
+        <p class="hint">Yeni bir parti kur ya da arkadaşının koduyla katıl.</p>
+        <button class="primary" id="party-create" type="button">🎊 Parti Oluştur</button>
+        <div class="divider"><span>veya</span></div>
+        <input id="party-code-input" type="text" maxlength="6" placeholder="PARTİ KODU" autocomplete="off" />
+        <p class="error" id="party-error"></p>
+        <button class="secondary" id="party-join" type="button">Partiye Katıl</button>
+      </div>
+    </section>
+
+    <!-- 3. Karakter seçim ekranı -->
+    <section class="screen hidden" id="screen-character">
+      <div class="panel wide">
+        <h2>İnsanını Seç</h2>
+        <p class="hint">Partide herkes seni bu karakterle görecek.</p>
+        <div class="character-grid" id="character-grid"></div>
+        <p class="error" id="character-error"></p>
+        <button class="primary" id="character-start" type="button" disabled>Başla 🚀</button>
+      </div>
+    </section>
+
+    <!-- 4. Oyun ekranı -->
+    <section class="screen hidden" id="screen-game">
+      <div class="game-topbar">
+        <div class="party-code-box">
+          <span class="party-code-label">Parti Kodu</span>
+          <strong id="party-code-text">------</strong>
+          <button class="copy" id="copy-code" type="button">📋 Kopyala</button>
+        </div>
+        <div class="game-status" id="game-status">Bağlanıyor...</div>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="game-canvas" width="880" height="616"></canvas>
+      </div>
+      <p class="hint game-hint" id="game-hint">Bir kareye tıkla, insanın oraya yürüsün. Yanına gelenleri duyarsın!</p>
+    </section>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

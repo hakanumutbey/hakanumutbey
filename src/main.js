@@ -312,6 +312,12 @@ const upcomingGames = [
 
 const projects = [
   {
+    title: "Sesli Parti",
+    description: "Parti koduyla arkadaşlarınla buluş, kareli alanda gezin; yakınındakileri net, uzaktakileri kısık duy.",
+    label: "Yeni proje",
+    link: "/projeler/sesli-parti/",
+  },
+  {
     title: "Oyun Motoru Denemeleri",
     description: "Babylon.js, canvas ve fizik denemeleri için yeni proje alanı.",
     label: "Hazır altyapı",
@@ -2512,14 +2518,22 @@ function renderGameCards() {
 }
 
 function renderProjectCard(project) {
+  const inner = `
+    <div class="project-badges">
+      <span>${project.label}</span>
+      ${project.status ? `<em>${project.status}</em>` : ""}
+    </div>
+    <h3>${project.title}</h3>
+    <p>${project.description}</p>
+  `;
+  if (project.link) {
+    return `
+    <a class="project-card project-card-link" href="${project.link}">${inner}
+    </a>
+  `;
+  }
   return `
-    <article class="project-card">
-      <div class="project-badges">
-        <span>${project.label}</span>
-        ${project.status ? `<em>${project.status}</em>` : ""}
-      </div>
-      <h3>${project.title}</h3>
-      <p>${project.description}</p>
+    <article class="project-card">${inner}
     </article>
   `;
 }

@@ -7,6 +7,8 @@ import { spawnSync } from "node:child_process";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const gamesRoot = join(root, "oyunlar");
 const distGamesRoot = join(root, "dist", "oyunlar");
+const projectsRoot = join(root, "projeler");
+const distProjectsRoot = join(root, "dist", "projeler");
 const inDocker = process.env.DOCKER_BUILD === "1" || existsSync("/.dockerenv");
 // Her build'de degisir: statik oyunlarin js/css URL'lerine ?v= eklenip
 // 30 gunluk tarayici onbellegi asilir (sunucu query'yi yok sayar).
@@ -32,7 +34,29 @@ await copyStaticGame("space-arena");
 await copyStaticGame("2d-car-simulator", ["game.test.mjs"]);
 await copyStaticGame("yaris-sehri");
 await copyRobotAvcisi();
+await copyStaticProject("sesli-parti");
 console.log("[build-games] all games ready");
+
+async function copyStaticProject(slug) {
+  const source = join(projectsRoot, slug);
+  const target = join(distProjectsRoot, slug);
+  console.log(`[build-games] proje ${slug}: static copy`);
+  await mkdir(distProjectsRoot, { recursive: true });
+  await rm(target, { recursive: true, force: true });
+  await cp(source, target, { recursive: true });
+  // Oyun arac cubugu (site-game-tools.js) projelere enjekte edilmez;
+  // sadece js/css onbellek kirici ?v= eklenir.
+  const indexFile = join(target, "index.html");
+  if (existsSync(indexFile)) {
+    let html = await readFile(indexFile, "utf8");
+    html = html.replace(
+      /((?:src|href)=")(?!https?:|\/|data:|#)([^"?]+\.(?:js|css))(?:\?[^"]*)?(")/g,
+      `$1$2?v=${buildId}$3`
+    );
+    await writeFile(indexFile, html, "utf8");
+  }
+  console.log(`[build-games] proje ${slug}: done`);
+}
 
 async function buildViteGame(slug) {
   const cwd = join(gamesRoot, slug);
