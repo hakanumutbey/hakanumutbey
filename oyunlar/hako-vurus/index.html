@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
     <meta name="theme-color" content="#08060c" />
     <title>Hako Vuruş — Hakorocks Studio</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=arena5" />
   </head>
   <body>
     <main class="wrap">
@@ -13,17 +13,24 @@
         <div>
           <p class="eyebrow">Hakorocks · Aksiyon</p>
           <h1>Hako Vuruş</h1>
-          <p class="tag">Yumrukla, atıl, combo patlat. Dalgalar durmaz.</p>
+          <p class="tag">Uzaylılar dünyayı yok etti. Bir şehirde 5 arena var. K ile diğer şehirleri gör.</p>
         </div>
-        <div class="best-box" aria-label="En iyi skor">
-          <span>Rekor</span>
-          <strong id="bestLabel">0</strong>
+        <div class="stat-row">
+          <div class="best-box" aria-label="En iyi skor">
+            <span>Rekor</span>
+            <strong id="bestLabel">0</strong>
+          </div>
+          <div class="best-box coin-box" aria-label="Coin">
+            <span>Coin</span>
+            <strong id="coinLabel">0</strong>
+          </div>
         </div>
       </header>
 
       <section class="stage">
-        <canvas id="game" width="960" height="540" aria-label="Hako Vuruş arena"></canvas>
+        <canvas id="game" width="960" height="540" aria-label="Hako Vuruş"></canvas>
         <div class="hud" id="hud" hidden>
+          <div><span>Şehir</span><strong id="levelLabel">İstanbul · Sokak</strong></div>
           <div><span>Dalga</span><strong id="waveLabel">1</strong></div>
           <div><span>Skor</span><strong id="scoreLabel">0</strong></div>
           <div><span>Combo</span><strong id="comboLabel">0</strong></div>
@@ -37,12 +44,18 @@
         </div>
       </section>
 
+      <div class="city-bar" id="cityBar">
+        <button class="go" type="button" data-act="shop">Dükkân</button>
+        <button class="ghost" type="button" data-act="world">Şehirler (K)</button>
+        <button class="ghost" type="button" data-act="map">Şehir haritası</button>
+      </div>
+
       <p class="hint">
-        <strong>A / D</strong> hareket · <strong>W</strong> zıpla ·
-        <strong>J / Boşluk</strong> vur · <strong>K / Shift</strong> atıl ·
-        6 combo = özel vuruş
+        <strong>Harita:</strong> WASD veya tıkla, 5 arenaya gir. <strong>K</strong> ile 20 şehri gör, arabayla geç.
+        <strong>Dövüş:</strong> A/D koş · W zıpla · J / Boşluk vur · Shift atıl · 30 combo = özel
       </p>
     </main>
-    <script src="game.js"></script>
+    <script type="module" src="/site-game-tools.js"></script>
+    <script src="game.js?v=reset3"></script>
   </body>
 </html>

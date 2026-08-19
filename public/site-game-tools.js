@@ -19,6 +19,7 @@ const gameTitles = {
   "hentw-premium": "HENTW Premium",
   "siber-polis": "Siber Polis",
   "hako-vurus": "Hako Vuruş",
+  "uzay-yarisi": "Uzay Yarışı",
 };
 
 const keyBindings = {
@@ -101,6 +102,15 @@ const mobileControlConfigs = {
     actions: [
       { label: "Vur", code: "Space" },
       { label: "Atıl", code: "ShiftLeft" },
+    ],
+  },
+  "uzay-yarisi": {
+    hint: "Sol tarafla aracı sür. Turbo skor katlar, lazer ve bomba silahların varsa çalışır.",
+    look: false,
+    actions: [
+      { label: "Ateş", code: "KeyJ" },
+      { label: "Bomba", code: "KeyB" },
+      { label: "Turbo", code: "ShiftLeft", hold: true },
     ],
   },
 };

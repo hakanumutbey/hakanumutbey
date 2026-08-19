@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
+    <meta name="theme-color" content="#060810" />
+    <title>Uzay Yarışı — Hakorocks Studio</title>
+    <link rel="stylesheet" href="styles.css?v=1" />
+  </head>
+  <body>
+    <main class="wrap">
+      <header class="top">
+        <div>
+          <p class="eyebrow">Hakorocks · Yarış</p>
+          <h1>Uzay Yarışı</h1>
+          <p class="tag">100 bölümlük uzay macerası! Lobide aracını seç, coin kazan, 10 aracın kilidini aç.</p>
+        </div>
+        <div class="stat-row">
+          <div class="best-box" aria-label="İpucu">
+            <span>Hedef</span>
+            <strong>100</strong>
+          </div>
+        </div>
+      </header>
+
+      <section class="stage">
+        <canvas id="game" width="960" height="540" aria-label="Uzay Yarışı"></canvas>
+        <div class="hud" id="hud" hidden>
+          <div><span>Bölüm</span><strong id="levelLabel">1 / 100</strong></div>
+          <div><span>Can</span><strong id="livesLabel">3</strong></div>
+          <div><span>Yıldız</span><strong id="starLabel">0</strong></div>
+        </div>
+      </section>
+
+      <p class="hint">
+        <strong>Lobi:</strong> A/D ile araç değiştir, MAĞAZA'dan yükseltme ve silah al. <strong>Bölüm:</strong> WASD/oklar ile uç,
+        <strong>Shift</strong> turbo (yakıt harcar) · <strong>J</strong> lazer · <strong>B</strong> süper bomba · <strong>Esc</strong> duraklat.
+      </p>
+    </main>
+    <script type="module" src="/site-game-tools.js"></script>
+    <script src="game.js?v=4"></script>
+  </body>
+</html>

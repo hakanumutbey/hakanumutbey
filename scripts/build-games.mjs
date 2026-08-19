@@ -34,6 +34,7 @@ await copyStaticGame("space-arena");
 await copyStaticGame("2d-car-simulator", ["game.test.mjs"]);
 await copyStaticGame("yaris-sehri");
 await copyStaticGame("hako-vurus");
+await copyStaticGame("uzay-yarisi");
 await copyRobotAvcisi();
 await copyStaticProject("sesli-parti");
 console.log("[build-games] all games ready");

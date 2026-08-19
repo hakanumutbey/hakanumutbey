@@ -17,6 +17,22 @@ import {
 
 const games = [
   {
+    slug: "uzay-yarisi",
+    title: "Uzay Yarışı",
+    path: "/oyunlar/uzay-yarisi/",
+    type: "Refleks Yarışı",
+    status: "Oynanabilir",
+    description: "Lobiden kalk, 100 bölüm boyunca meteorlardan kaç. Coin kazan, 10 uzay aracını topla!",
+    longDescription: "Uzay Yarışı — 100 bölümlük uzay macerası. Lobide aracını seç, bölümü başlatınca hangar kapısı açılır ve kalkış yaparsın. WASD veya ok tuşlarıyla uç, meteorlardan kaç, hedef metreye ulaş. Yıldız, kalp ve kalkan topla; Shift ile turbo aç. Kazandığın coinlerle 10 farklı uzay aracını satın al. Her bölüm daha uzun ve daha zor!",
+    accent: "cosmos",
+    controls: "WASD/oklar hareket, Shift turbo · dokunmatik",
+    mobileStatus: "Mobil uyumlu",
+    mobileNote: "Ekran altı hareket düğmeleri ve Turbo düğmesi ile telefonda oynanır.",
+    achievements: ["İlk bölümü bitir", "Süper Bomba'yı satın al", "Boss meteoru geç"],
+    updates: ["Lobi + mağaza + 10 araçlık garaj", "100 otomatik bölüm, boss meteorlar ve uzaylılar", "Lazer ve Süper Bomba silahları"],
+    stockBase: 142,
+  },
+  {
     slug: "hako-vurus",
     title: "Hako Vuruş",
     path: "/oyunlar/hako-vurus/",
@@ -304,7 +320,7 @@ const games = [
 ];
 
 const FUSION_GAME_PATH = "/oyunlar/birlesim-arenasi/";
-const NEW_GAME_SLUGS = new Set(["hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "2d-car-simulator", "yaris-sehri", "hako-vurus"]);
+const NEW_GAME_SLUGS = new Set(["hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "2d-car-simulator", "yaris-sehri", "hako-vurus", "uzay-yarisi"]);
 /** Only games the Birleşim Arenası client actually implements. */
 const FUSION_GAME_SLUGS = new Set([
   "annenden-kac",
@@ -374,6 +390,11 @@ const mobileFeatures = [
 ];
 
 const newsItems = [
+  {
+    date: "Yeni",
+    title: "Uzay Yarışı yayında",
+    description: "Meteor yağmurundan kaç, yıldızları topla ve turbo ile skorunu katla.",
+  },
   {
     date: "Yeni",
     title: "Hako Vuruş yayında",

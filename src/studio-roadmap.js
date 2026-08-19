@@ -170,6 +170,19 @@ export const gameExtras = {
     },
     changelog: ["Dalga sistemi", "Combo ve özel vuruş", "Mobil kontrol"],
   },
+  "uzay-yarisi": {
+    progress: 74,
+    difficulty: "Kolay",
+    averagePlayTime: "6 dk",
+    lastUpdated: "Lobi, coin ve 100 bölüm",
+    hiddenAchievements: ["Turbo ustası", "10 aracın sahibi"],
+    wiki: {
+      characters: ["Hako pilotu", "Meteor sürüsü"],
+      weapons: ["Turbo motor", "Kalkan baloncuğu"],
+      craft: ["Coin + garaj = yeni uzay aracı"],
+    },
+    changelog: ["Lobi, mağaza ve 10 araçlık garaj", "100 otomatik bölüm + boss meteor + uzaylılar", "Lazer ve Süper Bomba silahları, günlük görev"],
+  },
 };
 
 export const devDiaryEntries = [

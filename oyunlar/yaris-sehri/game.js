@@ -24,8 +24,8 @@ const CARS = [
   { id: "serit", name: "Şerit", price: 80, maxSpeed: 620, accel: 435, grip: 2.55, color: "#69d18b", desc: "Biraz daha hızlı, biraz daha kıvrak.", body: { len: 9, wid: 4.2, hei: 1.6, cab: 1.4, spoiler: false } },
   { id: "pars", name: "Pars", price: 160, maxSpeed: 680, accel: 480, grip: 2.7, color: "#ff9f43", desc: "Virajlarda güven verir.", body: { len: 9.5, wid: 4.4, hei: 1.5, cab: 1.3, spoiler: true } },
   { id: "seytan", name: "Şeytan", price: 280, maxSpeed: 740, accel: 530, grip: 2.85, color: "#ff5b6e", desc: "Kırmızı yıldırım.", body: { len: 10, wid: 4.4, hei: 1.4, cab: 1.2, spoiler: true } },
-  { id: "firtina", name: "Fırtına", price: 430, maxSpeed: 800, accel: 585, grip: 3.0, color: "#b67dff", desc: "Fırtına gibi eser.", body: { len: 10.5, wid: 4.6, hei: 1.3, cab: 1.1, spoiler: true } },
-  { id: "efsane", name: "Efsane", price: 650, maxSpeed: 860, accel: 640, grip: 3.2, color: "#ffd166", desc: "Şehrin en hızlı efsanesi!", body: { len: 11, wid: 4.8, hei: 1.2, cab: 1.0, spoiler: true } },
+  { id: "firtina", name: "Fırtına", price: 430, maxSpeed: 720, accel: 540, grip: 3.0, color: "#b67dff", desc: "Fırtına gibi eser.", body: { len: 10.5, wid: 4.6, hei: 1.3, cab: 1.1, spoiler: true } },
+  { id: "efsane", name: "Efsane", price: 650, maxSpeed: 750, accel: 560, grip: 3.2, color: "#ffd166", desc: "Şehrin en hızlı efsanesi!", body: { len: 11, wid: 4.8, hei: 1.2, cab: 1.0, spoiler: true } },
 ];
 
 // Yerel kopya rotalar (sunucu joined'da gönderir; çevrimdışı modda bunlar kullanılır)
@@ -1510,7 +1510,7 @@ const camTarget = new THREE.Vector3(3000, 0, 3000);
 // Yumuşatılmış kamera durumu: yaw ve yükseklik arabayı gecikmeli takip eder
 // (ani dönüş/inişlerde sarsıntıyı önler). Konum arabaya sert bağlıdır — aksi halde
 // hız arttıkça kamera geride kalır ("kamera uzaklaşıyor" hatası: hedef hızla ilerlerken
-// k=6'lık konum filtresi ~hız/6 birim geride dengeye oturuyordu, 860 hızda ~140 birim!).
+// k=6'lık konum filtresi ~hız/6 birim geride dengeye oturuyordu, 750 hızda ~125 birim!).
 const camState = { yaw: -Math.PI / 2, h: 0, dist: 26 };
 
 function snapCamera() {
@@ -1535,14 +1535,14 @@ function updateCamera3D(dt) {
     state.camYawTarget *= Math.max(0, 1 - 4 * dt);
     if (Math.abs(state.camYawTarget) < 0.01) state.camYawTarget = 0;
   }
-  state.camYawOffset += (state.camYawTarget - state.camYawOffset) * (1 - Math.exp(-12 * dt));
+  state.camYawOffset += (state.camYawTarget - state.camYawOffset) * (1 - Math.exp(-8 * dt));
 
-  // Kamera yönü arabanın yaw'unu düşük geçişli filtreyle takip eder (~3.5/s)
+  // Kamera yönü arabanın yaw'unu düşük geçişli filtreyle takip eder (~2.5/s)
   const desiredYaw = car.angle + state.camYawOffset;
   let yawDiff = desiredYaw - camState.yaw;
   while (yawDiff > Math.PI) yawDiff -= Math.PI * 2;
   while (yawDiff < -Math.PI) yawDiff += Math.PI * 2;
-  camState.yaw += yawDiff * (1 - Math.exp(-3.5 * dt));
+  camState.yaw += yawDiff * (1 - Math.exp(-2.5 * dt));
 
   // Dikey: rampa/inişlerde yükseklik yumuşak takip (~5/s)
   camState.h += (Math.max(0, car.h) - camState.h) * (1 - Math.exp(-5 * dt));
@@ -1555,6 +1555,11 @@ function updateCamera3D(dt) {
   const fz = Math.sin(camState.yaw);
   camPos.set(car.x - fx * camState.dist, camState.h + 13, car.z - fz * camState.dist);
 
+  // Bakış hedefi de arabaya sert bağlı: gövde hizasında, ileri yönde sabit nokta.
+  // (Eski hata: hedef 8/s filtreye hızlı hareket eden noktayı takip ettiremeyip ~v/8 geride
+  // kalıyordu; yüksek hızda hedef kameranın GERİSİNE düşüp kamera aşağı/arkaya dönüyordu.)
+  camTarget.set(car.x + fx * 16, camState.h + 3, car.z + fz * 16);
+
   // Güvenlik payı: saçma değer ya da aşırı uzaklık -> sert oturt
   const tooFar = Math.hypot(camPos.x - car.x, camPos.z - car.z) > camState.dist * 3;
   if (!Number.isFinite(camPos.x + camPos.y + camPos.z + camTarget.x) || tooFar) {
@@ -1562,12 +1567,6 @@ function updateCamera3D(dt) {
     return;
   }
   camera.position.copy(camPos);
-
-  // Bakış hedefi de yumuşatılır (~8/s) — ani dönüşlerde görüntü sarsılmaz
-  const targetT = 1 - Math.exp(-8 * dt);
-  camTarget.x += (car.x + fx * 16 - camTarget.x) * targetT;
-  camTarget.y += (camState.h + 3 - camTarget.y) * targetT;
-  camTarget.z += (car.z + fz * 16 - camTarget.z) * targetT;
   camera.lookAt(camTarget);
 }
 
@@ -2015,7 +2014,7 @@ function renderGallery() {
     card.className = "car-card" + (selected ? " selected" : "");
     card.innerHTML = `
       <div class="car-name" style="color:${carItem.color}">${carItem.name}</div>
-      <div class="stat-label">Hız</div><div class="stat-bar"><i style="width:${Math.round((carItem.maxSpeed / 860) * 100)}%"></i></div>
+      <div class="stat-label">Hız</div><div class="stat-bar"><i style="width:${Math.round((carItem.maxSpeed / 750) * 100)}%"></i></div>
       <div class="stat-label">Kalkış</div><div class="stat-bar"><i style="width:${Math.round((carItem.accel / 640) * 100)}%"></i></div>
       <div class="stat-label">Yol Tutuş</div><div class="stat-bar"><i style="width:${Math.round((carItem.grip / 3.2) * 100)}%"></i></div>
       <div class="car-price">${owned ? "Garajında" : `🪙 ${carItem.price}`}</div>
@@ -3586,7 +3585,7 @@ window.addEventListener("keyup", (event) => {
 // Ham hareket camYawTarget'a yazılır; uygulanan ofset updateCamera3D'de yumuşatılır.
 document.addEventListener("mousemove", (event) => {
   if (!state.pointerLocked || state.screen !== "game") return;
-  state.camYawTarget = clamp(state.camYawTarget + (event.movementX || 0) * 0.0025, -Math.PI, Math.PI);
+  state.camYawTarget = clamp(state.camYawTarget + (event.movementX || 0) * 0.0018, -Math.PI, Math.PI);
 });
 
 // Kilit reddedildiyse/koptuysa: oyun ekranına tıklayınca tekrar kilitlenir
