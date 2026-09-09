@@ -1,0 +1,947 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Make City — Şehrini Kur!</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    background: #0b171d;
+    color: #fff;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* ---- Ana menü ---- */
+  #menu {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 14px;
+    background: radial-gradient(circle at 50% 30%, #1c3d4d, #0b171d);
+    z-index: 10;
+    text-align: center;
+    padding: 20px;
+  }
+  #menu h1 { font-size: clamp(34px, 7vw, 64px); letter-spacing: 2px; }
+  #menu h1 span { color: #ffd54f; }
+  #menu p { color: #b0bec5; max-width: 520px; }
+  .mode-btn {
+    font-size: 22px;
+    padding: 14px 34px;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    color: #08222e;
+    font-weight: 700;
+    width: min(340px, 86vw);
+    transition: transform .12s, box-shadow .12s;
+  }
+  .mode-btn:hover { transform: translateY(-3px) scale(1.02); }
+  .mode-btn small { display: block; font-size: 13px; font-weight: 500; margin-top: 4px; opacity: .75; }
+  #btn-continue { background: linear-gradient(135deg, #4fc3f7, #0288d1); box-shadow: 0 8px 24px #0288d155; display: none; }
+  #btn-infinite { background: linear-gradient(135deg, #ffd54f, #ffb300); box-shadow: 0 8px 24px #ffb30055; }
+  #btn-economy  { background: linear-gradient(135deg, #69f0ae, #00c853); box-shadow: 0 8px 24px #00c85355; }
+
+  /* ---- Oyun arayüzü ---- */
+  #game-wrap { display: none; position: fixed; inset: 0; }
+  canvas { display: block; }
+
+  #hud {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: flex; gap: 10px; flex-wrap: wrap;
+    align-items: center; justify-content: center;
+    padding: 8px 12px;
+    background: linear-gradient(#00000099, transparent);
+    font-size: 15px;
+    pointer-events: none;
+    z-index: 3;
+  }
+  .hud-item { background: #00000088; border-radius: 10px; padding: 5px 12px; white-space: nowrap; }
+  #hud-msg { color: #ffd54f; font-weight: 600; }
+  .hud-btn {
+    background: #ef5350; color: #fff; border: none; border-radius: 10px;
+    padding: 5px 12px; cursor: pointer; font-weight: 600; pointer-events: auto;
+  }
+  #fs-btn { background: #455a64; }
+
+  #toolbar {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    display: flex; gap: 8px; flex-wrap: wrap;
+    justify-content: center;
+    padding: 10px;
+    background: linear-gradient(transparent, #00000099);
+    z-index: 3;
+  }
+  .tool {
+    border: 2px solid transparent;
+    background: #00000088;
+    color: #fff;
+    border-radius: 12px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 13px;
+    text-align: center;
+    min-width: 72px;
+    transition: transform .1s, background .1s;
+  }
+  .tool:hover { background: #ffffff2a; }
+  .tool.selected { border-color: #ffd54f; background: #ffd54f22; transform: scale(1.06); }
+  .tool .emoji { font-size: 20px; display: block; }
+  .tool .cost { display: block; font-size: 11px; color: #ffd54f; }
+
+  #cam-help {
+    position: absolute; right: 10px; top: 54px;
+    background: #00000077; border-radius: 10px;
+    padding: 6px 12px; font-size: 12px; color: #b0bec5;
+    z-index: 3; pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<div id="menu">
+  <h1>🏙️ Make <span>City</span></h1>
+  <p>Kendi şehrini 3D kur! Kamerayı döndür, yaklaş, yol döşe, evler ve dükkanlar yap. Hastaneni unutma — yoksa hastalar Gölgekent'e gider, parasını da onlar kazanır!</p>
+  <button class="mode-btn" id="btn-continue">▶️ Devam Et
+    <small>Kayıtlı şehrine kaldığın yerden devam et</small>
+  </button>
+  <button class="mode-btn" id="btn-infinite">💰 Sonsuz Para
+    <small>Her şey bedava, rahat rahat kur!</small>
+  </button>
+  <button class="mode-btn" id="btn-economy">📊 Ekonomi
+    <small>1.000.000₺ ile başla, vergilerle şehri büyüt!</small>
+  </button>
+</div>
+
+<div id="game-wrap">
+  <div id="hud">
+    <span class="hud-item" id="hud-day">📅 Gün 1</span>
+    <span class="hud-item" id="hud-money">💰 —</span>
+    <span class="hud-item" id="hud-pop">👨‍👩‍👧 Nüfus: 0</span>
+    <span class="hud-item" id="hud-level">🏘️ Köy</span>
+    <span class="hud-item" id="hud-happy">😊 —</span>
+    <span class="hud-item" id="hud-msg"></span>
+    <button class="hud-btn" id="fs-btn">⛶ Tam Ekran</button>
+    <button class="hud-btn" id="new-game-btn">↺ Menü</button>
+  </div>
+  <div id="cam-help">🖱️ Sol tık: inşa · Sağ sürükle: döndür · Tekerlek: yakınlaş · Shift+sağ: kaydır</div>
+  <div id="toolbar"></div>
+</div>
+
+<script type="module">
+import * as THREE from "./lib/three.module.min.js";
+
+// ---------- Ayarlar ----------
+const COLS = 22, ROWS = 13, TILE = 2;
+const DAY_MS = 12000; // 1 gün = 12 saniye
+const SAVE_KEY = "make-city-save";
+
+const TOOLS = [
+  { id: "road",     name: "Yol",      emoji: "🛣️", cost: 10000 },
+  { id: "house",    name: "Ev",       emoji: "🏠", cost: 50000 },
+  { id: "shop",     name: "Dükkan",   emoji: "🏪", cost: 100000 },
+  { id: "hospital", name: "Hastane",  emoji: "🏥", cost: 300000 },
+  { id: "school",   name: "Okul",     emoji: "🏫", cost: 150000 },
+  { id: "police",   name: "Polis",    emoji: "🚓", cost: 120000 },
+  { id: "fire",     name: "İtfaiye",  emoji: "🚒", cost: 120000 },
+  { id: "factory",  name: "Fabrika",  emoji: "🏭", cost: 200000 },
+  { id: "park",     name: "Park",     emoji: "🌳", cost: 20000 },
+  { id: "bulldoze", name: "Yık",      emoji: "🚜", cost: 0 },
+];
+
+const INCOME_HOUSE = 5000;    // çalışan ev başına günlük vergi
+const INCOME_SHOP = 15000;    // çalışan dükkan başına günlük kazanç
+const INCOME_FACTORY = 25000; // çalışan fabrika başına günlük kazanç
+const HOSPITAL_EARN = 3000;   // hastane varken ev başına hasta geliri
+const HOSPITAL_LOSS = 5000;   // hastane yokken ev başına Gölgekent zararı
+const PARK_BONUS = 0.05;      // park başına gelir bonusu
+const SERVICE_BONUS = 0.05;   // hizmet binası (okul/polis/itfaiye) başına bonus
+
+// ---------- Durum ----------
+let mode = null;
+let grid = [];               // grid[r][c] = null | { type, mesh }
+let money = 0;
+let day = 1;
+let selectedTool = "road";
+let messageUntil = 0;
+let lastTick = 0;
+const growing = [];          // büyüme animasyonundaki binalar
+const cars = [];             // yollardaki arabalar
+let ambulance = null;        // Gölgekent'e giden ambulans
+
+function newGrid() {
+  grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+}
+
+function isBuilding(t) { return t !== "road" && t !== "bulldoze"; }
+function isService(t) { return t === "school" || t === "police" || t === "fire"; }
+
+function hasRoadNextTo(r, c) {
+  return [[1,0],[-1,0],[0,1],[0,-1]].some(([dr,dc]) => {
+    const nr = r + dr, nc = c + dc;
+    return nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && grid[nr][nc]?.type === "road";
+  });
+}
+
+function cityStats() {
+  const s = { houses: 0, workingHouses: 0, shops: 0, workingShops: 0, parks: 0, hospitals: 0, services: 0, factories: 0, workingFactories: 0 };
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    const cell = grid[r][c];
+    if (!cell) continue;
+    const t = cell.type, ok = hasRoadNextTo(r, c);
+    if (t === "house") { s.houses++; if (ok) s.workingHouses++; }
+    else if (t === "shop") { s.shops++; if (ok) s.workingShops++; }
+    else if (t === "park" && ok) s.parks++;
+    else if (t === "hospital" && ok) s.hospitals++;
+    else if (isService(t) && ok) s.services++;
+    else if (t === "factory") { s.factories++; if (ok) s.workingFactories++; }
+  }
+  return s;
+}
+
+function say(text, ms = 5000) {
+  messageUntil = performance.now() + ms;
+  document.getElementById("hud-msg").textContent = text;
+}
+
+// ---------- 3D Sahne ----------
+const wrap = document.getElementById("game-wrap");
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+wrap.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const DAY_SKY = new THREE.Color(0x87ceeb);
+const NIGHT_SKY = new THREE.Color(0x0b1026);
+scene.background = DAY_SKY.clone();
+scene.fog = new THREE.Fog(0x87ceeb, 70, 400);
+
+const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 600);
+
+const hemi = new THREE.HemisphereLight(0xeaf6ff, 0x2e4d1e, 1.1);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffffff, 1.4);
+sun.position.set(30, 50, 20);
+scene.add(sun);
+
+// zemin (ufka kadar)
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(2000, 2000),
+  new THREE.MeshLambertMaterial({ color: 0x4a7c2f })
+);
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+
+// ızgara çizgileri
+const gridHelper = new THREE.GridHelper(Math.max(COLS, ROWS) * TILE, Math.max(COLS, ROWS), 0x2e4d1e, 0x3c6427);
+gridHelper.position.y = 0.01;
+scene.add(gridHelper);
+
+// şehir katmanı
+const cityLayer = new THREE.Group();
+scene.add(cityLayer);
+
+// fare vurgusu
+const hoverMark = new THREE.Mesh(
+  new THREE.PlaneGeometry(TILE * 0.96, TILE * 0.96),
+  new THREE.MeshBasicMaterial({ color: 0xffd54f, transparent: true, opacity: 0.35 })
+);
+hoverMark.rotation.x = -Math.PI / 2;
+hoverMark.position.y = 0.03;
+hoverMark.visible = false;
+scene.add(hoverMark);
+
+// ---------- Bulutlar ----------
+const clouds = [];
+const cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
+for (let i = 0; i < 7; i++) {
+  const cloud = new THREE.Group();
+  for (let j = 0; j < 3; j++) {
+    const puff = new THREE.Mesh(new THREE.SphereGeometry(1.6 - j * 0.35, 10, 8), cloudMat);
+    puff.position.set(j * 1.6 - 1.6, j * 0.3, 0);
+    puff.scale.y = 0.55;
+    cloud.add(puff);
+  }
+  cloud.position.set(Math.random() * 160 - 80, 22 + Math.random() * 10, Math.random() * 120 - 60);
+  cloud.userData.speed = 0.4 + Math.random() * 0.6;
+  clouds.push(cloud);
+  scene.add(cloud);
+}
+
+// ---------- Komşu şehir: Gölgekent ----------
+const golgekent = new THREE.Group();
+const gkMat = new THREE.MeshLambertMaterial({ color: 0x78909c });
+for (let i = 0; i < 14; i++) {
+  const h = 2 + Math.random() * 5;
+  const b = new THREE.Mesh(new THREE.BoxGeometry(2.5, h, 2.5), gkMat);
+  b.position.set(Math.random() * 30 - 15, h / 2, Math.random() * 20 - 10);
+  golgekent.add(b);
+}
+golgekent.position.set(120, 0, -70);
+scene.add(golgekent);
+
+// ---------- Kamera kontrolü ----------
+const cam = { theta: Math.PI / 4, phi: 0.9, radius: 42, target: new THREE.Vector3(0, 0, 0) };
+
+function updateCamera() {
+  const { theta, phi, radius, target } = cam;
+  camera.position.set(
+    target.x + radius * Math.sin(phi) * Math.sin(theta),
+    target.y + radius * Math.cos(phi),
+    target.z + radius * Math.sin(phi) * Math.cos(theta)
+  );
+  camera.lookAt(target);
+}
+
+function clampCam() {
+  cam.phi = Math.max(0.25, Math.min(1.35, cam.phi));
+  cam.radius = Math.max(8, Math.min(90, cam.radius));
+  cam.target.x = Math.max(-COLS * TILE / 2, Math.min(COLS * TILE / 2, cam.target.x));
+  cam.target.z = Math.max(-ROWS * TILE / 2, Math.min(ROWS * TILE / 2, cam.target.z));
+}
+
+// ---------- Bina modelleri ----------
+function makeRoadMesh() {
+  const g = new THREE.Group();
+  const asphalt = new THREE.Mesh(
+    new THREE.BoxGeometry(TILE, 0.08, TILE),
+    new THREE.MeshLambertMaterial({ color: 0x37474f })
+  );
+  asphalt.position.y = 0.04;
+  g.add(asphalt);
+  return g;
+}
+
+function refreshRoadMarkings(r, c) {
+  const cell = grid[r][c];
+  if (!cell || cell.type !== "road") return;
+  const g = cell.mesh;
+  while (g.children.length > 1) g.remove(g.children[g.children.length - 1]);
+  const lineMat = new THREE.MeshBasicMaterial({ color: 0xf5f5f5 });
+  const dirs = [
+    { dr: -1, dc: 0, rot: 0, x: 0, z: -TILE / 4 },
+    { dr: 1, dc: 0, rot: 0, x: 0, z: TILE / 4 },
+    { dr: 0, dc: -1, rot: Math.PI / 2, x: -TILE / 4, z: 0 },
+    { dr: 0, dc: 1, rot: Math.PI / 2, x: TILE / 4, z: 0 },
+  ];
+  for (const d of dirs) {
+    const nr = r + d.dr, nc = c + d.dc;
+    if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
+    if (grid[nr][nc]?.type !== "road") continue;
+    const line = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.02, TILE / 2), lineMat);
+    line.rotation.y = d.rot;
+    line.position.set(d.x, 0.09, d.z);
+    g.add(line);
+  }
+}
+
+function makeHouseMesh() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.9, 1.3),
+    new THREE.MeshLambertMaterial({ color: 0xa1887f }));
+  body.position.y = 0.45;
+  g.add(body);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(1.15, 0.7, 4),
+    new THREE.MeshLambertMaterial({ color: 0x8d3b2f }));
+  roof.rotation.y = Math.PI / 4;
+  roof.position.y = 1.25;
+  g.add(roof);
+  return g;
+}
+
+function makeShopMesh() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.2, 1.5),
+    new THREE.MeshLambertMaterial({ color: 0x5c6bc0 }));
+  body.position.y = 0.6;
+  g.add(body);
+  const sign = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.3, 0.1),
+    new THREE.MeshLambertMaterial({ color: 0xffd54f }));
+  sign.position.set(0, 1.0, 0.78);
+  g.add(sign);
+  return g;
+}
+
+function makeHospitalMesh() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.4, 1.6),
+    new THREE.MeshLambertMaterial({ color: 0xfafafa }));
+  body.position.y = 0.7;
+  g.add(body);
+  const crossMat = new THREE.MeshLambertMaterial({ color: 0xe53935 });
+  const h = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.22, 0.22), crossMat);
+  const v = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.7, 0.22), crossMat);
+  h.position.set(0, 1.62, 0); v.position.set(0, 1.62, 0);
+  g.add(h, v);
+  return g;
+}
+
+function makeSchoolMesh() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.0, 1.4),
+    new THREE.MeshLambertMaterial({ color: 0xffb74d }));
+  body.position.y = 0.5;
+  g.add(body);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.2),
+    new THREE.MeshLambertMaterial({ color: 0xbdbdbd }));
+  pole.position.set(0.5, 1.4, 0);
+  const flag = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.25, 0.02),
+    new THREE.MeshLambertMaterial({ color: 0xe53935 }));
+  flag.position.set(0.72, 1.85, 0);
+  g.add(pole, flag);
+  return g;
+}
+
+function makePoliceMesh() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.1, 1.5),
+    new THREE.MeshLambertMaterial({ color: 0x1a237e }));
+  body.position.y = 0.55;
+  g.add(body);
+  const red = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.12, 0.2),
+    new THREE.MeshBasicMaterial({ color: 0xe53935 }));
+  const blue = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.12, 0.2),
+    new THREE.MeshBasicMaterial({ color: 0x1e88e5 }));
+  red.position.set(-0.18, 1.16, 0); blue.position.set(0.18, 1.16, 0);
+  g.add(red, blue);
+  return g;
+}
+
+function makeFireMesh() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.0, 1.5),
+    new THREE.MeshLambertMaterial({ color: 0xc62828 }));
+  body.position.y = 0.5;
+  g.add(body);
+  const tower = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.8, 0.5),
+    new THREE.MeshLambertMaterial({ color: 0x9e9e9e }));
+  tower.position.set(-0.45, 0.9, -0.45);
+  g.add(tower);
+  return g;
+}
+
+function makeFactoryMesh() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.0, 1.5),
+    new THREE.MeshLambertMaterial({ color: 0x757575 }));
+  body.position.y = 0.5;
+  g.add(body);
+  const chimMat = new THREE.MeshLambertMaterial({ color: 0x9e9e9e });
+  for (const x of [-0.4, 0.4]) {
+    const chim = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.18, 1.4), chimMat);
+    chim.position.set(x, 1.4, -0.4);
+    g.add(chim);
+  }
+  return g;
+}
+
+function makeParkMesh() {
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 0.06, 20),
+    new THREE.MeshLambertMaterial({ color: 0x66bb6a }));
+  base.position.y = 0.03;
+  g.add(base);
+  const leafMat = new THREE.MeshLambertMaterial({ color: 0x2e7d32 });
+  const trunkMat = new THREE.MeshLambertMaterial({ color: 0x6d4c41 });
+  for (const [x, z] of [[-0.4, -0.3], [0.45, -0.15], [0, 0.45]]) {
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.35), trunkMat);
+    trunk.position.set(x, 0.2, z);
+    const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.7, 8), leafMat);
+    leaf.position.set(x, 0.72, z);
+    g.add(trunk, leaf);
+  }
+  return g;
+}
+
+const MESH_MAKERS = {
+  road: makeRoadMesh, house: makeHouseMesh, shop: makeShopMesh,
+  hospital: makeHospitalMesh, school: makeSchoolMesh, police: makePoliceMesh,
+  fire: makeFireMesh, factory: makeFactoryMesh, park: makeParkMesh,
+};
+
+function cellToWorld(r, c) {
+  return { x: (c - COLS / 2 + 0.5) * TILE, z: (r - ROWS / 2 + 0.5) * TILE };
+}
+
+// ---------- Arabalar ----------
+function randomRoadCell() {
+  const roads = [];
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++)
+    if (grid[r][c]?.type === "road") roads.push({ r, c });
+  return roads.length ? roads[Math.floor(Math.random() * roads.length)] : null;
+}
+
+function spawnCar() {
+  const cell = randomRoadCell();
+  if (!cell) return;
+  const colors = [0xe53935, 0x1e88e5, 0xfdd835, 0x8e24aa, 0xf5f5f5];
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.25, 0.9),
+    new THREE.MeshLambertMaterial({ color: colors[Math.floor(Math.random() * colors.length)] })
+  );
+  const pos = cellToWorld(cell.r, cell.c);
+  mesh.position.set(pos.x, 0.2, pos.z);
+  scene.add(mesh);
+  cars.push({ mesh, r: cell.r, c: cell.c, target: null, progress: 0 });
+}
+
+function roadNeighbor(fromR, fromC) {
+  const opts = [];
+  for (const [dr, dc] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+    const nr = fromR + dr, nc = fromC + dc;
+    if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && grid[nr][nc]?.type === "road") opts.push({ r: nr, c: nc });
+  }
+  return opts.length ? opts[Math.floor(Math.random() * opts.length)] : null;
+}
+
+function updateCars(dt) {
+  for (const car of cars) {
+    if (!car.target) {
+      car.target = roadNeighbor(car.r, car.c);
+      car.progress = 0;
+      if (!car.target) { // çıkmaz sokak: yeni yola ışınlan
+        const nc = randomRoadCell();
+        if (nc) { const p = cellToWorld(nc.r, nc.c); car.r = nc.r; car.c = nc.c; car.mesh.position.set(p.x, 0.2, p.z); }
+        continue;
+      }
+    }
+    car.progress += dt * 1.2; // hız
+    const a = cellToWorld(car.r, car.c);
+    const b = cellToWorld(car.target.r, car.target.c);
+    const t = Math.min(car.progress, 1);
+    car.mesh.position.set(a.x + (b.x - a.x) * t, 0.2, a.z + (b.z - a.z) * t);
+    car.mesh.lookAt(b.x, 0.2, b.z);
+    if (car.progress >= 1) {
+      car.r = car.target.r; car.c = car.target.c;
+      car.target = null;
+    }
+  }
+}
+
+function syncCarCount() {
+  let roadCount = 0;
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++)
+    if (grid[r][c]?.type === "road") roadCount++;
+  const wanted = Math.min(Math.floor(roadCount / 6), 10);
+  while (cars.length < wanted) spawnCar();
+  while (cars.length > wanted) { const car = cars.pop(); scene.remove(car.mesh); }
+}
+
+// ---------- Ambulans (Gölgekent'e) ----------
+function sendAmbulance() {
+  if (ambulance) return;
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.4, 1.1),
+    new THREE.MeshLambertMaterial({ color: 0xffffff }));
+  body.position.y = 0.25;
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.12, 1.0),
+    new THREE.MeshBasicMaterial({ color: 0xe53935 }));
+  stripe.position.y = 0.32;
+  g.add(body, stripe);
+  g.position.set(0, 0, 0);
+  scene.add(g);
+  ambulance = { mesh: g, t: 0 };
+}
+
+function updateAmbulance(dt) {
+  if (!ambulance) return;
+  ambulance.t += dt / 5; // 5 saniyede Gölgekent'e varır
+  const start = new THREE.Vector3(0, 0, 0);
+  const end = golgekent.position.clone();
+  const t = Math.min(ambulance.t, 1);
+  ambulance.mesh.position.lerpVectors(start, end, t);
+  ambulance.mesh.lookAt(end.x, 0, end.z);
+  if (ambulance.t >= 1) {
+    scene.remove(ambulance.mesh);
+    ambulance = null;
+  }
+}
+
+// ---------- İnşa / yıkım ----------
+function applyTool(r, c) {
+  const tool = TOOLS.find(t => t.id === selectedTool);
+  if (!tool) return;
+  const current = grid[r][c];
+
+  if (tool.id === "bulldoze") {
+    if (!current) return;
+    // Yıkım bedava; binanın parasının yarısını iade alırsın
+    if (mode === "economy") {
+      const refund = Math.floor((TOOLS.find(t => t.id === current.type)?.cost || 0) / 2);
+      money += refund;
+      if (refund > 0) say(`🚜 Yıkıldı, iade: +${refund.toLocaleString("tr-TR")}₺`);
+    }
+    cityLayer.remove(current.mesh);
+    grid[r][c] = null;
+    refreshNeighborRoads(r, c);
+    syncCarCount();
+    saveGame();
+    return;
+  }
+
+  if (current) return;
+  if (mode === "economy" && money < tool.cost) { say(`💸 ${tool.name} için ${tool.cost.toLocaleString("tr-TR")}₺ lazım, paran yetmiyor!`); return; }
+
+  const mesh = MESH_MAKERS[tool.id]();
+  const pos = cellToWorld(r, c);
+  mesh.position.set(pos.x, 0, pos.z);
+  mesh.scale.setScalar(0.01); // büyüme animasyonu buradan başlar
+  cityLayer.add(mesh);
+  growing.push({ mesh, t: 0 });
+  grid[r][c] = { type: tool.id, mesh };
+  if (mode === "economy") money -= tool.cost;
+
+  if (tool.id === "road") { refreshNeighborRoads(r, c); syncCarCount(); }
+  else if (isBuilding(tool.id) && !hasRoadNextTo(r, c)) {
+    say("⚠️ Bu bina yola bağlı değil, çalışmaz! Yanına yol yap.");
+  }
+  saveGame();
+}
+
+function refreshNeighborRoads(r, c) {
+  refreshRoadMarkings(r, c);
+  for (const [dr, dc] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+    const nr = r + dr, nc = c + dc;
+    if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) refreshRoadMarkings(nr, nc);
+  }
+}
+
+// ---------- Kayıt sistemi ----------
+function saveGame() {
+  if (!mode) return;
+  try {
+    const cells = grid.map(row => row.map(cell => cell ? cell.type : null));
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      mode, day, money: mode === "economy" ? money : "inf", cells,
+    }));
+  } catch {}
+}
+
+function loadGame() {
+  try {
+    const data = JSON.parse(localStorage.getItem(SAVE_KEY));
+    if (!data || !data.cells) return false;
+    startGame(data.mode, true);
+    day = data.day || 1;
+    if (data.mode === "economy") money = data.money || 0;
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      const type = data.cells[r]?.[c];
+      if (!type || !MESH_MAKERS[type]) continue;
+      const mesh = MESH_MAKERS[type]();
+      const pos = cellToWorld(r, c);
+      mesh.position.set(pos.x, 0, pos.z);
+      cityLayer.add(mesh);
+      grid[r][c] = { type, mesh };
+      if (type === "road") refreshNeighborRoads(r, c);
+    }
+    syncCarCount();
+    updateHud();
+    say(`▶️ Kaldığın yerden devam! Gün ${day}, şehrin seni bekliyordu.`);
+    return true;
+  } catch { return false; }
+}
+
+// ---------- Gün döngüsü ----------
+function tickDay() {
+  day++;
+  if (mode !== "economy") { saveGame(); return; }
+
+  const s = cityStats();
+  const parkBonus = 1 + Math.min(s.parks * PARK_BONUS, 0.5);
+  const serviceBonus = 1 + Math.min(s.services * SERVICE_BONUS, 0.25);
+  let income = Math.round(
+    (s.workingHouses * INCOME_HOUSE + s.workingShops * INCOME_SHOP + s.workingFactories * INCOME_FACTORY)
+    * parkBonus * serviceBonus
+  );
+  let hospitalDiff = 0;
+
+  if (s.workingHouses > 0) {
+    if (s.hospitals > 0) {
+      hospitalDiff = s.workingHouses * HOSPITAL_EARN;
+      say(`🏥 Hastanen çalışıyor: hasta geliri +${hospitalDiff.toLocaleString("tr-TR")}₺`);
+    } else {
+      hospitalDiff = -s.workingHouses * HOSPITAL_LOSS;
+      say(`🚑 Hastane yok! Hastalar Gölgekent'e gitti: ${hospitalDiff.toLocaleString("tr-TR")}₺`);
+      sendAmbulance();
+    }
+  } else {
+    say("📅 Yeni gün! Ev yap ki vergi topla.");
+  }
+
+  money += income + hospitalDiff;
+  if (money < 0) say("⚠️ Belediye borçta! Dükkan, fabrika ve evlerle geliri artır.");
+  saveGame();
+}
+
+// ---------- Fare / dokunma ----------
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+let hovered = null;
+let dragButton = -1;
+let lastX = 0, lastY = 0;
+let pinchDist = 0;
+
+function pickCell(clientX, clientY) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const hit = raycaster.intersectObject(ground)[0];
+  if (!hit) return null;
+  const c = Math.floor((hit.point.x + COLS * TILE / 2) / TILE);
+  const r = Math.floor((hit.point.z + ROWS * TILE / 2) / TILE);
+  if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return null;
+  return { r, c };
+}
+
+wrap.addEventListener("contextmenu", e => e.preventDefault());
+
+wrap.addEventListener("pointerdown", e => {
+  if (e.pointerType === "touch") return;
+  dragButton = e.button;
+  lastX = e.clientX; lastY = e.clientY;
+  if (e.button === 0) {
+    const cell = pickCell(e.clientX, e.clientY);
+    if (cell) applyTool(cell.r, cell.c);
+  }
+});
+
+wrap.addEventListener("pointermove", e => {
+  if (e.pointerType === "touch") return;
+  const dx = e.clientX - lastX, dy = e.clientY - lastY;
+  lastX = e.clientX; lastY = e.clientY;
+
+  if (dragButton === 2) {
+    if (e.shiftKey) panBy(dx, dy);
+    else {
+      cam.theta -= dx * 0.006;
+      cam.phi -= dy * 0.004;
+      clampCam();
+    }
+  } else if (dragButton === 1) {
+    panBy(dx, dy);
+  } else if (dragButton === -1) {
+    hovered = pickCell(e.clientX, e.clientY);
+  }
+});
+
+wrap.addEventListener("pointerup", () => { dragButton = -1; });
+
+wrap.addEventListener("wheel", e => {
+  e.preventDefault();
+  cam.radius *= e.deltaY > 0 ? 1.1 : 0.9;
+  clampCam();
+}, { passive: false });
+
+function panBy(dx, dy) {
+  const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0);
+  const fwd = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 2);
+  fwd.y = 0; fwd.normalize();
+  const scale = cam.radius * 0.0016;
+  cam.target.addScaledVector(right, -dx * scale);
+  cam.target.addScaledVector(fwd, dy * scale * 2);
+  clampCam();
+}
+
+wrap.addEventListener("touchstart", e => {
+  if (e.touches.length === 1) {
+    const t = e.touches[0];
+    const cell = pickCell(t.clientX, t.clientY);
+    if (cell) applyTool(cell.r, cell.c);
+    lastX = t.clientX; lastY = t.clientY;
+  } else if (e.touches.length === 2) {
+    pinchDist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+  }
+}, { passive: true });
+
+wrap.addEventListener("touchmove", e => {
+  if (e.touches.length === 2) {
+    const t = e.touches[0];
+    cam.theta -= (t.clientX - lastX) * 0.006;
+    lastX = t.clientX; lastY = t.clientY;
+    const d = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    cam.radius *= pinchDist / d;
+    pinchDist = d;
+    clampCam();
+  }
+  e.preventDefault();
+}, { passive: false });
+
+// ---------- HUD ----------
+function levelOf(population) {
+  if (population >= 400) return "🌆 Metropol";
+  if (population >= 150) return "🏙️ Şehir";
+  if (population >= 50) return "🏘️ Kasaba";
+  return "🏡 Köy";
+}
+
+function updateHud() {
+  const s = cityStats();
+  const population = s.workingHouses * 4;
+  document.getElementById("hud-day").textContent = `📅 Gün ${day}`;
+  document.getElementById("hud-money").textContent =
+    mode === "economy" ? `💰 ${money.toLocaleString("tr-TR")}₺` : "💰 Sonsuz";
+  document.getElementById("hud-pop").textContent = `👨‍👩‍👧 Nüfus: ${population}`;
+  document.getElementById("hud-level").textContent = levelOf(population);
+
+  let happy = "😐 Şehir boş";
+  if (s.workingHouses > 0) {
+    const score = (s.parks / s.workingHouses) + s.services * 0.1 - s.workingFactories * 0.15;
+    happy = score >= 0.5 ? "😄 Çok mutlu" : score >= 0.25 ? "🙂 Mutlu" : "😕 Park ve hizmet istiyorlar";
+    if (s.hospitals === 0) happy += " + 🚑 Hastane yok!";
+  }
+  document.getElementById("hud-happy").textContent = `😊 ${happy}`;
+
+  if (performance.now() > messageUntil) {
+    document.getElementById("hud-msg").textContent = "";
+  }
+}
+
+// ---------- Araç çubuğu ----------
+function buildToolbar() {
+  const bar = document.getElementById("toolbar");
+  bar.innerHTML = "";
+  for (const t of TOOLS) {
+    const btn = document.createElement("button");
+    btn.className = "tool" + (t.id === selectedTool ? " selected" : "");
+    const costLabel = t.id === "bulldoze"
+      ? (mode === "economy" ? "%50 iade" : "bedava")
+      : (mode === "economy" ? t.cost.toLocaleString("tr-TR") + "₺" : "bedava");
+    btn.innerHTML = `<span class="emoji">${t.emoji}</span>${t.name}<span class="cost">${costLabel}</span>`;
+    btn.onclick = () => { selectedTool = t.id; buildToolbar(); };
+    bar.appendChild(btn);
+  }
+}
+
+// ---------- Boyutlandırma ----------
+function resize() {
+  renderer.setSize(innerWidth, innerHeight);
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+}
+addEventListener("resize", resize);
+
+// ---------- Gece / gündüz ----------
+function updateDayNight() {
+  // her oyun günü bir tam gece-gündüz döngüsü
+  const phase = ((performance.now() - lastTick) / DAY_MS) * Math.PI * 2;
+  const light = (Math.sin(phase - Math.PI / 2) + 1) / 2; // 0 = gece, 1 = gündüz
+  const sky = NIGHT_SKY.clone().lerp(DAY_SKY, light);
+  scene.background = sky;
+  scene.fog.color = sky;
+  hemi.intensity = 0.35 + light * 0.75;
+  sun.intensity = 0.15 + light * 1.25;
+}
+
+// ---------- Büyüme animasyonu ----------
+function updateGrowing(dt) {
+  for (let i = growing.length - 1; i >= 0; i--) {
+    const g = growing[i];
+    g.t += dt / 0.5;
+    const s = Math.min(g.t, 1);
+    // hafif zıplama hissi
+    const bounce = s < 1 ? 1 + Math.sin(s * Math.PI) * 0.15 : 1;
+    g.mesh.scale.setScalar(Math.max(s, 0.01) * bounce);
+    if (g.t >= 1) { g.mesh.scale.setScalar(1); growing.splice(i, 1); }
+  }
+}
+
+// ---------- Bulut animasyonu ----------
+function updateClouds(dt) {
+  for (const cloud of clouds) {
+    cloud.position.x += cloud.userData.speed * dt;
+    if (cloud.position.x > 100) cloud.position.x = -100;
+  }
+}
+
+// ---------- Ana döngü ----------
+let lastFrame = performance.now();
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = Math.min((now - lastFrame) / 1000, 0.1);
+  lastFrame = now;
+  if (!mode) return;
+  if (now - lastTick >= DAY_MS) { lastTick = now; tickDay(); updateHud(); }
+  if (hovered) {
+    const pos = cellToWorld(hovered.r, hovered.c);
+    hoverMark.position.set(pos.x, 0.03, pos.z);
+    hoverMark.visible = true;
+  } else {
+    hoverMark.visible = false;
+  }
+  updateDayNight();
+  updateGrowing(dt);
+  updateClouds(dt);
+  updateCars(dt);
+  updateAmbulance(dt);
+  updateCamera();
+  renderer.render(scene, camera);
+}
+
+// ---------- Tam ekran ----------
+function goFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  }
+}
+document.getElementById("fs-btn").onclick = goFullscreen;
+
+// ---------- Başlangıç ----------
+function startGame(selectedMode, silent = false) {
+  mode = selectedMode;
+  while (cityLayer.children.length) cityLayer.remove(cityLayer.children[0]);
+  while (cars.length) scene.remove(cars.pop().mesh);
+  growing.length = 0;
+  newGrid();
+  day = 1;
+  money = mode === "economy" ? 1000000 : Infinity;
+  selectedTool = "road";
+  lastTick = performance.now();
+
+  document.getElementById("menu").style.display = "none";
+  document.getElementById("game-wrap").style.display = "block";
+  resize();
+  buildToolbar();
+  updateHud();
+  goFullscreen();
+  if (!silent) {
+    say(mode === "economy"
+      ? "📊 Ekonomi modu: 1.000.000₺ bütçen var. Önce yol, sonra ev!"
+      : "💰 Sonsuz para modu: her şey bedava, hayal gücün serbest!", 7000);
+  }
+}
+
+document.getElementById("btn-infinite").onclick = () => startGame("infinite");
+document.getElementById("btn-economy").onclick = () => startGame("economy");
+document.getElementById("btn-continue").onclick = () => loadGame();
+document.getElementById("new-game-btn").onclick = () => {
+  document.getElementById("game-wrap").style.display = "none";
+  document.getElementById("menu").style.display = "flex";
+  refreshContinueButton();
+  if (document.fullscreenElement) document.exitFullscreen();
+};
+
+function refreshContinueButton() {
+  document.getElementById("btn-continue").style.display =
+    localStorage.getItem(SAVE_KEY) ? "block" : "none";
+}
+
+newGrid();
+refreshContinueButton();
+requestAnimationFrame(loop);
+</script>
+<script src="versiyon.js"></script>
+<script>initVersionPicker("4.0");</script>
+</body>
+</html>

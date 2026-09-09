@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Işın Savaşı | Hakorocks Studio</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- ANA MENÜ / LOBİ -->
+    <section class="screen active" id="screen-menu">
+      <div class="stars"></div>
+      <div class="menu-top">
+        <div class="coin-pill">🪙 <span id="menu-coins">0</span></div>
+      </div>
+      <h1 class="game-title">IŞIN <span>SAVAŞI</span></h1>
+      <p class="game-sub">Işın tabancanı kap, arenaya in. Sona kalan kazanır.</p>
+
+      <div class="menu-character">
+        <canvas id="menu-char-canvas" width="180" height="180"></canvas>
+        <div class="menu-char-name" id="menu-char-name">Asker</div>
+      </div>
+
+      <label class="field">
+        <span>Adın</span>
+        <input id="name-input" maxlength="14" placeholder="Oyuncu" autocomplete="off">
+      </label>
+
+      <div class="menu-buttons">
+        <button class="btn btn-primary" id="btn-play" type="button">OYNA</button>
+        <button class="btn btn-party" id="btn-party" type="button">PARTY İLE OYNA</button>
+        <div class="menu-row">
+          <button class="btn btn-small" id="btn-chars" type="button">KARAKTERLER</button>
+          <button class="btn btn-small" id="btn-code" type="button">KOD</button>
+        </div>
+      </div>
+      <p class="menu-hint">WASD hareket · Fare nişan · Tıkla / Boşluk ateş</p>
+    </section>
+
+    <!-- PARTY KUR / KATIL -->
+    <section class="screen" id="screen-party">
+      <h2 class="screen-title">Party</h2>
+      <p class="screen-sub">Kendi odanı kur ya da arkadaşının koduyla katıl.</p>
+      <div class="party-grid">
+        <div class="panel">
+          <h3>Oda Kur</h3>
+          <p>Sana özel bir kod üretilir, arkadaşların onunla girer.</p>
+          <button class="btn btn-primary" id="btn-create-room" type="button">ODA KUR</button>
+        </div>
+        <div class="panel">
+          <h3>Odaya Katıl</h3>
+          <label class="field">
+            <span>Parti kodu</span>
+            <input id="join-code-input" maxlength="8" placeholder="ABC123" autocomplete="off">
+          </label>
+          <button class="btn btn-primary" id="btn-join-room" type="button">KATIL</button>
+        </div>
+      </div>
+      <p class="form-error" id="party-error"></p>
+      <button class="btn btn-back" id="btn-party-back" type="button">← Geri</button>
+    </section>
+
+    <!-- ODA LOBİSİ -->
+    <section class="screen" id="screen-lobby">
+      <h2 class="screen-title" id="lobby-title">Oda</h2>
+      <div class="lobby-code-row" id="lobby-code-row">
+        <span>Kod:</span>
+        <button class="code-badge" id="lobby-code" type="button" title="Kopyala">------</button>
+      </div>
+      <div class="lobby-grid">
+        <div class="panel">
+          <h3>Oyuncular <span id="lobby-count">0</span>/10</h3>
+          <ul class="player-list" id="player-list"></ul>
+        </div>
+        <div class="panel">
+          <h3>Oyun Modu</h3>
+          <div class="mode-buttons">
+            <button class="btn btn-mode" id="btn-mode-solo" type="button">
+              HERKES TEK
+              <small>Tek can. Sona kalan kazanır.</small>
+            </button>
+            <button class="btn btn-mode" id="btn-mode-team" type="button">
+              TAKIMLAR
+              <small>Ortak can havuzu. Can biterse doğuş yok.</small>
+            </button>
+          </div>
+          <div class="team-buttons" id="team-buttons">
+            <span>Takımın:</span>
+            <button class="btn btn-team team-a" id="btn-team-a" type="button">A Takımı</button>
+            <button class="btn btn-team team-b" id="btn-team-b" type="button">B Takımı</button>
+          </div>
+          <button class="btn btn-primary btn-start" id="btn-start" type="button">BAŞLAT</button>
+          <p class="lobby-note" id="lobby-note">Başlatmak için en az 2 oyuncu gerekli.</p>
+        </div>
+      </div>
+      <button class="btn btn-back" id="btn-lobby-leave" type="button">← Odadan Ayrıl</button>
+    </section>
+
+    <!-- KARAKTERLER -->
+    <section class="screen" id="screen-chars">
+      <h2 class="screen-title">Karakterler</h2>
+      <p class="screen-sub">Coinlerin: 🪙 <span id="chars-coins">0</span> — Kazan, biriktir, kilidini aç.</p>
+      <div class="char-grid" id="char-grid"></div>
+      <button class="btn btn-back" id="btn-chars-back" type="button">← Geri</button>
+    </section>
+
+    <!-- KOD -->
+    <section class="screen" id="screen-code">
+      <h2 class="screen-title">Kod Kullan</h2>
+      <p class="screen-sub">Elindeki gizli kodu yaz, ödülü kap.</p>
+      <label class="field">
+        <span>Kod</span>
+        <input id="code-input" maxlength="16" placeholder="KOD" autocomplete="off">
+      </label>
+      <button class="btn btn-primary" id="btn-redeem" type="button">KODU KULLAN</button>
+      <p class="form-error" id="code-message"></p>
+      <button class="btn btn-back" id="btn-code-back" type="button">← Geri</button>
+    </section>
+
+    <!-- MAÇ -->
+    <section class="screen" id="screen-match">
+      <canvas id="game-canvas"></canvas>
+      <div class="hud">
+        <div class="hud-top">
+          <div class="hud-lives" id="hud-lives">
+            <div class="lives-team team-a"><span>A</span><b id="lives-a">0</b></div>
+            <div class="lives-vs">CAN</div>
+            <div class="lives-team team-b"><span>B</span><b id="lives-b">0</b></div>
+          </div>
+          <div class="hud-alive" id="hud-alive">🧍 0</div>
+        </div>
+        <div class="killfeed" id="killfeed"></div>
+        <div class="hud-bottom">
+          <div class="hp-wrap">
+            <div class="hp-label" id="hud-name">Oyuncu</div>
+            <div class="hp-bar"><div class="hp-fill" id="hp-fill"></div></div>
+          </div>
+        </div>
+        <div class="respawn-overlay" id="respawn-overlay">
+          <div class="respawn-text" id="respawn-text">Yeniden doğuyorsun...</div>
+        </div>
+        <div class="match-end" id="match-end">
+          <h2 id="end-title">Kazandın!</h2>
+          <p id="end-detail"></p>
+          <div class="end-coins" id="end-coins"></div>
+          <div class="end-buttons">
+            <button class="btn btn-primary" id="btn-end-lobby" type="button">LOBİYE DÖN</button>
+          </div>
+        </div>
+        <button class="btn btn-quit" id="btn-quit-match" type="button">Çık</button>
+        <div class="damage-flash" id="damage-flash"></div>
+        <div class="crosshair" id="crosshair">+</div>
+        <div class="lock-hint" id="lock-hint">Nişan almak için ekrana tıkla</div>
+      </div>
+    </section>
+
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <script src="vendor/babylon.js"></script>
+  <script src="/site-game-tools.js"></script>
+  <script src="game.js?v=9"></script>
+</body>
+</html>

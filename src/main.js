@@ -17,6 +17,86 @@ import {
 
 const games = [
   {
+    slug: "karanlik-labirent",
+    title: "Karanlık Labirent",
+    path: "/oyunlar/karanlik-labirent/",
+    type: "3D Korku Kaçış",
+    status: "Oynanabilir",
+    description: "Zifiri karanlık dev bir labirent, bir el feneri ve 3 altın anahtar! Kapıyı açıp kaç — ama dikkat, her 2 dakikada bir gizli lanet yiyorsun ve hangisi olduğunu BİLMİYORSUN!",
+    longDescription: "Karanlık Labirent — 5 arkadaşa kadar online oynanan 3D korku kaçış oyunu. Oda kodunu kur, arkadaşlarını çağır; herkes aynı dev labirente düşer. Elindeki fenerden başka hiçbir şeyin yok: duvarları, köşeleri ve arkadaşlarının ışığını karanlıkta ara. Labirente saklanmış 3 altın anahtarı bulun (anahtarlar ortak, kim bulursa bulsun herkes için sayılır), kilitli çıkış kapısı açılsın ve kapıdan ilk geçen kazansın! Ama bir yakalama var: her 2 dakikada bir labirent herkese gizli bir lanet dağıtır — kimse ne yediğini bilmez. Bazen arkadaşlarını göremezsin, bazen ekranın kendi kendine döner, bazen her şey maviye bürünür, bazen de tam kazandım derken... şaka çıkar! ⚡",
+    accent: "violet",
+    controls: "WASD hareket, fare ile bak, fener otomatik",
+    mobileStatus: "Masaüstü önerilir",
+    mobileNote: "Pointer-lock fare bakışı gerektirdiği için masaüstünde oynanır.",
+    achievements: ["İlk anahtarı bul", "Kapıyı açtır", "Lanete rağmen kaç"],
+    updates: ["Online oda kodu sistemi (maks. 5 oyuncu)", "Seed ile üretilen dev 31x31 labirent", "3 ortak altın anahtar ve kilitli çıkış kapısı", "5 gizli lanet: kimse hangisini yediğini bilmez!"],
+    stockBase: 150,
+  },
+  {
+    slug: "ejderha-ucus",
+    title: "Ejderha Uçuşu",
+    path: "/oyunlar/ejderha-ucus/",
+    type: "3D Uçuş",
+    status: "Oynanabilir",
+    description: "Hako’sun, ejderha değilsin. Vadide koş, kayıp ejderhayı gör, bin, sonra uç!",
+    longDescription: "Ejderha Uçuşu — hikaye: sen Hako’sun. 11 bölümde ipucu topla, ejderhayı gör, E ile bin, sırtında uç. Yaya WASD, binekte W/S yüksel. Kızıl / Altın / Buz binilecek ejderha.",
+    accent: "crimson",
+    controls: "W/S yüksel-alçal, A/D dön, Boşluk hız, J ateş · dokunmatik",
+    mobileStatus: "Mobil uyumlu",
+    mobileNote: "Solda yön dairesi, sağda ATEŞ ve HIZ düğmeleri ile telefonda oynanır.",
+    achievements: ["İlk yüzüğü geç", "Tüm yüzükleri bitir", "8 balonu ateşle"],
+    updates: ["3D vadi, yüzük parkuru ve ateş nefesi", "Kızıl / Altın / Buz ejderha", "Kendi GLB modelini yükleme"],
+    stockBase: 133,
+  },
+  {
+    slug: "make-city",
+    title: "Make City",
+    path: "/oyunlar/make-city/",
+    type: "Şehir Kurma",
+    status: "Oynanabilir",
+    description: "Kendi şehrini kur! Binaları yerleştir, yolları çiz; Sonsuz Para modunda serbestçe kur ya da Ekonomi modunda bütçeyi yönet.",
+    longDescription: "Make City — 3D şehir kurma oyunu. Boş araziye yollar, evler ve binalar yerleştirerek kendi şehrini sıfırdan inşa et. Sonsuz Para modunda hiçbir sınır olmadan hayalindeki şehri kur; Ekonomi modunda ise paran sınırlı, her binayı akıllıca seçmelisin. Kamerayı döndür, yakınlaş, şehrine tepeden bak. Şehrin kaydedilir, Devam Et ile kaldığın yerden devam edersin.",
+    accent: "mint",
+    controls: "Sol tık: inşa · Sağ sürükle: döndür · Tekerlek: yakınlaş · Shift+sağ: kaydır",
+    mobileStatus: "Masaüstü önerilir",
+    mobileNote: "Fare ile en rahat oynanır; dokunmatik destek sınırlı olabilir.",
+    achievements: ["İlk binanı dik", "Şehrini 50 binaya ulaştır", "Ekonomi modunda kârda kal"],
+    updates: ["v6 Şehir Halkı: sokakta yürüyen ve konuşan vatandaşlar", "Sonsuz Para ve Ekonomi modları", "3D kamera: döndür, yakınlaş, kaydır", "Kayıt sistemi: Devam Et ile kaldığın yerden sür"],
+    stockBase: 142,
+  },
+  {
+    slug: "beyaz-bardak",
+    title: "Beyaz Bardak",
+    path: "/oyunlar/beyaz-bardak/",
+    type: "3D Macera + Parti",
+    status: "Oynanabilir",
+    description: "Sen beyaz bir bardaksın! Evde görevleri yap, kayıp Atatürk'lü Bardağı bul, bardak kapısından caddeye kaç, zombi bardakları ez — parti koduyla arkadaşlarınla birlikte!",
+    longDescription: "Beyaz Bardak — 3D macera + parti modu. Sen bir beyaz bardaksın ve Space ile baktığın yöne zıplayarak ilerliyorsun. Evde görevleri tamamla: mutfağa git, 3 bardak altlığını topla, kediyi bul. Sonra kayıp Atatürk'lü Bardağı bulup bardak anahtarını al, bardak kapısını aç ve upuzun caddeye çık. İnsanlar üstüne basarsa kırılırsın; parlayan altlıklar checkpoint. Gizli köşede Zombi Bardak İstilası, çalıların arkasında Kırık Bardak Mezarlığı seni bekliyor. PARTİ ile kod kur ya da arkadaşının koduna katıl: aynı dünyada birbirinizi görürsünüz, zombi sayacı ortak! Oyun hiç bitmez.",
+    accent: "amber",
+    controls: "Space ile baktığın yöne zıpla, fare ile bak · dokunmatik",
+    mobileStatus: "Mobil uyumlu",
+    mobileNote: "Sol yarıyı sürükleyerek kamera çevrilir, büyük ZIPLA düğmesiyle zıplanır; ses M tuşu veya köşe düğmesiyle kapatılır.",
+    achievements: ["Atatürk'lü Bardağı bul", "Evden kaç", "10 zombi bardağı ez"],
+    updates: ["Parti modu: kodla kur/katıl, arkadaşlarınla aynı dünyada zıpla", "Harita büyüdü: banyo + çalışma odası, uzun cadde, gizli Kırık Bardak Mezarlığı", "Caddeye 5 gizli bölge: kanalizasyon, inşaat, gizli park, arka sokak, alt geçit", "NPC'ler: sohbet eden yetişkinler + bardağı kapmaya çalışan çocuklar", "Ortak zombi sayacı ve checkpoint altlıkları"],
+    stockBase: 158,
+  },
+  {
+    slug: "isin-savasi",
+    title: "Işın Savaşı",
+    path: "/oyunlar/isin-savasi/",
+    type: "Çok Oyunculu Arena",
+    status: "Oynanabilir",
+    description: "Işın tabancanı kap, arenaya in! Herkes tek ya da takımlar halinde; sona kalan kazanır. Party koduyla arkadaşlarınla oyna.",
+    longDescription: "Işın Savaşı — çok oyunculu arena savaşı. Oyna'ya bas, sitedeki oyuncularla hızlı maça gir; ya da party koduyla arkadaşlarına özel oda kur. Herkes Tek modunda tek canın var, sona kalan kazanır. Takımlar modunda ortak can havuzu var: can bitene kadar yeniden doğarsın, can bitince ölen elenir. Kazandığın coinlerle 10 karakterin kilidini aç!",
+    accent: "nova",
+    controls: "WASD hareket, fare nişan, tık/Boşluk ateş · dokunmatik",
+    mobileStatus: "Mobil uyumlu",
+    mobileNote: "Mobilde hareket düğmeleri ve Ateş düğmesi var; nişan en yakın düşmana otomatik kilitlenir.",
+    achievements: ["İlk avını al", "Bir maç kazan", "10 karakterin sahibi ol"],
+    updates: ["Çok oyunculu arena: hızlı maç + party kodu", "Herkes Tek ve Takımlar modları, takım can havuzu", "10 karakter ve coin ekonomisi"],
+    stockBase: 128,
+  },
+  {
     slug: "uzay-yarisi",
     title: "Uzay Yarışı",
     path: "/oyunlar/uzay-yarisi/",
@@ -320,7 +400,7 @@ const games = [
 ];
 
 const FUSION_GAME_PATH = "/oyunlar/birlesim-arenasi/";
-const NEW_GAME_SLUGS = new Set(["hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "2d-car-simulator", "yaris-sehri", "hako-vurus", "uzay-yarisi"]);
+const NEW_GAME_SLUGS = new Set(["karanlik-labirent", "ejderha-ucus", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "2d-car-simulator", "yaris-sehri", "hako-vurus", "uzay-yarisi", "isin-savasi", "beyaz-bardak", "make-city"]);
 /** Only games the Birleşim Arenası client actually implements. */
 const FUSION_GAME_SLUGS = new Set([
   "annenden-kac",
@@ -390,6 +470,31 @@ const mobileFeatures = [
 ];
 
 const newsItems = [
+  {
+    date: "Yeni",
+    title: "Karanlık Labirent yayında",
+    description: "Zifiri karanlık labirent, 3 altın anahtar ve 2 dakikada bir gizli lanet. Arkadaşlarınla kaç!",
+  },
+  {
+    date: "Yeni",
+    title: "Ejderha Uçuşu yayında",
+    description: "Vadide koş, kayıp ejderhayı bul, bin ve yüzük parkurunu uçarak geç.",
+  },
+  {
+    date: "Yeni",
+    title: "Make City yayında",
+    description: "Kendi şehrini kur: yollar, binalar, Sonsuz Para veya Ekonomi modu.",
+  },
+  {
+    date: "Yeni",
+    title: "Beyaz Bardak yayında",
+    description: "Beyaz bir bardak ol, evden kaç, zombi bardakları ez; parti koduyla arkadaşlarınla zıpla.",
+  },
+  {
+    date: "Yeni",
+    title: "Işın Savaşı yayında",
+    description: "Çok oyunculu arena: party koduyla arkadaşlarınla ışın tabancası savaşı. Sona kalan kazanır!",
+  },
   {
     date: "Yeni",
     title: "Uzay Yarışı yayında",

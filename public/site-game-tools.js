@@ -20,6 +20,11 @@ const gameTitles = {
   "siber-polis": "Siber Polis",
   "hako-vurus": "Hako Vuruş",
   "uzay-yarisi": "Uzay Yarışı",
+  "isin-savasi": "Işın Savaşı",
+  "beyaz-bardak": "Beyaz Bardak",
+  "make-city": "Make City",
+  "ejderha-ucus": "Ejderha Uçuşu",
+  "karanlik-labirent": "Karanlık Labirent",
 };
 
 const keyBindings = {
@@ -111,6 +116,13 @@ const mobileControlConfigs = {
       { label: "Ateş", code: "KeyJ" },
       { label: "Bomba", code: "KeyB" },
       { label: "Turbo", code: "ShiftLeft", hold: true },
+    ],
+  },
+  "isin-savasi": {
+    hint: "Sol tarafla hareket et. Ateşe basılı tut; nişan en yakın düşmana otomatik kilitlenir.",
+    look: false,
+    actions: [
+      { label: "Ateş", code: "Space", hold: true },
     ],
   },
 };

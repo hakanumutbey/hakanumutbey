@@ -26,6 +26,11 @@ Buradaki hedef basit: yeni oyunları ve projeleri aynı çatı altında toplamak
 
 | Oyun | Tür | Durum |
 | --- | --- | --- |
+| **Karanlık Labirent** | 3D korku kaçış | Tarayıcıdan oynanabilir |
+| **Ejderha Uçuşu** | 3D uçuş | Tarayıcıdan oynanabilir |
+| **Make City** | Şehir kurma | Tarayıcıdan oynanabilir |
+| **Beyaz Bardak** | 3D macera + parti | Tarayıcıdan oynanabilir |
+| **Işın Savaşı** | Çok oyunculu arena | Tarayıcıdan oynanabilir |
 | **Annenden Kaç** | 3D kaçış | Tarayıcıdan oynanabilir |
 | **Bardak** | 3D fizik oyunu | Tarayıcıdan oynanabilir |
 | **Eşsiz Zindan** | Zindan aksiyonu | Tarayıcıdan oynanabilir |

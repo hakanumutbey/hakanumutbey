@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Karanlık Labirent — Hakorocks Studio</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #05060a; color: #e8e6df;
+    font-family: "Segoe UI", system-ui, sans-serif; }
+  #game { position: fixed; inset: 0; }
+  canvas { display: block; }
+
+  .panel { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle at 50% 30%, #141428 0%, #05060a 70%); z-index: 20; }
+  .card { background: rgba(10, 12, 24, 0.92); border: 1px solid #2c2c50; border-radius: 14px;
+    padding: 28px 32px; width: min(420px, 92vw); box-shadow: 0 0 60px rgba(90, 60, 180, 0.25); }
+  h1 { font-size: 30px; letter-spacing: 1px; margin-bottom: 4px; color: #c9b8ff;
+    text-shadow: 0 0 18px rgba(140, 100, 255, 0.6); }
+  .sub { color: #8f8fb0; font-size: 13px; margin-bottom: 18px; }
+  input { width: 100%; padding: 11px 12px; border-radius: 8px; border: 1px solid #3a3a66;
+    background: #0b0d1a; color: #fff; font-size: 15px; margin-bottom: 10px; outline: none; }
+  input:focus { border-color: #7a5cff; }
+  button { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 15px;
+    font-weight: 700; cursor: pointer; margin-bottom: 8px; transition: filter .15s; }
+  button:hover { filter: brightness(1.2); }
+  .btn-create { background: linear-gradient(135deg, #7a5cff, #4a2fd0); color: #fff; }
+  .btn-join { background: linear-gradient(135deg, #2fae6e, #177a49); color: #fff; }
+  .btn-start { background: linear-gradient(135deg, #ffb02e, #e06f00); color: #201200; }
+  .err { color: #ff7b7b; font-size: 13px; min-height: 18px; margin-top: 4px; }
+  .code-big { font-size: 40px; font-weight: 800; letter-spacing: 12px; text-align: center;
+    color: #ffd76a; margin: 10px 0 16px; text-shadow: 0 0 22px rgba(255, 200, 60, 0.5); }
+  .plist { list-style: none; margin-bottom: 16px; }
+  .plist li { padding: 7px 10px; background: #12152a; border-radius: 7px; margin-bottom: 6px;
+    font-size: 14px; display: flex; justify-content: space-between; }
+  .plist li .tag { color: #8f8fb0; font-size: 12px; }
+  .hint { color: #6f6f95; font-size: 12px; text-align: center; margin-top: 6px; }
+
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; display: none; }
+  #keyBox { position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    background: rgba(8, 10, 20, 0.75); border: 1px solid #4a3f14; padding: 8px 18px;
+    border-radius: 10px; font-size: 18px; font-weight: 700; color: #ffd76a; }
+  #roomBox { position: absolute; top: 14px; left: 14px; background: rgba(8,10,20,0.75);
+    padding: 7px 12px; border-radius: 8px; font-size: 13px; color: #9f9fc0; }
+  #playersBox { position: absolute; top: 14px; right: 14px; background: rgba(8,10,20,0.75);
+    padding: 8px 12px; border-radius: 8px; font-size: 12px; color: #c8c8e0; min-width: 120px; }
+  #playersBox div { padding: 2px 0; }
+  #toast { position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%);
+    background: rgba(8, 10, 20, 0.85); border: 1px solid #3a3a66; padding: 10px 22px;
+    border-radius: 10px; font-size: 16px; opacity: 0; transition: opacity .3s; white-space: nowrap; }
+  #crosshair { position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; margin: -3px;
+    border-radius: 50%; background: rgba(255,255,255,0.65); }
+
+  #clickToPlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(3, 4, 8, 0.72); z-index: 15; cursor: pointer; font-size: 22px; color: #d8d4ff;
+    text-shadow: 0 0 14px rgba(120, 90, 255, 0.8); }
+
+  #blueOverlay { position: fixed; inset: 0; z-index: 12; display: none; pointer-events: none;
+    background: radial-gradient(circle 30px at 50% 50%, transparent 28px, rgba(8, 16, 110, 0.985) 32px); }
+
+  #centerMsg { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    flex-direction: column; z-index: 30; background: rgba(3, 4, 8, 0.85); text-align: center; padding: 20px; }
+  #centerMsg .big { font-size: 44px; font-weight: 800; margin-bottom: 12px; }
+  #centerMsg .small { font-size: 17px; color: #b9b9d8; }
+  .confetti { position: fixed; top: -20px; width: 10px; height: 16px; z-index: 31; pointer-events: none;
+    animation: confall linear forwards; }
+  @keyframes confall { to { transform: translateY(110vh) rotate(720deg); } }
+</style>
+</head>
+<body>
+<div id="game"></div>
+
+<div id="hud">
+  <div id="keyBox">🔑 Anahtar 0/3</div>
+  <div id="roomBox"></div>
+  <div id="playersBox"></div>
+  <div id="toast"></div>
+  <div id="crosshair"></div>
+</div>
+
+<div id="blueOverlay"></div>
+<div id="clickToPlay">🔦 Başlamak için tıkla (fare ile bak, WASD ile yürü)</div>
+
+<div id="centerMsg"><div class="big"></div><div class="small"></div></div>
+
+<div class="panel" id="menuPanel">
+  <div class="card">
+    <h1>🕯️ Karanlık Labirent</h1>
+    <div class="sub">Zifiri karanlık labirent, el fenerin ve 3 altın anahtar... Ve kimse hangi laneti yediğini bilmiyor. 👀</div>
+    <input id="nickInput" maxlength="14" placeholder="Takma adın" autocomplete="off">
+    <button class="btn-create" id="createBtn">Oda Kur</button>
+    <input id="codeInput" maxlength="4" placeholder="Oda kodu (4 harf)" autocomplete="off" style="text-transform:uppercase">
+    <button class="btn-join" id="joinBtn">Koda Katıl</button>
+    <div class="err" id="menuErr"></div>
+    <div class="hint">Maksimum 5 oyuncu · 3 anahtarı bulun, kapı açılsın, kaçın!</div>
+  </div>
+</div>
+
+<div class="panel" id="lobbyPanel" style="display:none">
+  <div class="card">
+    <h1>Oda Kuruldu</h1>
+    <div class="sub">Kodu arkadaşlarına ver, gelsinler:</div>
+    <div class="code-big" id="lobbyCode"></div>
+    <ul class="plist" id="lobbyPlayers"></ul>
+    <button class="btn-start" id="startBtn" style="display:none">🚪 Labirente Gir (Başla)</button>
+    <div class="hint" id="lobbyHint">Odayı kuran oyunu başlatır.</div>
+  </div>
+</div>
+
+<script src="three.min.js"></script>
+<script>
+"use strict";
+// ================= AĞ =================
+const WS_URL = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/karanlik-labirent";
+let ws = null;
+let myId = "", roomCode = "", hostId = "", phase = "menu", seed = 0;
+let myCurse = "";
+let doorOpen = false;
+let escaped = false;
+let keyCount = 0;
+let initialKeys = [false, false, false];
+const players = new Map(); // id -> {id, nickname, escaped}
+const $ = (id) => document.getElementById(id);
+
+function connect() {
+  ws = new WebSocket(WS_URL);
+  ws.onmessage = (ev) => {
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch { return; }
+    handleMessage(msg);
+  };
+  ws.onclose = () => {
+    if (phase !== "menu") showCenter("🔌 Bağlantı koptu", "Sayfayı yenileyip tekrar katılabilirsin.", true);
+  };
+}
+function send(payload) {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(payload));
+}
+
+function handleMessage(msg) {
+  switch (msg.type) {
+    case "joined": {
+      myId = msg.id; roomCode = msg.code; hostId = msg.host;
+      phase = msg.phase; seed = msg.seed;
+      keyCount = msg.keyCount;
+      initialKeys = msg.keys || [false, false, false];
+      players.clear();
+      for (const p of msg.players) players.set(p.id, { id: p.id, nickname: p.nickname, escaped: p.escaped });
+      if (msg.curse) applyCurse(msg.curse);
+      if (phase === "lobby") showLobby();
+      else enterGame(true);
+      break;
+    }
+    case "player-joined":
+      players.set(msg.player.id, { id: msg.player.id, nickname: msg.player.nickname, escaped: false });
+      toast(`👋 ${msg.player.nickname} katıldı`);
+      refreshLobby();
+      break;
+    case "player-left": {
+      const p = players.get(msg.id);
+      players.delete(msg.id);
+      removeRemote(msg.id);
+      toast(`🚶 ${(p && p.nickname) || msg.nickname || "Biri"} ayrıldı`);
+      refreshLobby();
+      break;
+    }
+    case "host":
+      hostId = msg.id;
+      refreshLobby();
+      break;
+    case "start":
+      phase = "play"; seed = msg.seed; hostId = msg.host;
+      keyCount = 0; initialKeys = [false, false, false]; escaped = false;
+      players.clear();
+      for (const p of msg.players) players.set(p.id, { id: p.id, nickname: p.nickname, escaped: false });
+      enterGame(false);
+      break;
+    case "pos": {
+      if (msg.id === myId) break;
+      updateRemote(msg.id, msg.x, msg.z, msg.ry, msg.inv === true);
+      break;
+    }
+    case "key": {
+      collectKeyVisual(msg.key);
+      keyCount = msg.count;
+      updateKeyHud();
+      playPling();
+      toast(`🔑 ${msg.nickname} bir anahtar buldu! (${msg.count}/3)`);
+      break;
+    }
+    case "door-open":
+      openDoor();
+      playCreak();
+      toast("🚪 KAPI AÇILDI! Kaçış zamanı!");
+      break;
+    case "curse":
+      applyCurse(msg.curse);
+      break;
+    case "curse-shift":
+      playVin();
+      toast("⚡ Bir şeyler değişti...");
+      break;
+    case "escaped": {
+      const p = players.get(msg.id);
+      if (p) p.escaped = true;
+      if (msg.id === myId && msg.fake !== true) {
+        escaped = true;
+        showCenter("🏆 KAÇTIN! KAZANDIN!", "Karanlık labirentten çıkmayı başardın. Tebrikler!", true);
+      } else {
+        toast(`🏆 ${msg.nickname} labirentten kaçtı!`);
+      }
+      refreshLobby();
+      break;
+    }
+    case "fake-win":
+      runFakeWin();
+      break;
+    case "error": {
+      const texts = {
+        "room-not-found": "Oda bulunamadı. Kodu kontrol et!",
+        "room-full": "Oda dolu (maksimum 5 oyuncu).",
+      };
+      $("menuErr").textContent = texts[msg.code] || "Bir hata oluştu.";
+      break;
+    }
+  }
+}
+
+// ================= LOBİ UI =================
+$("createBtn").onclick = () => {
+  const nickname = $("nickInput").value.trim();
+  if (!nickname) { $("menuErr").textContent = "Önce takma adını yaz!"; return; }
+  send({ type: "create", nickname });
+};
+$("joinBtn").onclick = () => {
+  const nickname = $("nickInput").value.trim();
+  const code = $("codeInput").value.trim().toUpperCase();
+  if (!nickname) { $("menuErr").textContent = "Önce takma adını yaz!"; return; }
+  if (code.length !== 4) { $("menuErr").textContent = "Kod 4 harfli olmalı!"; return; }
+  send({ type: "join", code, nickname });
+};
+$("startBtn").onclick = () => send({ type: "start" });
+
+function showLobby() {
+  $("menuPanel").style.display = "none";
+  $("lobbyPanel").style.display = "flex";
+  $("lobbyCode").textContent = roomCode;
+  refreshLobby();
+}
+function refreshLobby() {
+  const list = $("lobbyPlayers");
+  list.innerHTML = "";
+  for (const p of players.values()) {
+    const li = document.createElement("li");
+    const tags = [];
+    if (p.id === hostId) tags.push("kurucu");
+    if (p.id === myId) tags.push("sen");
+    if (p.escaped) tags.push("kaçtı 🏆");
+    li.innerHTML = `<span>${escapeHtml(p.nickname)}</span><span class="tag">${tags.join(" · ")}</span>`;
+    list.appendChild(li);
+  }
+  $("startBtn").style.display = (myId === hostId && phase === "lobby") ? "block" : "none";
+  const box = $("playersBox");
+  box.innerHTML = "";
+  for (const p of players.values()) {
+    const d = document.createElement("div");
+    d.textContent = `${p.id === myId ? "▶ " : ""}${p.nickname}${p.escaped ? " 🏆" : ""}`;
+    box.appendChild(d);
+  }
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+function updateKeyHud() {
+  $("keyBox").textContent = `🔑 Anahtar ${keyCount}/3`;
+}
+let toastTimer = 0;
+function toast(text) {
+  const el = $("toast");
+  el.textContent = text;
+  el.style.opacity = "1";
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.style.opacity = "0"; }, 2600);
+}
+function showCenter(big, small, sticky) {
+  $("centerMsg").style.display = "flex";
+  $("centerMsg").querySelector(".big").textContent = big;
+  $("centerMsg").querySelector(".small").textContent = small;
+  if (!sticky) setTimeout(() => { $("centerMsg").style.display = "none"; }, 2500);
+}
+
+// ================= SES (WebAudio, inline) =================
+let actx = null;
+function audio() {
+  if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+  if (actx.state === "suspended") actx.resume();
+  return actx;
+}
+function tone(freq, dur, type, vol, slideTo, delay = 0) {
+  try {
+    const ctx = audio();
+    const t0 = ctx.currentTime + delay;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    gain.gain.setValueAtTime(vol, t0);
+    gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.02);
+  } catch { /* ses yoksa sorun değil */ }
+}
+function playPling() { tone(880, 0.12, "sine", 0.18); tone(1320, 0.22, "sine", 0.16, 0, 0.09); }
+function playCreak() { tone(140, 0.9, "sawtooth", 0.12, 55); tone(90, 0.9, "sawtooth", 0.08, 40, 0.1); }
+function playVin() { tone(240, 0.12, "square", 0.12, 180); tone(240, 0.12, "square", 0.12, 180, 0.18); }
+
+// ================= LABİRENT (seed ile deterministik) =================
+const MW = 31, MH = 31, S = 4, WALL_H = 3.2;
+const DOOR_COL = MW - 2, DOOR_ROW = MH - 1; // alt kenar açıklığı (29, 30)
+const SPAWN_COL = 1, SPAWN_ROW = 1;
+let grid = null;
+let keyCells = [];
+
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function genMaze(mazeSeed) {
+  const rnd = mulberry32(mazeSeed);
+  const g = Array.from({ length: MH }, () => Array(MW).fill(1));
+  const stack = [[SPAWN_COL, SPAWN_ROW]];
+  g[SPAWN_ROW][SPAWN_COL] = 0;
+  while (stack.length) {
+    const [cx, cy] = stack[stack.length - 1];
+    const dirs = [[2, 0], [-2, 0], [0, 2], [0, -2]].filter(([dx, dy]) => {
+      const nx = cx + dx, ny = cy + dy;
+      return nx > 0 && ny > 0 && nx < MW - 1 && ny < MH - 1 && g[ny][nx] === 1;
+    });
+    if (!dirs.length) { stack.pop(); continue; }
+    const [dx, dy] = dirs[Math.floor(rnd() * dirs.length)];
+    g[cy + dy / 2][cx + dx / 2] = 0;
+    g[cy + dy][cx + dx] = 0;
+    stack.push([cx + dx, cy + dy]);
+  }
+  // Biraz ek geçit aç ki labirent boğucu olmasın
+  for (let i = 0; i < 30; i += 1) {
+    const col = 1 + Math.floor(rnd() * (MW - 2));
+    const row = 1 + Math.floor(rnd() * (MH - 2));
+    if (g[row][col] === 1) {
+      const openSides = [[1, 0], [-1, 0], [0, 1], [0, -1]]
+        .filter(([dx, dy]) => g[row + dy] && g[row + dy][col + dx] === 0);
+      if (openSides.length === 2) g[row][col] = 0;
+    }
+  }
+  // Çıkış açıklığı
+  g[DOOR_ROW][DOOR_COL] = 0;
+  // Anahtar hücreleri: spawn'dan uzak, birbirinden ayrık 3 koridor hücresi
+  const cells = [];
+  for (let row = 1; row < MH - 1; row += 1) {
+    for (let col = 1; col < MW - 1; col += 1) {
+      if (g[row][col] !== 0) continue;
+      const dSpawn = Math.abs(col - SPAWN_COL) + Math.abs(row - SPAWN_ROW);
+      if (dSpawn >= 18 && !(col === DOOR_COL && row >= DOOR_ROW - 1)) cells.push([col, row]);
+    }
+  }
+  for (let i = cells.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rnd() * (i + 1));
+    [cells[i], cells[j]] = [cells[j], cells[i]];
+  }
+  const picked = [];
+  for (const c of cells) {
+    if (picked.length >= 3) break;
+    if (picked.every((p) => Math.abs(p[0] - c[0]) + Math.abs(p[1] - c[1]) >= 10)) picked.push(c);
+  }
+  for (const c of cells) { if (picked.length >= 3) break; if (!picked.includes(c)) picked.push(c); }
+  keyCells = picked;
+  return g;
+}
+
+function cellToWorld(col, row) { return [(col - (MW - 1) / 2) * S, (row - (MH - 1) / 2) * S]; }
+function isWallCell(col, row) {
+  if (col < 0 || row < 0 || col >= MW || row >= MH) return true;
+  if (!doorOpen && col === DOOR_COL && row === DOOR_ROW) return true;
+  return grid[row][col] === 1;
+}
+function hitsWall(x, z) {
+  const r = 0.35;
+  for (const [ox, oz] of [[-r, -r], [r, -r], [-r, r], [r, r]]) {
+    const col = Math.floor((x + ox) / S + MW / 2);
+    const row = Math.floor((z + oz) / S + MH / 2);
+    if (isWallCell(col, row)) return true;
+  }
+  return false;
+}
+
+// ================= 3D SAHNE =================
+let renderer, scene, camera, flashlight;
+let doorMesh = null, doorLight = null;
+let keyMeshes = [];
+const remotes = new Map(); // id -> {group, nameSprite, tx, tz, try_, hidden}
+const REMOTE_COLORS = [0xff5a5a, 0x5aff8a, 0x5aa8ff, 0xffe45a, 0xff5ad8];
+
+const pos = { x: 0, z: 0 };
+let yaw = 0, pitch = 0;
+const keysDown = new Set();
+let lastPosSent = 0;
+let gameStarted = false;
+
+function enterGame(midJoin) {
+  $("menuPanel").style.display = "none";
+  $("lobbyPanel").style.display = "none";
+  $("hud").style.display = "block";
+  $("roomBox").textContent = `Oda: ${roomCode}`;
+  updateKeyHud();
+  refreshLobby();
+  if (!gameStarted) {
+    initScene();
+    gameStarted = true;
+  }
+  buildMaze(seed);
+  // Oyuna sonradan katıldıysak önceden toplanmış anahtarları sahneden kaldır
+  initialKeys.forEach((taken, i) => { if (taken) collectKeyVisual(i); });
+  if (keyCount >= 3) openDoor();
+  // spawn
+  const idx = [...players.keys()].indexOf(myId);
+  const [sx, sz] = cellToWorld(SPAWN_COL, SPAWN_ROW);
+  pos.x = sx + (idx % 3) * 0.8 - 0.8;
+  pos.z = sz + Math.floor(idx / 3) * 0.8;
+  yaw = Math.PI * 0.25; pitch = 0;
+  if (midJoin) toast("⚡ Oyuna sonradan katıldın!");
+  $("clickToPlay").style.display = "flex";
+}
+
+function initScene() {
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  $("game").appendChild(renderer.domElement);
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x010103);
+  scene.fog = new THREE.Fog(0x010103, 1.5, 34);
+
+  camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 80);
+  camera.rotation.order = "YXZ";
+  scene.add(camera);
+
+  // El feneri: kameraya bağlı spot
+  flashlight = new THREE.SpotLight(0xfff0c0, 1.9, 34, 0.55, 0.5, 1);
+  flashlight.position.set(0.15, -0.1, 0);
+  camera.add(flashlight);
+  flashlight.target.position.set(0, -0.08, -1);
+  camera.add(flashlight.target);
+
+  scene.add(new THREE.AmbientLight(0x0b0b16, 1));
+  const hemi = new THREE.HemisphereLight(0x101024, 0x050508, 0.35);
+  scene.add(hemi);
+
+  window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // Kontroller
+  document.addEventListener("keydown", (e) => keysDown.add(e.code));
+  document.addEventListener("keyup", (e) => keysDown.delete(e.code));
+  document.addEventListener("mousemove", (e) => {
+    if (document.pointerLockElement !== renderer.domElement) return;
+    yaw -= e.movementX * 0.0024;
+    pitch = Math.max(-1.2, Math.min(1.2, pitch - e.movementY * 0.0024));
+  });
+  document.addEventListener("pointerlockchange", () => {
+    const locked = document.pointerLockElement === renderer.domElement;
+    $("clickToPlay").style.display = (!locked && phase === "play" && !escaped) ? "flex" : "none";
+  });
+  $("clickToPlay").addEventListener("click", () => {
+    audio();
+    renderer.domElement.requestPointerLock();
+  });
+
+  requestAnimationFrame(loop);
+}
+
+function buildMaze(mazeSeed) {
+  // Eski labirenti temizle
+  for (let i = scene.children.length - 1; i >= 0; i -= 1) {
+    const obj = scene.children[i];
+    if (obj !== camera && obj.userData.maze) scene.remove(obj);
+  }
+  keyMeshes = [];
+  grid = genMaze(mazeSeed);
+
+  // Duvarlar: tek InstancedMesh
+  let wallCount = 0;
+  for (let row = 0; row < MH; row += 1) for (let col = 0; col < MW; col += 1) if (grid[row][col] === 1) wallCount += 1;
+  const wallGeo = new THREE.BoxGeometry(S, WALL_H, S);
+  const wallMat = new THREE.MeshLambertMaterial({ color: 0x3d3d52 });
+  const walls = new THREE.InstancedMesh(wallGeo, wallMat, wallCount);
+  walls.userData.maze = true;
+  const m = new THREE.Matrix4();
+  let wi = 0;
+  for (let row = 0; row < MH; row += 1) {
+    for (let col = 0; col < MW; col += 1) {
+      if (grid[row][col] !== 1) continue;
+      const [wx, wz] = cellToWorld(col, row);
+      m.setPosition(wx, WALL_H / 2, wz);
+      walls.setMatrixAt(wi, m);
+      wi += 1;
+    }
+  }
+  walls.instanceMatrix.needsUpdate = true;
+  scene.add(walls);
+
+  // Zemin ve tavan
+  const floorGeo = new THREE.PlaneGeometry(MW * S + S * 2, MH * S + S * 2);
+  const floor = new THREE.Mesh(floorGeo, new THREE.MeshLambertMaterial({ color: 0x1a1a24 }));
+  floor.rotation.x = -Math.PI / 2;
+  floor.userData.maze = true;
+  scene.add(floor);
+  const ceil = new THREE.Mesh(floorGeo, new THREE.MeshLambertMaterial({ color: 0x12121c }));
+  ceil.rotation.x = Math.PI / 2;
+  ceil.position.y = WALL_H;
+  ceil.userData.maze = true;
+  scene.add(ceil);
+
+  // Çıkış kapısı
+  const [dx, dz] = cellToWorld(DOOR_COL, DOOR_ROW);
+  doorMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(S, WALL_H, 0.5),
+    new THREE.MeshLambertMaterial({ color: 0x7a2020, emissive: 0x300808 })
+  );
+  doorMesh.position.set(dx, WALL_H / 2, dz);
+  doorMesh.userData.maze = true;
+  scene.add(doorMesh);
+  doorLight = new THREE.PointLight(0xff3020, 0.9, 10);
+  doorLight.position.set(dx, 2.2, dz - 1);
+  doorLight.userData.maze = true;
+  scene.add(doorLight);
+  doorOpen = false;
+
+  // Anahtarlar
+  const keyGeo = new THREE.TorusGeometry(0.28, 0.11, 10, 20);
+  const keyMat = new THREE.MeshBasicMaterial({ color: 0xffd23e });
+  keyCells.forEach(([col, row], i) => {
+    const [kx, kz] = cellToWorld(col, row);
+    const km = new THREE.Mesh(keyGeo, keyMat);
+    km.position.set(kx, 1.1, kz);
+    km.userData.maze = true;
+    scene.add(km);
+    const kl = new THREE.PointLight(0xffc23e, 0.8, 7);
+    kl.position.set(kx, 1.4, kz);
+    kl.userData.maze = true;
+    scene.add(kl);
+    keyMeshes.push({ mesh: km, light: kl, x: kx, z: kz, removed: false, pending: false });
+  });
+}
+
+function collectKeyVisual(idx) {
+  const k = keyMeshes[idx];
+  if (!k || k.removed) return;
+  k.removed = true;
+  scene.remove(k.mesh);
+  scene.remove(k.light);
+}
+function openDoor() {
+  doorOpen = true;
+  if (doorMesh) doorMesh.visible = false;
+  if (doorLight) doorLight.color.setHex(0x30ff60);
+}
+
+// ================= DİĞER OYUNCULAR =================
+function makeNameSprite(text, color) {
+  const cv = document.createElement("canvas");
+  cv.width = 256; cv.height = 64;
+  const ctx = cv.getContext("2d");
+  ctx.font = "bold 34px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 12;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(text, 128, 32);
+  const tex = new THREE.CanvasTexture(cv);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+  sprite.scale.set(2.6, 0.65, 1);
+  return sprite;
+}
+function ensureRemote(id) {
+  if (remotes.has(id)) return remotes.get(id);
+  const p = players.get(id);
+  const color = REMOTE_COLORS[remotes.size % REMOTE_COLORS.length];
+  const group = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ color });
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 1.0, 12), mat);
+  body.position.y = 0.85;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 10), mat);
+  head.position.y = 1.62;
+  const name = makeNameSprite(p ? p.nickname : "???", "#" + color.toString(16).padStart(6, "0"));
+  name.position.y = 2.15;
+  group.add(body, head, name);
+  scene.add(group);
+  const r = { group, tx: 0, tz: 0, try_: 0, inv: false };
+  remotes.set(id, r);
+  return r;
+}
+function updateRemote(id, x, z, ry, inv) {
+  const r = ensureRemote(id);
+  r.tx = x; r.tz = z; r.try_ = ry; r.inv = inv;
+  if (r.group.position.lengthSq() === 0) r.group.position.set(x, 0, z);
+}
+function removeRemote(id) {
+  const r = remotes.get(id);
+  if (r) { scene.remove(r.group); remotes.delete(id); }
+}
+
+// ================= LANETLER (istemci tarafı) =================
+// Not: lanetin adı bilerek hiçbir yerde GÖSTERİLMEZ; oyuncu etkisini yaşayarak anlar.
+function applyCurse(curse) {
+  myCurse = curse || "";
+  $("blueOverlay").style.display = myCurse === "blue" ? "block" : "none";
+}
+
+// ================= SAHTE ZAFER =================
+function runFakeWin() {
+  showCenter("🎉 TEBRİKLER KAZANDIN!", "Labirentten kaçtın... galiba?", true);
+  spawnConfetti();
+  setTimeout(() => {
+    showCenter("💀 ŞAKA. BAŞA DÖN.", "Labirent seni öyle kolay bırakmaz...", true);
+    setTimeout(() => {
+      $("centerMsg").style.display = "none";
+      document.querySelectorAll(".confetti").forEach((el) => el.remove());
+      const [sx, sz] = cellToWorld(SPAWN_COL, SPAWN_ROW);
+      pos.x = sx; pos.z = sz; yaw = Math.PI * 0.25;
+    }, 1600);
+  }, 3000);
+}
+function spawnConfetti() {
+  const colors = ["#ff5a5a", "#ffd23e", "#5aff8a", "#5aa8ff", "#ff5ad8", "#ffffff"];
+  for (let i = 0; i < 70; i += 1) {
+    const el = document.createElement("div");
+    el.className = "confetti";
+    el.style.left = Math.random() * 100 + "vw";
+    el.style.background = colors[i % colors.length];
+    el.style.animationDuration = 1.6 + Math.random() * 1.6 + "s";
+    el.style.animationDelay = Math.random() * 0.5 + "s";
+    el.style.transform = "rotate(" + Math.random() * 360 + "deg)";
+    document.body.appendChild(el);
+  }
+}
+
+// ================= OYUN DÖNGÜSÜ =================
+let lastT = performance.now();
+function loop(t) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - lastT) / 1000);
+  lastT = t;
+  if (phase !== "play" || !grid) { if (renderer) renderer.render(scene, camera); return; }
+
+  // Lanet: Dönen Ekran — yaw kendi kendine döner
+  if (myCurse === "spin") yaw += 0.7 * dt;
+
+  // Hareket
+  if (!escaped && document.pointerLockElement === renderer.domElement) {
+    const speed = keysDown.has("ShiftLeft") ? 6.2 : 4.2;
+    let mx = 0, mz = 0;
+    if (keysDown.has("KeyW")) mz += 1;
+    if (keysDown.has("KeyS")) mz -= 1;
+    if (keysDown.has("KeyA")) mx -= 1;
+    if (keysDown.has("KeyD")) mx += 1;
+    if (mx || mz) {
+      const len = Math.hypot(mx, mz);
+      mx /= len; mz /= len;
+      const sin = Math.sin(yaw), cos = Math.cos(yaw);
+      const vx = (mz * -sin + mx * cos) * speed * dt;
+      const vz = (mz * -cos + mx * -sin) * speed * dt;
+      if (!hitsWall(pos.x + vx, pos.z)) pos.x += vx;
+      if (!hitsWall(pos.x, pos.z + vz)) pos.z += vz;
+    }
+  }
+
+  camera.position.set(pos.x, 1.55, pos.z);
+  camera.rotation.set(pitch, yaw, 0);
+
+  // Anahtar toplama
+  if (!escaped) {
+    keyMeshes.forEach((k, i) => {
+      if (k.removed || k.pending) return;
+      k.mesh.rotation.y += dt * 2;
+      k.mesh.position.y = 1.1 + Math.sin(t / 400 + i) * 0.12;
+      if (Math.hypot(pos.x - k.x, pos.z - k.z) < 1.3) {
+        k.pending = true; // yarışı önlemek için yerel kilit; sunucu onaylayınca kesinleşir
+        send({ type: "key", key: i });
+      }
+    });
+    // Kapıdan geçiş
+    if (doorOpen) {
+      const [dx, dz] = cellToWorld(DOOR_COL, DOOR_ROW);
+      if (Math.hypot(pos.x - dx, pos.z - dz) < 1.4) {
+        send({ type: "escape" });
+      }
+    }
+  }
+
+  // Pos yayını (10/sn)
+  if (t - lastPosSent > 100) {
+    lastPosSent = t;
+    send({ type: "pos", x: pos.x, z: pos.z, ry: yaw });
+  }
+
+  // Diğer oyuncular
+  const blind = myCurse === "kor";
+  for (const [id, r] of remotes) {
+    r.group.position.x += (r.tx - r.group.position.x) * Math.min(1, dt * 10);
+    r.group.position.z += (r.tz - r.group.position.z) * Math.min(1, dt * 10);
+    r.group.rotation.y = r.try_;
+    const p = players.get(id);
+    r.group.visible = !blind && !r.inv && !(p && p.escaped);
+  }
+
+  renderer.render(scene, camera);
+}
+
+connect();
+</script>
+</body>
+</html>

@@ -1,0 +1,2165 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Beyaz Bardak — Hakorocks Studio</title>
+<style>
+  /* ---------- Genel gorunum ---------- */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #87b8d9; font-family: "Segoe UI", Arial, sans-serif; }
+  canvas { display: block; }
+
+  /* ---------- Baslangic ekrani ---------- */
+  #start-ekrani {
+    position: fixed; inset: 0; z-index: 50;
+    background: radial-gradient(circle at 50% 30%, #2b4a6b, #101d2c 75%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: #fff; text-align: center; padding: 20px;
+  }
+  #start-ekrani h1 { font-size: clamp(38px, 8vw, 72px); letter-spacing: 4px; color: #fff; text-shadow: 0 4px 0 #1b2f45, 0 8px 24px rgba(0,0,0,.5); }
+  #start-ekrani .bardak-emoji { font-size: 64px; margin-bottom: 8px; }
+  #start-ekrani p.aciklama { margin: 16px 0 8px; max-width: 560px; line-height: 1.6; color: #cfe3f5; }
+  #start-ekrani ul.nasil { list-style: none; margin: 12px 0 22px; color: #a9c6de; line-height: 1.9; font-size: 15px; }
+  #basla-btn {
+    font-size: 24px; font-weight: bold; padding: 14px 54px; border: none; border-radius: 40px;
+    background: linear-gradient(180deg, #ffd35c, #f5a623); color: #4a2f00; cursor: pointer;
+    box-shadow: 0 6px 0 #b97a0a, 0 10px 20px rgba(0,0,0,.4); transition: transform .1s;
+  }
+  #basla-btn:hover { transform: scale(1.06); }
+  #basla-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #b97a0a; }
+
+  /* ---------- HUD (gorev paneli) ---------- */
+  #hud { position: fixed; top: 12px; left: 12px; z-index: 20; pointer-events: none; }
+  #gorev-panel {
+    background: rgba(10, 25, 40, .72); border: 2px solid rgba(255,255,255,.25);
+    border-radius: 12px; padding: 10px 14px; color: #fff; max-width: 300px;
+    backdrop-filter: blur(4px);
+  }
+  #gorev-panel h3 { font-size: 15px; margin-bottom: 6px; color: #ffd35c; }
+  #gorev-listesi { list-style: none; font-size: 13.5px; line-height: 1.75; }
+  #gorev-listesi li.bitti { color: #7ee081; text-decoration: line-through; opacity: .75; }
+  #gorev-listesi li.aktif { color: #fff; }
+  #gorev-listesi li.aktif::before { content: "▸ "; color: #ffd35c; }
+
+  #zombi-sayac {
+    margin-top: 8px; background: rgba(30, 60, 20, .8); border: 2px solid #7ee081;
+    border-radius: 12px; padding: 8px 14px; color: #c8ffb0; font-weight: bold; font-size: 15px;
+  }
+  #anahtar-rozet {
+    margin-top: 8px; background: rgba(80, 55, 5, .85); border: 2px solid #ffd35c;
+    border-radius: 12px; padding: 8px 14px; color: #ffd35c; font-weight: bold; font-size: 14px;
+  }
+  .gizli { display: none !important; }
+
+  /* ---------- Bildirim (toast) ---------- */
+  #toast {
+    position: fixed; top: 18%; left: 50%; transform: translateX(-50%);
+    background: rgba(15, 30, 48, .9); color: #fff; font-size: 20px; font-weight: bold;
+    padding: 14px 30px; border-radius: 30px; border: 2px solid #ffd35c;
+    z-index: 40; opacity: 0; transition: opacity .3s; pointer-events: none; text-align: center;
+  }
+
+  /* ---------- Koselerdeki dugmeler ---------- */
+  #sessiz-btn {
+    position: fixed; top: 12px; right: 12px; z-index: 30; font-size: 22px;
+    width: 48px; height: 48px; border-radius: 50%; border: 2px solid rgba(255,255,255,.4);
+    background: rgba(10,25,40,.7); color: #fff; cursor: pointer;
+  }
+  #zipla-btn {
+    position: fixed; right: 26px; bottom: 30px; z-index: 30; display: none;
+    width: 110px; height: 110px; border-radius: 50%; font-size: 22px; font-weight: bold;
+    background: radial-gradient(circle at 35% 30%, #ffe08a, #f5a623); color: #4a2f00;
+    border: 4px solid #fff3d0; box-shadow: 0 6px 0 #b97a0a; touch-action: none;
+  }
+  #zipla-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #b97a0a; }
+
+  /* ---------- Alt ipucu cubugu ---------- */
+  #ipucu {
+    position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%);
+    background: rgba(10,25,40,.6); color: #cfe3f5; font-size: 13px;
+    padding: 7px 18px; border-radius: 20px; z-index: 20; pointer-events: none;
+    white-space: nowrap;
+  }
+
+  /* ---------- Parti modu (baslangic ekrani) ---------- */
+  #parti-btn {
+    margin-top: 14px; font-size: 18px; font-weight: bold; padding: 10px 34px;
+    border-radius: 30px; border: 2px solid #ffd35c; background: rgba(255,211,92,.12);
+    color: #ffd35c; cursor: pointer;
+  }
+  #parti-panel {
+    margin-top: 14px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.25);
+    border-radius: 14px; padding: 14px 18px; display: flex; flex-direction: column;
+    gap: 10px; align-items: center;
+  }
+  #parti-panel input { padding: 8px 12px; border-radius: 10px; border: none; font-size: 16px; text-align: center; }
+  #parti-kod { width: 100px; text-transform: uppercase; letter-spacing: 3px; font-weight: bold; }
+  #parti-panel button {
+    padding: 8px 18px; border-radius: 20px; border: none; font-weight: bold;
+    background: linear-gradient(180deg, #ffd35c, #f5a623); color: #4a2f00; cursor: pointer;
+  }
+  .parti-satir { display: flex; gap: 10px; align-items: center; color: #cfe3f5; }
+  #parti-durum { color: #ffd35c; font-size: 14px; min-height: 18px; }
+  #parti-rozet {
+    margin-top: 8px; background: rgba(60, 20, 80, .85); border: 2px solid #c39bff;
+    border-radius: 12px; padding: 8px 14px; color: #e3ccff; font-weight: bold; font-size: 14px;
+  }
+  #kesif-rozet {
+    margin-top: 8px; background: rgba(20, 45, 60, .85); border: 2px solid #7cc4e8;
+    border-radius: 12px; padding: 8px 14px; color: #c8e8ff; font-weight: bold; font-size: 14px;
+  }
+
+  /* ---------- Cocuk yakalama uyarisi ---------- */
+  #yakalanma {
+    position: fixed; top: 34%; left: 50%; transform: translateX(-50%);
+    background: rgba(180, 30, 40, .92); color: #fff; font-size: 22px; font-weight: bold;
+    padding: 16px 30px; border-radius: 16px; border: 3px solid #ffd35c;
+    z-index: 45; pointer-events: none; text-align: center;
+    animation: bas-bas .5s infinite;
+  }
+  @keyframes bas-bas {
+    0%, 100% { transform: translateX(-50%) scale(1); }
+    50% { transform: translateX(-50%) scale(1.07); }
+  }
+</style>
+</head>
+<body>
+
+<!-- Baslangic ekrani -->
+<div id="start-ekrani">
+  <div class="bardak-emoji">☕</div>
+  <h1>BEYAZ BARDAK</h1>
+  <p class="aciklama">
+    Sen beyaz bir bardaksın! Evdeki görevleri tamamla, kayıp <b>Atatürk'lü Bardak</b>'ı bul,
+    bardak anahtarını al ve bardak kapısından caddeye kaç. İnsanlara dikkat et —
+    üstüne basarlarsa kırılırsın! Gizli köşede seni <b>Zombi Bardak İstilası</b> bekliyor. 🧟
+  </p>
+  <ul class="nasil">
+    <li>🖱️ Fareyi sürükle (veya tıklayıp kilitle): kamerayı çevir — bardak baktığın yöne bakar</li>
+    <li>␣ <b>Space</b>: baktığın yöne ZIPLA (asıl hareket bu!)</li>
+    <li>⌨️ Yürümek yok — tek hareket: ZIPLAMAK! &nbsp;·&nbsp; <b>M</b>: ses aç/kapat</li>
+    <li>🗺️ Cadde artık upuzun — çalıların arkasında gizli bir sürpriz var... 🪦</li>
+    <li>🎉 <b>PARTİ</b>: kodla kur veya katıl — arkadaşlarınla aynı dünyada zıplayın!</li>
+    <li>📱 Telefonda: sol yarıyı sürükle + kocaman ZIPLA düğmesi</li>
+  </ul>
+  <button id="basla-btn">TEK BAŞINA</button>
+  <button id="parti-btn">🎉 PARTİ (arkadaşlarınla)</button>
+  <div id="parti-panel" class="gizli">
+    <input id="parti-isim" placeholder="İsmini yaz" maxlength="16" autocomplete="off">
+    <div class="parti-satir">
+      <button id="parti-kur-btn">PARTİ KUR</button>
+      <span>veya</span>
+      <input id="parti-kod" placeholder="KOD" maxlength="4" autocomplete="off">
+      <button id="parti-katil-btn">KATIL</button>
+    </div>
+    <div id="parti-durum"></div>
+  </div>
+</div>
+
+<!-- HUD -->
+<div id="hud">
+  <div id="gorev-panel">
+    <h3>📋 Görevler</h3>
+    <ul id="gorev-listesi"></ul>
+  </div>
+  <div id="anahtar-rozet" class="gizli">🗝️ Bardak Anahtarı sende!</div>
+  <div id="parti-rozet" class="gizli">🎉 Parti</div>
+  <div id="zombi-sayac" class="gizli">🧟 Ezilen zombi bardak: <span id="zombi-sayi">0</span></div>
+  <div id="kesif-rozet">🗺️ Keşifler: 0/8</div>
+</div>
+
+<div id="toast"></div>
+<div id="yakalanma" class="gizli">Yakalandın! SPACE'e bas bas kurtul! 😱</div>
+<button id="sessiz-btn" title="Ses aç/kapat (M)">🔊</button>
+<button id="zipla-btn">ZIPLA<br>⬆</button>
+<div id="ipucu">Sürükle: kamera · Space: zıpla · M: ses</div>
+
+<script src="three.min.js"></script>
+<script>
+"use strict";
+/* =====================================================================
+   BEYAZ BARDAK — 3D macera oyunu
+   Sen bir beyaz bardaksın! Space ile baktığın yöne zıplarsın.
+   Three.js (klasik sürüm, THREE globali) ile yapıldı.
+   ===================================================================== */
+
+/* ---------------- Ses motoru (WebAudio, dosyasız) ---------------- */
+let sesCtx = null;
+let sesKapali = false;
+
+function sesHazirla() {
+  if (!sesCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) sesCtx = new AC();
+  }
+  if (sesCtx && sesCtx.state === "suspended") sesCtx.resume();
+}
+
+// Basit bir ton cal: frekans baslangictan bitise kayar
+function tonCal(fA, fB, sure, tip, seviye) {
+  if (!sesCtx || sesKapali) return;
+  const o = sesCtx.createOscillator();
+  const g = sesCtx.createGain();
+  o.type = tip || "sine";
+  o.frequency.setValueAtTime(fA, sesCtx.currentTime);
+  o.frequency.exponentialRampToValueAtTime(Math.max(fB, 1), sesCtx.currentTime + sure);
+  g.gain.setValueAtTime(seviye || 0.2, sesCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, sesCtx.currentTime + sure);
+  o.connect(g); g.connect(sesCtx.destination);
+  o.start(); o.stop(sesCtx.currentTime + sure);
+}
+
+// Gurultu cal (kirilma efekti icin)
+function gurultuCal(sure, seviye, filtreFrekans) {
+  if (!sesCtx || sesKapali) return;
+  const boyut = sesCtx.sampleRate * sure;
+  const tampon = sesCtx.createBuffer(1, boyut, sesCtx.sampleRate);
+  const veri = tampon.getChannelData(0);
+  for (let i = 0; i < boyut; i++) veri[i] = (Math.random() * 2 - 1) * (1 - i / boyut);
+  const kaynak = sesCtx.createBufferSource();
+  kaynak.buffer = tampon;
+  const filtre = sesCtx.createBiquadFilter();
+  filtre.type = "highpass"; filtre.frequency.value = filtreFrekans || 1000;
+  const g = sesCtx.createGain();
+  g.gain.setValueAtTime(seviye || 0.3, sesCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, sesCtx.currentTime + sure);
+  kaynak.connect(filtre); filtre.connect(g); g.connect(sesCtx.destination);
+  kaynak.start();
+}
+
+const sesler = {
+  zipla:      () => tonCal(180, 520, 0.18, "sine", 0.25),          // boing!
+  ding:       () => { tonCal(880, 1320, 0.25, "triangle", 0.22); }, // esya toplama
+  checkpoint: () => { tonCal(660, 660, 0.12, "triangle", 0.2); setTimeout(() => tonCal(990, 990, 0.2, "triangle", 0.2), 120); },
+  kapi:       () => tonCal(140, 55, 0.7, "sawtooth", 0.18),         // gicirti
+  kirilma:    () => { gurultuCal(0.45, 0.35, 1800); tonCal(700, 120, 0.3, "square", 0.08); },
+  ezme:       () => { tonCal(320, 70, 0.16, "sine", 0.3); gurultuCal(0.12, 0.15, 500); },
+  miyav:      () => { tonCal(500, 900, 0.18, "sawtooth", 0.1); setTimeout(() => tonCal(850, 450, 0.22, "sawtooth", 0.1), 160); },
+};
+
+/* ---------------- Temel sahne kurulumu ---------------- */
+const sahne = new THREE.Scene();
+sahne.background = new THREE.Color(0x9fd3f5);           // acik mavi gokyuzu
+sahne.fog = new THREE.Fog(0x9fd3f5, 50, 135);           // hafif sis (uzun cadde gorunsun)
+
+const kamera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 200);
+const cizici = new THREE.WebGLRenderer({ antialias: true });
+cizici.setSize(innerWidth, innerHeight);
+cizici.setPixelRatio(Math.min(devicePixelRatio, 2));
+cizici.shadowMap.enabled = true;
+cizici.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(cizici.domElement);
+
+// Isiklar: gunes + yumusak ortam isigi
+const gunes = new THREE.DirectionalLight(0xffffff, 0.9);
+gunes.position.set(18, 30, 10);
+gunes.castShadow = true;
+gunes.shadow.mapSize.set(1024, 1024);
+gunes.shadow.camera.left = -40; gunes.shadow.camera.right = 40;
+gunes.shadow.camera.top = 40; gunes.shadow.camera.bottom = -40;
+gunes.shadow.camera.far = 90;
+sahne.add(gunes);
+sahne.add(new THREE.HemisphereLight(0xcfe8ff, 0x7a5c3a, 0.75));
+
+/* ---------------- Malzemeler (duz renkler) ---------------- */
+const mat = {
+  beyaz:   new THREE.MeshStandardMaterial({ color: 0xfafafa, roughness: 0.35 }),
+  bardakIc:new THREE.MeshStandardMaterial({ color: 0xd8d3c8, roughness: 0.8 }),
+  duvar:   new THREE.MeshStandardMaterial({ color: 0xf0e0c8, roughness: 0.9 }),
+  duvarIc: new THREE.MeshStandardMaterial({ color: 0xe8d9ff, roughness: 0.9 }),
+  zeminEv: new THREE.MeshStandardMaterial({ color: 0xb9895a, roughness: 0.95 }),
+  hali:    new THREE.MeshStandardMaterial({ color: 0xc0503f, roughness: 1 }),
+  kanepe:  new THREE.MeshStandardMaterial({ color: 0x4a7ec2, roughness: 0.9 }),
+  ahsap:   new THREE.MeshStandardMaterial({ color: 0x8a5a2e, roughness: 0.8 }),
+  buzdolabi:new THREE.MeshStandardMaterial({ color: 0xdde5ea, roughness: 0.4, metalness: 0.3 }),
+  yatak:   new THREE.MeshStandardMaterial({ color: 0x7ec24a, roughness: 0.9 }),
+  cim:     new THREE.MeshStandardMaterial({ color: 0x69b34c, roughness: 1 }),
+  yol:     new THREE.MeshStandardMaterial({ color: 0x555a60, roughness: 1 }),
+  kaldirim:new THREE.MeshStandardMaterial({ color: 0xb9bec4, roughness: 1 }),
+  altin:   new THREE.MeshStandardMaterial({ color: 0xffc93c, roughness: 0.25, metalness: 0.7, emissive: 0x664d00, emissiveIntensity: 0.4 }),
+  parilti: new THREE.MeshStandardMaterial({ color: 0x5cf2ff, roughness: 0.3, emissive: 0x1e8a96, emissiveIntensity: 0.9 }),
+  zombi:   new THREE.MeshStandardMaterial({ color: 0x6fae3e, roughness: 0.85 }),
+  zombiKoyu:new THREE.MeshStandardMaterial({ color: 0x3d5c1e, roughness: 1 }),
+  kedi:    new THREE.MeshStandardMaterial({ color: 0x808890, roughness: 0.9 }),
+};
+
+/* ---------------- Carpisma kutuleri (AABB) ---------------- */
+// Her engel: { minX, maxX, minZ, maxZ, ustY? } — bardak bir daire gibi itilir
+// ustY verilirse: oyuncu o yuksekligin ustundeyken engel itmez (ustune cikilabilir kasalar)
+const engeller = [];
+// Ustune ziplanabilir platformlar: { minX, maxX, minZ, maxZ, y } (y = ust yuzey)
+const platformlar = [];
+const KANAL_TABAN = -6;   // kanalizasyonun zemin yuksekligi
+
+function engelEkle(cx, cz, w, d, ustY) {
+  engeller.push({ minX: cx - w / 2, maxX: cx + w / 2, minZ: cz - d / 2, maxZ: cz + d / 2, ustY });
+}
+
+// Kutu mesh + engel ekleyen yardimci
+function kutuEkle(w, h, d, x, y, z, malzeme, engelMi, ustY) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), malzeme);
+  m.position.set(x, y, z);
+  m.castShadow = true; m.receiveShadow = true;
+  sahne.add(m);
+  if (engelMi !== false) engelEkle(x, z, w, d, ustY);
+  return m;
+}
+
+// Ustune cikilabilir kasa (platform + engel birlikte)
+function kasaEkle(x, z, boy, tabanY, malzeme) {
+  const m = kutuEkle(boy, boy, boy, x, tabanY + boy / 2, z, malzeme || mat.ahsap, true, tabanY + boy);
+  platformlar.push({ minX: x - boy / 2, maxX: x + boy / 2, minZ: z - boy / 2, maxZ: z + boy / 2, y: tabanY + boy });
+  return m;
+}
+
+// Ince duvar parcasi (x1,z1) - (x2,z2) arasi
+function duvarEkle(x1, z1, x2, z2, yukseklik) {
+  const w = Math.max(Math.abs(x2 - x1), 0.3);
+  const d = Math.max(Math.abs(z2 - z1), 0.3);
+  kutuEkle(w, yukseklik, d, (x1 + x2) / 2, yukseklik / 2, (z1 + z2) / 2, mat.duvar);
+}
+
+// Yazili etiket (sprite) olusturucu
+function etiketYap(yazi, renk, buyukluk) {
+  const tuval = document.createElement("canvas");
+  tuval.width = 512; tuval.height = 128;
+  const c = tuval.getContext("2d");
+  c.font = "bold 64px Arial";
+  c.textAlign = "center"; c.textBaseline = "middle";
+  c.shadowColor = "rgba(0,0,0,.6)"; c.shadowBlur = 10;
+  c.fillStyle = renk || "#ffffff";
+  c.fillText(yazi, 256, 64);
+  const doku = new THREE.CanvasTexture(tuval);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: doku, transparent: true }));
+  sp.scale.set(buyukluk || 4, (buyukluk || 4) / 4, 1);
+  return sp;
+}
+
+/* ---------------- Bardak modeli (oyuncu ve kapilar icin) ---------------- */
+function bardakYap(govde, cap, yukseklik, kulplu) {
+  const grup = new THREE.Group();
+  // Govde: hafif koni biciminde silindir
+  const g = new THREE.Mesh(new THREE.CylinderGeometry(cap, cap * 0.78, yukseklik, 24), govde);
+  g.position.y = yukseklik / 2;
+  g.castShadow = true;
+  grup.add(g);
+  // Ic kisim (ustte koyu daire — bardagin ici bos gorunsun)
+  const ic = new THREE.Mesh(new THREE.CircleGeometry(cap * 0.88, 24), mat.bardakIc);
+  ic.rotation.x = -Math.PI / 2;
+  ic.position.y = yukseklik - 0.02;
+  grup.add(ic);
+  // Kulp: yan tarafta halka
+  if (kulplu !== false) {
+    const kulp = new THREE.Mesh(new THREE.TorusGeometry(cap * 0.5, cap * 0.13, 10, 22), govde);
+    kulp.position.set(cap + cap * 0.35, yukseklik * 0.55, 0);
+    kulp.castShadow = true;
+    grup.add(kulp);
+  }
+  return grup;
+}
+
+/* ---------------- EVIN INSAI ----------------
+   Plan (x: dogu, z: guney/cadde yonu):
+   - salon:         x[-10,-2], z[-8,6]
+   - mutfak:        x[-2,10],  z[-8,0]
+   - koridor:       x[-2,4],   z[0,6]
+   - yatak odasi:   x[4,10],   z[0,6]
+   - banyo:         x[-10,-1], z[-16,-8]   (yeni kuzey kanat!)
+   - calisma odasi: x[-1,10],  z[-16,-8]   (yeni kuzey kanat!)
+   Bardak kapisi guney duvarda (0, 6). */
+const EV = { x1: -10, x2: 10, z1: -16, z2: 6 };
+
+function eviKur() {
+  // Ev zemini (ahsap) + kirmizi hali
+  const zemin = new THREE.Mesh(new THREE.BoxGeometry(20.4, 0.2, 14.4), mat.zeminEv);
+  zemin.position.set(0, -0.1, -1);
+  zemin.receiveShadow = true;
+  sahne.add(zemin);
+  // Kuzey kanat zemini (banyo + calisma odasi)
+  const zeminKuzey = new THREE.Mesh(new THREE.BoxGeometry(20.4, 0.2, 8.4), mat.zeminEv);
+  zeminKuzey.position.set(0, -0.1, -12.2);
+  zeminKuzey.receiveShadow = true;
+  sahne.add(zeminKuzey);
+  // Banyo fayanslari (acik gri, parlak)
+  const fayans = new THREE.Mesh(new THREE.BoxGeometry(8.6, 0.06, 7.6), mat.kaldirim);
+  fayans.position.set(-5.5, 0.02, -12);
+  fayans.receiveShadow = true;
+  sahne.add(fayans);
+  const hali = new THREE.Mesh(new THREE.CircleGeometry(2.2, 24), mat.hali);
+  hali.rotation.x = -Math.PI / 2;
+  hali.position.set(-6, 0.01, 0);
+  hali.receiveShadow = true;
+  sahne.add(hali);
+
+  const Y = 3.2; // duvar yuksekligi
+  // Dis duvarlar (guneyde kapi boslugu: x[-1.2, 1.2])
+  // Eski kuzey duvari artik ic duvar: banyo boslugu x[-6.5,-5.5], calisma odasi boslugu x[3.5,4.5]
+  duvarEkle(-10, -8, -6.5, -8, Y);        // kuzey (banyo kapisi solu)
+  duvarEkle(-5.5, -8, 3.5, -8, Y);        // kuzey (iki kapi arasi)
+  duvarEkle(4.5, -8, 10, -8, Y);          // kuzey (calisma kapisi sagi)
+  duvarEkle(-10, -16, -10, -8, Y);        // bati kanat uzatmasi
+  duvarEkle(10, -16, 10, -8, Y);          // dogu kanat uzatmasi
+  duvarEkle(-10, -16, 10, -16, Y);        // yeni kuzey dis duvar
+  duvarEkle(-1, -16, -1, -12.5, Y);       // banyo|calisma odasi (bosluk z[-12.5,-11.5])
+  duvarEkle(-1, -11.5, -1, -8, Y);
+  duvarEkle(-10, -8, -10, 6, Y);          // bati
+  duvarEkle(10, -8, 10, 6, Y);            // dogu
+  duvarEkle(-10, 6, -1.2, 6, Y);          // guney sol
+  duvarEkle(1.2, 6, 10, 6, Y);            // guney sag
+  // Ic duvarlar (kapi bosluklari ile)
+  duvarEkle(-2, -8, -2, -4, Y);           // salon|mutfak (bosluk z[-4,-3])
+  duvarEkle(-2, -3, -2, 2.5, Y);          // salon duvari orta (bosluk z[2.5,3.5])
+  duvarEkle(-2, 3.5, -2, 6, Y);
+  duvarEkle(-2, 0, -0.5, 0, Y);           // mutfak|koridor (bosluk x[-0.5,0.5])
+  duvarEkle(0.5, 0, 5.5, 0, Y);           // (bosluk x[5.5,6.5] mutfak|yatak odasi)
+  duvarEkle(6.5, 0, 10, 0, Y);
+  duvarEkle(4, 0, 4, 1.5, Y);             // koridor|yatak odasi (bosluk z[1.5,2.5])
+  duvarEkle(4, 2.5, 4, 6, Y);
+
+  // --- Salon mobilyalari ---
+  kutuEkle(1.1, 0.9, 2.8, -8.9, 0.45, 0, mat.kanepe);        // kanepe
+  kutuEkle(0.4, 0.5, 2.8, -8.35, 0.95, 0, mat.kanepe, false);// kanepe sirti
+  kutuEkle(2, 0.75, 1.2, -6, 0.375, 2.5, mat.ahsap);         // orta sehpa
+  kutuEkle(2, 0.8, 0.6, -3.2, 0.4, -6.6, mat.ahsap);         // TV unitesi
+  kutuEkle(1.6, 1, 0.12, -3.2, 1.6, -6.8, mat.yol, false);   // TV ekrani
+
+  // --- Mutfak mobilyalari ---
+  kutuEkle(4, 0.9, 1.2, 2, 0.45, -7.3, mat.kaldirim);        // mutfak tezgahi
+  kutuEkle(1.3, 1.9, 1.3, 8.5, 0.95, -6.8, mat.buzdolabi);   // buzdolabi
+  kutuEkle(1.6, 0.75, 1.6, 6.5, 0.375, -3, mat.ahsap);       // yemek masasi
+
+  // --- Yatak odasi ---
+  kutuEkle(3.6, 0.9, 2.2, 7.8, 0.45, 4, mat.yatak);          // yatak
+  kutuEkle(0.8, 1.2, 0.5, 3.4, 0.6, 5.4, mat.ahsap);         // koridor dolabi
+
+  // --- Banyo (yeni!) ---
+  kutuEkle(2.2, 0.7, 1.1, -8, 0.35, -14.5, mat.buzdolabi);   // kuvet
+  kutuEkle(0.8, 0.9, 0.6, -1.9, 0.45, -15.4, mat.beyaz);     // lavabo
+  kutuEkle(0.7, 0.6, 0.8, -8.8, 0.3, -9.2, mat.beyaz);       // klozet
+  kutuEkle(1.2, 1, 0.08, -1.9, 1.6, -15.85, mat.parilti, false); // ayna (parlak)
+
+  // --- Calisma odasi (yeni!) ---
+  kutuEkle(2.4, 0.8, 1.1, 7, 0.4, -14.8, mat.ahsap);         // calisma masasi
+  kutuEkle(0.9, 0.6, 0.08, 7, 1.1, -15.2, mat.yol, false);   // bilgisayar ekrani
+  kutuEkle(0.7, 2.2, 2.5, 9.5, 1.1, -10.5, mat.ahsap);       // kitaplik
+  kutuEkle(0.7, 0.7, 0.7, 7, 0.35, -13.2, mat.kanepe);       // sandalye
+
+  // Oda isimleri (tavanda yazi)
+  const odalar = [ ["SALON", -6, -1], ["MUTFAK", 4, -4], ["KORİDOR", 1, 3], ["YATAK ODASI", 7, 3], ["BANYO", -5.5, -12], ["ÇALIŞMA ODASI", 5, -12] ];
+  for (const [ad, x, z] of odalar) {
+    const e = etiketYap(ad, "#fff7d6", 3.4);
+    e.position.set(x, 2.75, z);
+    e.material.opacity = 0.85;
+    sahne.add(e);
+  }
+}
+
+/* ---------------- BARDAK KAPISI ---------------- */
+let kapiGrup, kapiEngel, kapiAcildi = false, kapiAnim = 0;
+function kapiyiKur() {
+  kapiGrup = bardakYap(mat.ahsap, 1.0, 2.3);   // kocaman tahta bardak = kapi!
+  kapiGrup.position.set(0, 0, 6);
+  sahne.add(kapiGrup);
+  const e = etiketYap("BARDAK KAPISI 🗝️", "#ffd35c", 3);
+  e.position.set(0, 3, 6);
+  sahne.add(e);
+  kapiEngel = { minX: -1.2, maxX: 1.2, minZ: 5.6, maxZ: 6.4 };
+  engeller.push(kapiEngel);
+}
+
+/* ---------------- CADDENIN INSAI (uzatilmis: z 6 -> 96) ---------------- */
+let efsaneviAltlik = null;      // gizli mezarliktaki odul
+let mezarlikBulundu = false;
+function caddeyiKur() {
+  // Cim zemin (butun disarisi)
+  const cim = new THREE.Mesh(new THREE.BoxGeometry(44, 0.2, 94), mat.cim);
+  cim.position.set(0, -0.11, 50);
+  cim.receiveShadow = true;
+  sahne.add(cim);
+  // Yol (z yonunde uzayan gri serit) + kaldirimlar
+  const yol = new THREE.Mesh(new THREE.BoxGeometry(7, 0.06, 90), mat.yol);
+  yol.position.set(0, 0.02, 51);
+  yol.receiveShadow = true;
+  sahne.add(yol);
+  for (const x of [-5.5, 5.5]) {
+    const k = new THREE.Mesh(new THREE.BoxGeometry(3, 0.1, 90), mat.kaldirim);
+    k.position.set(x, 0.03, 51);
+    k.receiveShadow = true;
+    sahne.add(k);
+  }
+  // Yol cizgileri
+  for (let z = 8; z < 95; z += 4) {
+    const cizgi = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.07, 1.8), mat.beyaz);
+    cizgi.position.set(0, 0.03, z);
+    sahne.add(cizgi);
+  }
+  // Binalar (yolun iki yani, pastel kutuler) — dogu tarafta zombi bolgesi boslugu var
+  const binaRenkleri = [0xf2b8c6, 0xb8d9f2, 0xf2e3b8, 0xc6f2b8, 0xe0c6f2, 0xf2c6a8];
+  let bi = 0;
+  for (const [x, z] of [[-13, 10], [-13, 22], [-13, 34], [-13, 60], [-13, 72],
+                        [13, 10], [13, 22], [13, 34], [13, 64], [13, 88]]) {
+    const renkMat = new THREE.MeshStandardMaterial({ color: binaRenkleri[bi++ % binaRenkleri.length], roughness: 0.9 });
+    kutuEkle(8, 6 + (bi % 3), 8, x, 3 + (bi % 3) / 2, z, renkMat);
+  }
+  // Zombi bolgesini saklayan buyuk bina (gizli kose arkada kalsin)
+  kutuEkle(9, 6, 5, 13.5, 3, 38.5, new THREE.MeshStandardMaterial({ color: 0x9a8fb8, roughness: 0.9 }));
+  // Park etmis arabalar (yol kenarlarinda, kutulardan)
+  const arabaRenkleri = [0xd64541, 0x3f7fbf, 0xf2c94c, 0x8e6bbf];
+  let ai = 0;
+  for (const [x, z] of [[-2.9, 24], [2.9, 36], [-2.9, 58], [2.9, 72]]) {
+    const renk = new THREE.MeshStandardMaterial({ color: arabaRenkleri[ai++ % arabaRenkleri.length], roughness: 0.5, metalness: 0.3 });
+    kutuEkle(1.3, 0.45, 2.3, x, 0.28, z, renk);              // govde
+    kutuEkle(1.1, 0.35, 1.1, x, 0.68, z - 0.2, renk, false); // kabin
+  }
+  // Agaclar
+  for (const [x, z] of [[-9, 15], [9, 22], [-9, 30], [-9, 44], [3, 52], [9, 60], [-9, 68], [3, 80], [-9, 88]]) {
+    const govde = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.25, 1.4, 8), mat.ahsap);
+    govde.position.set(x, 0.7, z); govde.castShadow = true;
+    sahne.add(govde);
+    const yaprak = new THREE.Mesh(new THREE.ConeGeometry(1.1, 2.2, 10), new THREE.MeshStandardMaterial({ color: 0x3e8e41, roughness: 1 }));
+    yaprak.position.set(x, 2.4, z); yaprak.castShadow = true;
+    sahne.add(yaprak);
+    engelEkle(x, z, 0.6, 0.6);
+  }
+  // Lambalar
+  for (const [x, z] of [[-4, 14], [4, 26], [-4, 38], [4, 50], [-4, 59], [4, 74], [-4, 86]]) {
+    const direk = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 3, 8), mat.yol);
+    direk.position.set(x, 1.5, z);
+    sahne.add(direk);
+    const ampul = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 10),
+      new THREE.MeshStandardMaterial({ color: 0xfff2b0, emissive: 0xffe27a, emissiveIntensity: 0.8 }));
+    ampul.position.set(x, 3.1, z);
+    sahne.add(ampul);
+  }
+  // Caddenin sinirlari (gorunmez duvarlar)
+  engelEkle(-20, 50, 1, 94); engelEkle(20, 50, 1, 94); engelEkle(0, 96, 44, 1);
+  // Zombi bolgesi girisindeki tabela
+  const tabela = new THREE.Mesh(new THREE.BoxGeometry(3.6, 1.6, 0.15), mat.ahsap);
+  tabela.position.set(9.5, 1.8, 44);
+  tabela.rotation.y = Math.PI / 2;
+  sahne.add(tabela);
+  const ty = etiketYap("⚠ ZOMBİ BARDAK İSTİLASI ⚠", "#a4ff6e", 3.4);
+  ty.position.set(9.5, 1.9, 44);
+  sahne.add(ty);
+
+  /* --- KIRIK BARDAK MEZARLIGI (gizli kose, calilarin arkasinda) ---
+     Giris cali duvarinin en bati ucundan (x[-17,-15] bosluk). */
+  const caliMat = new THREE.MeshStandardMaterial({ color: 0x2f6b2a, roughness: 1 });
+  for (const x of [-14, -12, -10, -8, -6, -4]) {
+    const cali = new THREE.Mesh(new THREE.SphereGeometry(0.9, 10, 8), caliMat);
+    cali.position.set(x, 0.55, 80);
+    cali.scale.y = 0.75;
+    cali.castShadow = true;
+    sahne.add(cali);
+    engelEkle(x, 80, 1.5, 1.2);
+  }
+  // Mezartaslari ve kirik bardaklar (uzgun ama komik)
+  const tasMat = new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.95 });
+  const mezarlar = [[-16, 84], [-12, 86], [-8, 84], [-15, 90], [-11, 92], [-7, 90]];
+  for (const [x, z] of mezarlar) {
+    const tas = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.85, 0.16), tasMat);
+    tas.position.set(x, 0.42, z);
+    tas.castShadow = true;
+    sahne.add(tas);
+    engelEkle(x, z, 0.6, 0.25);
+    // Onunde egik duran kirik bardak
+    const kirik = bardakYap(mat.bardakIc, 0.22, 0.45, false);
+    kirik.position.set(x, 0, z + 0.7);
+    kirik.rotation.z = 0.5;
+    kirik.rotation.y = Math.random() * 3;
+    sahne.add(kirik);
+  }
+  const mezarlikYazi = etiketYap("KIRIK BARDAK MEZARLIĞI 🪦", "#d8dce0", 4.2);
+  mezarlikYazi.position.set(-11.5, 2.4, 88);
+  sahne.add(mezarlikYazi);
+  // Efsanevi odul: altin parlayan dev altlik
+  efsaneviAltlik = new THREE.Group();
+  const tabakG = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.75, 0.12, 24), mat.altin);
+  tabakG.position.y = 0.1;
+  efsaneviAltlik.add(tabakG);
+  const ey = etiketYap("EFSANEVİ ALTLIK 🏆", "#ffd35c", 2.6);
+  ey.position.y = 1.3;
+  efsaneviAltlik.add(ey);
+  const eIsik = new THREE.PointLight(0xffd35c, 0.8, 6);
+  eIsik.position.y = 1;
+  efsaneviAltlik.add(eIsik);
+  efsaneviAltlik.position.set(-11.5, 0, 94);
+  sahne.add(efsaneviAltlik);
+}
+
+/* ---------------- 5 GIZLI BOLGE (cadde tarafi) ----------------
+   Kanalizasyon, Insaat Alani, Gizli Park, Arka Sokak, Alt Gecit.
+   Hepsine ziplayarak gidilir; kesfedince bir kere toast cikar.
+   Kesif toast'lari sadece yereldir (partide sunucuya gonderilmez). */
+const kesifBayraklari = { zombi: false, mezarlik: false, kanal: false, insaat: false, park: false, arkaSokak: false, altGecit: false, arena: false };
+const sokakKedileri = [];      // arka sokaktaki kediler (kuyruk sallama + kacma icin)
+let parkCesmeSu = null;        // park cesmesinin suyu (parlama animasyonu)
+let kanalCikisMesh = null;     // kanalizasyon cikis kapagi (yesil parlar)
+let vincTopu = null;           // insaattaki sallanan vinc topu (carparsa kirar!)
+let lagimFaresi = null;        // kanalizasyondaki kovalayan fare
+let cesmeFirlatmaKilit = 0;    // cesme ust uste firlatmasin diye
+let arenaCikisMesh = null;     // arena cikis rogari (mor parlar)
+let zombiKral = null;          // arenadaki dev boss: 3 ezilmede yenilir
+
+function kesifGuncelle() {
+  kesifBayraklari.zombi = zombiKesfedildi;
+  kesifBayraklari.mezarlik = mezarlikBulundu;
+  const n = Object.values(kesifBayraklari).filter(Boolean).length;
+  document.getElementById("kesif-rozet").textContent = "🗺️ Keşifler: " + n + "/8";
+}
+
+function kesfet(ad, mesaj) {
+  if (kesifBayraklari[ad]) return;
+  kesifBayraklari[ad] = true;
+  sesler.ding();
+  toast(mesaj);
+  kesifGuncelle();
+}
+
+// Rogar kapagi: koyu yassi daire (giris/cikis noktasi)
+function rogarKapagi(x, z, y, parlaMi) {
+  const k = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.07, 18),
+    new THREE.MeshStandardMaterial({
+      color: 0x2c2f33, roughness: 0.7,
+      emissive: 0x39ff88, emissiveIntensity: parlaMi ? 0.5 : 0,
+    }));
+  k.position.set(x, y + 0.04, z);
+  sahne.add(k);
+  return k;
+}
+
+// Sokak kedisi: minik govde + kafa + kulaklar + sallanan kuyruk
+function sokakKedisiYap(x, z, renk) {
+  const m = new THREE.MeshStandardMaterial({ color: renk, roughness: 0.9 });
+  const g = new THREE.Group();
+  const govde = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.22, 0.2), m);
+  govde.position.y = 0.11; govde.castShadow = true;
+  g.add(govde);
+  const kafa = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.18, 0.18), m);
+  kafa.position.set(0.26, 0.24, 0); kafa.castShadow = true;
+  g.add(kafa);
+  for (const s of [-1, 1]) {
+    const kulak = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.09, 6), m);
+    kulak.position.set(0.26, 0.37, s * 0.06);
+    g.add(kulak);
+  }
+  // Kuyruk ayri bir ekleme bagli ki sallanabilsin
+  const eklem = new THREE.Group();
+  eklem.position.set(-0.2, 0.14, 0);
+  const kuyruk = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 0.05), m);
+  kuyruk.position.set(-0.15, 0.05, 0);
+  eklem.add(kuyruk);
+  g.add(eklem);
+  g.position.set(x, 0, z);
+  g.rotation.y = Math.random() * Math.PI * 2;
+  sahne.add(g);
+  sokakKedileri.push({ grup: g, eklem, faz: Math.random() * 6, ev: { x, z } });
+}
+
+function gizliBolgeleriKur() {
+  /* === 1) KANALIZASYON (rogar kapagindan asagi, y=-6 tunel) === */
+  rogarKapagi(5.5, 52, 0, true);             // giris: dogu kaldiriminda (yesil parlar)
+  rogarKapagi(-5.5, 68, 0, false);           // cikis: bati kaldiriminda
+  kanalCikisMesh = rogarKapagi(-1, 73, KANAL_TABAN, true);  // tunel icindeki cikis (parlar)
+  const kKoyu = new THREE.MeshStandardMaterial({ color: 0x24302b, roughness: 1 });
+  // tunel zemini + duvarlari (gorsel; sinirlari kod tutuyor)
+  const kTaban = new THREE.Mesh(new THREE.BoxGeometry(7, 0.2, 16), kKoyu);
+  kTaban.position.set(0, KANAL_TABAN - 0.1, 67.5);
+  kTaban.receiveShadow = true;
+  sahne.add(kTaban);
+  for (const [w, d, x, z] of [[0.3, 16, -3.4, 67.5], [0.3, 16, 3.4, 67.5], [7, 0.3, 0, 59.6], [7, 0.3, 0, 75.4]]) {
+    const dv = new THREE.Mesh(new THREE.BoxGeometry(w, 6, d), kKoyu);
+    dv.position.set(x, KANAL_TABAN + 3, z);
+    sahne.add(dv);
+  }
+  // yesilimsi isik seritleri
+  const seritMat = new THREE.MeshStandardMaterial({ color: 0x1e3a2a, emissive: 0x39ff88, emissiveIntensity: 0.9 });
+  for (const [x, z] of [[-3.2, 63], [3.2, 63], [-3.2, 72], [3.2, 72]]) {
+    const serit = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 3.5), seritMat);
+    serit.position.set(x, KANAL_TABAN + 4.4, z);
+    sahne.add(serit);
+  }
+  // su birikintisi
+  const su = new THREE.Mesh(new THREE.CircleGeometry(1.4, 18),
+    new THREE.MeshStandardMaterial({ color: 0x1e5b4a, emissive: 0x2e8b6a, emissiveIntensity: 0.4, roughness: 0.3 }));
+  su.rotation.x = -Math.PI / 2;
+  su.position.set(1.2, KANAL_TABAN + 0.02, 70);
+  sahne.add(su);
+  // Lagim faresi: tunelin bekçisi; oyuncu inince pesine duser (aksiyonGuncelle)
+  const fareMat = new THREE.MeshStandardMaterial({ color: 0x6b6b6b, roughness: 0.9 });
+  const fg = new THREE.Group();
+  const fgovde = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.28, 0.3), fareMat);
+  fgovde.position.y = 0.16; fgovde.castShadow = true;
+  fg.add(fgovde);
+  const fkafa = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.35, 8), fareMat);
+  fkafa.rotation.z = -Math.PI / 2; fkafa.position.set(0.4, 0.2, 0);
+  fg.add(fkafa);
+  for (const s of [-1, 1]) {
+    const fkulak = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), fareMat);
+    fkulak.position.set(0.3, 0.36, s * 0.08);
+    fg.add(fkulak);
+  }
+  const fgozMat = new THREE.MeshStandardMaterial({ color: 0xff4444, emissive: 0xff0000, emissiveIntensity: 0.8 });
+  for (const s of [-1, 1]) {
+    const fgoz = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 6), fgozMat);
+    fgoz.position.set(0.42, 0.24, s * 0.07);
+    fg.add(fgoz);
+  }
+  const fkuyruk = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.04, 0.04), fareMat);
+  fkuyruk.position.set(-0.45, 0.14, 0);
+  fg.add(fkuyruk);
+  fg.position.set(1.5, KANAL_TABAN, 66);
+  sahne.add(fg);
+  lagimFaresi = { grup: fg, ev: { x: 1.5, z: 66 }, kilit: 0 };
+
+  /* === 2) INSAAT ALANI (dogu taraf, z 72-80 cebi) === */
+  const bariyerMat = new THREE.MeshStandardMaterial({ color: 0xe8862e, roughness: 0.8 });
+  // Turuncu bariyerler; guneybati kose (x~10, z~72) acik — oradan ziplanir
+  for (const [w, d, x, z] of [[4, 0.25, 12.5, 72], [2.5, 0.25, 16.2, 72], [8, 0.25, 13, 80],
+                              [0.25, 8, 17, 76], [0.25, 6.5, 9, 76.7]]) {
+    kutuEkle(w, 0.7, d, x, 0.35, z, bariyerMat);
+  }
+  // Rampa (gorsel) + ust uste tirmanilabilir kasalar
+  const rampa = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.2, 3), mat.kaldirim);
+  rampa.position.set(11, 0.55, 78.2);
+  rampa.rotation.x = -0.35;
+  rampa.castShadow = true;
+  sahne.add(rampa);
+  kasaEkle(14, 76, 1, 0);          // birinci kat (ust: 1)
+  kasaEkle(14, 76, 1, 1);          // ikinci kat (ust: 2)
+  kasaEkle(15.5, 76, 1, 0);        // yan kasa
+  // Tehlike levhasi (tepede)
+  const direk = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.4, 8), mat.yol);
+  direk.position.set(15.8, 1.2, 78.5);
+  sahne.add(direk);
+  kutuEkle(1.3, 0.9, 0.1, 15.8, 2.6, 78.5,
+    new THREE.MeshStandardMaterial({ color: 0xffd23c, emissive: 0x8a6a00, emissiveIntensity: 0.5 }), false);
+  const tl = etiketYap("⚠ TEHLİKE ⚠", "#ffd23c", 2.2);
+  tl.position.set(15.8, 3.6, 78.5);
+  sahne.add(tl);
+  // Vinc: direk + sallanan celik top (aksiyonGuncelle sallar ve carpma kontrolu yapar)
+  const vincDirek = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 5, 8), mat.yol);
+  vincDirek.position.set(13, 2.5, 76);
+  vincDirek.castShadow = true;
+  sahne.add(vincDirek);
+  const vincPivot = new THREE.Group();
+  vincPivot.position.set(13, 5, 76);
+  sahne.add(vincPivot);
+  const zincir = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 3, 6),
+    new THREE.MeshStandardMaterial({ color: 0x333333 }));
+  zincir.position.y = -1.5;
+  vincPivot.add(zincir);
+  const celikTop = new THREE.Mesh(new THREE.SphereGeometry(0.65, 14, 12),
+    new THREE.MeshStandardMaterial({ color: 0x555c66, roughness: 0.5, metalness: 0.6 }));
+  celikTop.position.y = -3;
+  celikTop.castShadow = true;
+  vincPivot.add(celikTop);
+  vincTopu = { pivot: vincPivot, uzunluk: 3 };
+
+  /* === 3) GIZLI PARK (bati taraf, calilarin arkasinda z 44-52 cebi) === */
+  const caliMat2 = new THREE.MeshStandardMaterial({ color: 0x2f6b2a, roughness: 1 });
+  for (const z of [44.5, 46, 49.5, 51]) {   // z 46.6-48.9 arasi giris boslugu
+    const cali = new THREE.Mesh(new THREE.SphereGeometry(0.9, 10, 8), caliMat2);
+    cali.position.set(-9, 0.55, z);
+    cali.scale.y = 0.75;
+    cali.castShadow = true;
+    sahne.add(cali);
+    engelEkle(-9, z, 1.5, 1.2);
+  }
+  // Cesme: tas havuz + fiskiye suyu
+  const havuz = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.3, 0.5, 16), mat.kaldirim);
+  havuz.position.set(-13, 0.25, 48);
+  havuz.castShadow = true;
+  sahne.add(havuz);
+  engelEkle(-13, 48, 2.2, 2.2);
+  const havuzSu = new THREE.Mesh(new THREE.CircleGeometry(0.95, 16),
+    new THREE.MeshStandardMaterial({ color: 0x3fa7d6, emissive: 0x2b7ea8, emissiveIntensity: 0.5 }));
+  havuzSu.rotation.x = -Math.PI / 2;
+  havuzSu.position.set(-13, 0.52, 48);
+  sahne.add(havuzSu);
+  parkCesmeSu = new THREE.Mesh(new THREE.ConeGeometry(0.22, 1.0, 10),
+    new THREE.MeshStandardMaterial({ color: 0x9fdcf5, emissive: 0x7cd4ff, emissiveIntensity: 0.8, transparent: true, opacity: 0.85 }));
+  parkCesmeSu.position.set(-13, 1.05, 48);
+  sahne.add(parkCesmeSu);
+  // Bank + iki agac
+  kutuEkle(1.6, 0.1, 0.5, -10.2, 0.4, 46, mat.ahsap);
+  kutuEkle(1.6, 0.5, 0.1, -10.2, 0.7, 45.8, mat.ahsap, false);
+  for (const [x, z] of [[-15.5, 45.5], [-11, 50.8]]) {
+    const govde = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.2, 1.2, 8), mat.ahsap);
+    govde.position.set(x, 0.6, z); govde.castShadow = true;
+    sahne.add(govde);
+    const yaprak = new THREE.Mesh(new THREE.ConeGeometry(0.9, 1.8, 10),
+      new THREE.MeshStandardMaterial({ color: 0x3e8e41, roughness: 1 }));
+    yaprak.position.set(x, 2, z); yaprak.castShadow = true;
+    sahne.add(yaprak);
+    engelEkle(x, z, 0.5, 0.5);
+  }
+
+  /* === 4) ARKA SOKAK (binalarin arkasindaki dar serit, x>17) === */
+  // Giris iki bina arasindan (z 26-30); kasa yiginlari gizliyor
+  kasaEkle(11, 27.5, 1.2, 0);
+  kutuEkle(1.4, 1.4, 1.4, 16, 0.7, 28.5, mat.ahsap);
+  kutuEkle(1, 1, 1, 18.4, 0.5, 22, mat.ahsap);
+  kutuEkle(1.2, 1.2, 1.2, 18.2, 0.6, 33, mat.kaldirim);
+  kasaEkle(18.3, 25, 1, 0, mat.kaldirim);
+  // Sokak kedileri
+  sokakKedisiYap(18.2, 20, 0xd9a45b);
+  sokakKedisiYap(18.4, 30, 0x404040);
+  sokakKedisiYap(17.9, 36.5, 0xf0f0f0);
+
+  /* === 5) ALT GECIT (yolun altindan gecen tunel, z 63-67) === */
+  // Kopru tabani (ustune ziplanabilir platform, y=2)
+  kutuEkle(14, 0.4, 4, 0, 1.8, 65, mat.kaldirim, false);
+  platformlar.push({ minX: -7, maxX: 7, minZ: 63, maxZ: 67, y: 2 });
+  // Kopruye cikis kasalari (guney ve kuzey yaklasim; ust kasalarin altina destek)
+  kasaEkle(0, 61.5, 1, 0, mat.kaldirim);
+  kutuEkle(1, 1, 1, 0, 0.5, 62.3, mat.kaldirim);
+  kasaEkle(0, 62.3, 1, 1, mat.kaldirim);
+  kutuEkle(1, 1, 1, 0, 0.5, 67.7, mat.kaldirim);
+  kasaEkle(0, 67.7, 1, 1, mat.kaldirim);
+  kasaEkle(0, 68.5, 1, 0, mat.kaldirim);
+  // Tunel duvarlari (tunel x boyunca, iki ucu acik; kopru ustunde yuruyene itmez: ustY=2)
+  kutuEkle(14.6, 2, 0.3, 0, 1, 63.2, mat.yol, true, 2);
+  kutuEkle(14.6, 2, 0.3, 0, 1, 66.8, mat.yol, true, 2);
+  // Graffiti: duvarlarda renkli levhalar
+  const grafRenkler = [0xff5b8d, 0x4ecdc4, 0xffd166, 0x8e6bbf, 0x69d18b];
+  for (let i = 0; i < 5; i++) {
+    const gm = new THREE.MeshStandardMaterial({
+      color: grafRenkler[i], emissive: grafRenkler[i], emissiveIntensity: 0.35, roughness: 0.8,
+    });
+    const levha = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.9, 0.06), gm);
+    levha.position.set(-4.8 + i * 2.4, 0.9, i % 2 === 0 ? 63.42 : 66.58);
+    sahne.add(levha);
+  }
+
+  /* === 6) ZOMBI KRALI ARENASI (yeraltinda; giris zombi bolgesindeki parlayan rogar) === */
+  rogarKapagi(18, 57, 0, true);                    // giris: zombi bolgesinin kosesi
+  arenaCikisMesh = rogarKapagi(0, 90.5, KANAL_TABAN, true);  // cikis: arenanin kuzeyi
+  const arenaMat = new THREE.MeshStandardMaterial({ color: 0x3a2030, roughness: 1 });
+  const arenaTaban = new THREE.Mesh(new THREE.BoxGeometry(16.6, 0.2, 16.6), arenaMat);
+  arenaTaban.position.set(0, KANAL_TABAN - 0.1, 84);
+  arenaTaban.receiveShadow = true;
+  sahne.add(arenaTaban);
+  for (const [w, d, x, z] of [[0.3, 16.6, -8.2, 84], [0.3, 16.6, 8.2, 84], [16.6, 0.3, 0, 75.8], [16.6, 0.3, 0, 92.2]]) {
+    const dv = new THREE.Mesh(new THREE.BoxGeometry(w, 6, d), arenaMat);
+    dv.position.set(x, KANAL_TABAN + 3, z);
+    sahne.add(dv);
+  }
+  // Mor isik seritleri (kraliyet arenasi havasi)
+  const arenaSeritMat = new THREE.MeshStandardMaterial({ color: 0x3a1a4a, emissive: 0xc39bff, emissiveIntensity: 0.9 });
+  for (const [x, z] of [[-8, 80], [8, 80], [-8, 88], [8, 88]]) {
+    const serit = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 3), arenaSeritMat);
+    serit.position.set(x, KANAL_TABAN + 4.2, z);
+    sahne.add(serit);
+  }
+  // Koselerde ates kadehleri
+  for (const [x, z] of [[-7.4, 76.6], [7.4, 76.6], [-7.4, 91.4], [7.4, 91.4]]) {
+    const kase = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.14, 0.5, 8), mat.yol);
+    kase.position.set(x, KANAL_TABAN + 0.25, z);
+    sahne.add(kase);
+    const ates = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8),
+      new THREE.MeshStandardMaterial({ color: 0xff9a3c, emissive: 0xff6a00, emissiveIntensity: 1.2 }));
+    ates.position.set(x, KANAL_TABAN + 0.62, z);
+    sahne.add(ates);
+  }
+  // Kralin tahti (alcak platform)
+  kutuEkle(2.6, 0.3, 1.6, 0, KANAL_TABAN + 0.15, 88.5, mat.yol, false);
+  // ZOMBI KRALI: dev zombi bardak + altin tac; 3 ezilmede yenilir
+  const kralGrup = bardakYap(mat.zombi, 0.28, 0.58);
+  const tac = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.14, 8), mat.altin);
+  tac.position.y = 0.64;
+  kralGrup.add(tac);
+  kralGrup.scale.set(1.7, 1.7, 1.7);
+  kralGrup.position.set(0, KANAL_TABAN, 87);
+  kralGrup.rotation.z = 0.15;                     // hafif egik, tekinsiz dursun
+  sahne.add(kralGrup);
+  zombiKral = { grup: kralGrup, can: 3, kilit: 0, yendi: false, uyandi: false, ziplama: 0, taht: { x: 0, z: 87 } };
+}
+
+// Kesif kontrolleri (her karede cagrilir; hepsi birer kere toast cikarir)
+function gizliBolgeKontrol() {
+  // 1) Kanalizasyon: kaldirimdaki rogara ziplayinca asagi dus
+  if (!oyuncu.kirildi && oyuncu.yerde && oyuncu.y > -0.5 &&
+      Math.hypot(oyuncu.x - 5.5, oyuncu.z - 52) < 0.7) {
+    oyuncu.x = -1; oyuncu.z = 62; oyuncu.y = -4;
+    oyuncu.vx = 0; oyuncu.vy = 0; oyuncu.vz = 0; oyuncu.yerde = false;
+    kesfet("kanal", "Kanalizasyonu buldun! 🕳️");
+    sesler.kapi();
+  }
+  // Kanalizasyondan cikis: tuneldeki parlayan kapaga ziplayinca yukari
+  if (!oyuncu.kirildi && oyuncu.y < -2 && oyuncu.yerde &&
+      Math.hypot(oyuncu.x - (-1), oyuncu.z - 73) < 0.7) {
+    oyuncu.x = -5.5; oyuncu.z = 68; oyuncu.y = 2.5;
+    oyuncu.vx = 0; oyuncu.vy = 0; oyuncu.vz = 0; oyuncu.yerde = false;
+    toast("Yukarı çıktın! 🕳️");
+    sesler.zipla();
+  }
+  // 2) Insaat Alani
+  if (oyuncu.x > 9 && oyuncu.x < 17 && oyuncu.z > 72 && oyuncu.z < 80 && oyuncu.y > -1) {
+    kesfet("insaat", "İnşaat Alanı keşfedildi! 🏗️");
+  }
+  // 3) Gizli Park
+  if (oyuncu.x < -9 && oyuncu.x > -17 && oyuncu.z > 44 && oyuncu.z < 52) {
+    kesfet("park", "Gizli Park! ⛲");
+  }
+  // 4) Arka Sokak
+  if (oyuncu.x > 17 && oyuncu.z > 14 && oyuncu.z < 44) {
+    kesfet("arkaSokak", "Arka Sokağı buldun! Kediler seni süzüyor 🐈");
+  }
+  // 5) Alt Gecit (tunelin icinde, zemin seviyesinde)
+  if (oyuncu.x > -7 && oyuncu.x < 7 && oyuncu.z > 63.4 && oyuncu.z < 66.6 && oyuncu.y < 1 && oyuncu.y > -1) {
+    kesfet("altGecit", "Alt Geçit! 🎨");
+  }
+  const simdiSn = performance.now() / 1000;
+  // Park cesmesi: yanina gelirsen seni havaya firlatir
+  if (oyuncu.yerde && oyuncu.y > -1 && simdiSn > cesmeFirlatmaKilit &&
+      Math.hypot(oyuncu.x - (-13), oyuncu.z - 48) < 2.2) {
+    oyuncu.vy = 11; oyuncu.yerde = false;
+    cesmeFirlatmaKilit = simdiSn + 2;
+    sesler.zipla();
+    toast("Çeşme seni havaya fırlattı! ⛲🚀");
+  }
+  // 6) Zombi Krali Arenasi: zombi bolgesindeki parlayan rogardan asagi dus
+  if (!oyuncu.kirildi && oyuncu.yerde && oyuncu.y > -0.5 &&
+      Math.hypot(oyuncu.x - 18, oyuncu.z - 57) < 0.7) {
+    oyuncu.x = 0; oyuncu.z = 77.5; oyuncu.y = -4;
+    oyuncu.vx = 0; oyuncu.vy = 0; oyuncu.vz = 0; oyuncu.yerde = false;
+    kesfet("arena", "Zombi Kralı Arenası! 👑🧟");
+    sesler.kapi();
+  }
+  // Arenadan cikis: kuzeydeki parlayan rogara ziplayinca yukari
+  if (!oyuncu.kirildi && oyuncu.y < -2 && oyuncu.yerde && oyuncu.z > 75.5 &&
+      Math.hypot(oyuncu.x - 0, oyuncu.z - 90.5) < 0.7) {
+    oyuncu.x = 16; oyuncu.z = 55; oyuncu.y = 2.5;
+    oyuncu.vx = 0; oyuncu.vy = 0; oyuncu.vz = 0; oyuncu.yerde = false;
+    toast("Arenadan çıktın! 🕳️");
+    sesler.zipla();
+  }
+}
+
+// Kucuk animasyonlar: kedi kuyruklari, cesme suyu, kanal kapagi parlama
+function gizliBolgeAnim(dt) {
+  const t = performance.now() / 1000;
+  for (const k of sokakKedileri) {
+    k.eklem.rotation.y = Math.sin(t * 3 + k.faz) * 0.5;
+    // Oyuncu yaklasinca kedi kacar, uzaklasinca evine doner
+    const kdx = k.grup.position.x - oyuncu.x, kdz = k.grup.position.z - oyuncu.z;
+    const km = Math.hypot(kdx, kdz);
+    if (oyuncu.y > -1 && km < 2.6 && km > 0.01) {
+      k.grup.position.x += (kdx / km) * 3.4 * dt;
+      k.grup.position.z += (kdz / km) * 3.4 * dt;
+      k.grup.rotation.y = Math.atan2(kdx, kdz);
+    } else {
+      const hx = k.ev.x - k.grup.position.x, hz = k.ev.z - k.grup.position.z;
+      const hm = Math.hypot(hx, hz);
+      if (hm > 0.2) {
+        k.grup.position.x += (hx / hm) * 1.2 * dt;
+        k.grup.position.z += (hz / hm) * 1.2 * dt;
+        k.grup.rotation.y = Math.atan2(hx, hz);
+      }
+    }
+    // Arka sokaktan disari tasmasinlar
+    k.grup.position.x = Math.max(16.8, Math.min(19.6, k.grup.position.x));
+    k.grup.position.z = Math.max(15, Math.min(42, k.grup.position.z));
+  }
+  if (parkCesmeSu) {
+    parkCesmeSu.scale.y = 1 + Math.sin(t * 6) * 0.15;
+    parkCesmeSu.material.emissiveIntensity = 0.6 + Math.sin(t * 6) * 0.25;
+  }
+  if (kanalCikisMesh) {
+    kanalCikisMesh.material.emissiveIntensity = 0.4 + Math.sin(t * 4) * 0.3;
+  }
+}
+
+/* ---------------- AKSIYON: vinc topu, lagim faresi, zombi krali ---------------- */
+function aksiyonGuncelle(dt) {
+  const t = performance.now() / 1000;
+  // Arena cikis rogari parlasin
+  if (arenaCikisMesh) arenaCikisMesh.material.emissiveIntensity = 0.4 + Math.sin(t * 4) * 0.3;
+
+  // 1) Vinc topu: insaatta sallanir; carparsa bardagi kirar
+  if (vincTopu) {
+    vincTopu.pivot.rotation.z = Math.sin(t * 1.6) * 0.85;
+    const a = vincTopu.pivot.rotation.z;
+    const topX = 13 + Math.sin(a) * vincTopu.uzunluk;
+    const topY = 5 - Math.cos(a) * vincTopu.uzunluk;
+    if (!oyuncu.kirildi && !oyuncu.yakalandi && oyuncu.dokunulmaz <= 0 && oyuncu.y > -1 &&
+        Math.hypot(oyuncu.x - topX, oyuncu.z - 76) < 0.95 && Math.abs(oyuncu.y + 0.3 - topY) < 1.3) {
+      bardagiKir("Vinç topu seni ezdi! 🏗️💥");
+    }
+  }
+
+  // 2) Lagim faresi: kanalizasyondayken kovalar; isirirsa seni firlatir
+  if (lagimFaresi) {
+    const f = lagimFaresi;
+    f.kilit -= dt;
+    const oyuncuTunelde = oyuncu.y < -2 && oyuncu.z <= 75.5;
+    if (oyuncuTunelde && !oyuncu.kirildi && f.kilit <= 0) {
+      const dx = oyuncu.x - f.grup.position.x, dz = oyuncu.z - f.grup.position.z;
+      const m = Math.hypot(dx, dz);
+      if (m > 0.01) {
+        f.grup.position.x += (dx / m) * 2.6 * dt;
+        f.grup.position.z += (dz / m) * 2.6 * dt;
+        f.grup.rotation.y = Math.atan2(dx, dz);
+      }
+      if (m < 0.55 && m > 0.01) {
+        oyuncu.vy = 6; oyuncu.yerde = false;
+        oyuncu.vx = (dx / m) * 8; oyuncu.vz = (dz / m) * 8;
+        f.kilit = 4;
+        sesler.zipla();
+        toast("Lağım faresi seni ısırdı! 🐀");
+      }
+    } else {
+      // Oyuncu yoksa ya da isirdiktan sonra evine don
+      const hx = f.ev.x - f.grup.position.x, hz = f.ev.z - f.grup.position.z;
+      const hm = Math.hypot(hx, hz);
+      if (hm > 0.3) {
+        f.grup.position.x += (hx / hm) * 1.8 * dt;
+        f.grup.position.z += (hz / hm) * 1.8 * dt;
+        f.grup.rotation.y = Math.atan2(hx, hz);
+      }
+    }
+    // Tunelden disari cikmasin
+    f.grup.position.x = Math.max(-2.7, Math.min(2.7, f.grup.position.x));
+    f.grup.position.z = Math.max(60.5, Math.min(74.5, f.grup.position.z));
+  }
+
+  // 3) ZOMBI KRALI: arenaya girince uyanir; 3 kere ustune zipla -> yen!
+  if (zombiKral && !zombiKral.yendi) {
+    const k = zombiKral;
+    k.kilit -= dt;
+    const oyuncuArenada = oyuncu.y < -2 && oyuncu.z > 75.5 && !oyuncu.kirildi;
+    if (oyuncuArenada && !k.uyandi) {
+      k.uyandi = true;
+      toast("Zombi Kralı uyandı! 👑🧟");
+    }
+    if (k.kilit <= 0) {
+      const hedefX = oyuncuArenada ? oyuncu.x : k.taht.x;
+      const hedefZ = oyuncuArenada ? oyuncu.z : k.taht.z;
+      const hx = hedefX - k.grup.position.x, hz = hedefZ - k.grup.position.z;
+      const hm = Math.hypot(hx, hz);
+      if (hm > 0.4) {
+        k.grup.position.x += (hx / hm) * 3.0 * dt;
+        k.grup.position.z += (hz / hm) * 3.0 * dt;
+        k.grup.rotation.y = Math.atan2(hx, hz);
+      }
+      // Kral da ziplaya ziplaya gelir
+      k.ziplama += dt * 6;
+      k.grup.position.y = KANAL_TABAN + Math.abs(Math.sin(k.ziplama)) * 0.3;
+    }
+    // Arenadan cikmasin
+    k.grup.position.x = Math.max(-7.2, Math.min(7.2, k.grup.position.x));
+    k.grup.position.z = Math.max(76.5, Math.min(91.5, k.grup.position.z));
+    if (oyuncuArenada && oyuncu.dokunulmaz <= 0) {
+      const mesafe = Math.hypot(oyuncu.x - k.grup.position.x, oyuncu.z - k.grup.position.z);
+      const kralTepe = k.grup.position.y + 0.99;   // 0.58 boy x 1.7 olcek
+      if (mesafe < 1.15) {
+        if (oyuncu.vy < -0.5 && oyuncu.y > kralTepe - 0.4 && k.kilit <= 0) {
+          // Ustune zipladin -> hasar!
+          k.can--;
+          k.kilit = 1.6;
+          oyuncu.vy = 7.5; oyuncu.yerde = false;
+          sesler.ezme();
+          if (k.can <= 0) {
+            k.yendi = true;
+            k.grup.scale.y = 0.15;
+            k.grup.position.y = KANAL_TABAN;
+            sesler.ding();
+            toast("Zombi Kralı'nı yendin! EFSANESİN! 👑🎉");
+          } else {
+            toast("Zombi Kralı'na vurdun! (" + (3 - k.can) + "/3) 💥");
+          }
+        } else if (oyuncu.y < kralTepe - 0.55 && k.kilit <= 0) {
+          bardagiKir("Zombi Kralı seni kırdı! 👑🧟");
+        }
+      }
+    }
+  }
+}
+
+/* ---------------- OYUNCU: BEYAZ BARDAK ---------------- */
+const oyuncu = {
+  grup: bardakYap(mat.beyaz, 0.28, 0.58),
+  x: -6, y: 0, z: 3,        // konum (salonda basla)
+  vx: 0, vy: 0, vz: 0,      // hiz
+  yerde: true,
+  yaricap: 0.28,
+  yon: 0,                   // bardagin baktigi aci (yumuşak donus icin)
+  kirildi: false,
+  kirilmaSayaci: 0,
+  dokunulmaz: 0,            // yeniden dogunca 3 sn koruma (zombi/insan kiramaz)
+  yakalandi: false,         // cocuk NPC bardagi eline aldi mi?
+  yakalayan: null,          // yakalayan cocuk
+  yakalanmaSure: 0,         // kurtulmak icin geri sayim
+  kurtulmaSayi: 0,          // SPACE basma sayisi
+};
+sahne.add(oyuncu.grup);
+
+// Kamera acilari
+let kameraYatay = 0;   // baslangicta evin icine (mutfak yonune) bak
+let kameraDikey = 0.35;
+
+/* ---------------- KIRILMA PARCALARI ---------------- */
+const parcaciklar = [];
+function kirilmaBaslat(x, y, z) {
+  sesler.kirilma();
+  for (let i = 0; i < 22; i++) {
+    const p = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.09), mat.beyaz);
+    p.position.set(x, y + 0.4, z);
+    sahne.add(p);
+    parcaciklar.push({
+      mesh: p,
+      vx: (Math.random() - 0.5) * 5,
+      vy: Math.random() * 4.5 + 1,
+      vz: (Math.random() - 0.5) * 5,
+      omur: 1.1,
+    });
+  }
+}
+function parcacikGuncelle(dt) {
+  for (let i = parcaciklar.length - 1; i >= 0; i--) {
+    const p = parcaciklar[i];
+    p.vy -= 12 * dt;
+    p.mesh.position.x += p.vx * dt;
+    p.mesh.position.y += p.vy * dt;
+    p.mesh.position.z += p.vz * dt;
+    if (p.mesh.position.y < 0.05) { p.mesh.position.y = 0.05; p.vy *= -0.4; p.vx *= 0.7; p.vz *= 0.7; }
+    p.mesh.rotation.x += 5 * dt; p.mesh.rotation.z += 4 * dt;
+    p.omur -= dt;
+    if (p.omur <= 0) { sahne.remove(p.mesh); parcaciklar.splice(i, 1); }
+  }
+}
+
+/* ---------------- GOREVLER ---------------- */
+const gorevler = [
+  { id: "mutfak", yazi: "Mutfağa git 🍳", bitti: false },
+  { id: "altlik", yazi: "3 bardak altlığını topla", bitti: false, sayac: 0 },
+  { id: "kedi",   yazi: "Kediyi bul 🐱", bitti: false },
+  { id: "altin",  yazi: "Kayıp Atatürk'lü Bardağı bul ⭐", bitti: false },
+  { id: "kapi",   yazi: "Bardak kapısından dışarı çık 🚪", bitti: false },
+  { id: "cadde",  yazi: "Caddede ilerle, insanlara dikkat! 🚶", bitti: false },
+  { id: "zombi",  yazi: "Gizli köşeyi keşfet 🧟", bitti: false },
+];
+
+function gorevCiz() {
+  const ul = document.getElementById("gorev-listesi");
+  ul.innerHTML = "";
+  let aktifVerildi = false;
+  for (const g of gorevler) {
+    const li = document.createElement("li");
+    let yazi = g.yazi;
+    if (g.id === "altlik") yazi += " (" + g.sayac + "/3)";
+    li.textContent = yazi;
+    if (g.bitti) li.className = "bitti";
+    else if (!aktifVerildi) { li.className = "aktif"; aktifVerildi = true; }
+    else li.style.opacity = 0.5;
+    ul.appendChild(li);
+  }
+}
+
+let toastZaman = null;
+function toast(yazi) {
+  const t = document.getElementById("toast");
+  t.textContent = yazi;
+  t.style.opacity = 1;
+  clearTimeout(toastZaman);
+  toastZaman = setTimeout(() => { t.style.opacity = 0; }, 2400);
+}
+
+function gorevTamamla(id, mesaj) {
+  const g = gorevler.find(x => x.id === id);
+  if (!g || g.bitti) return;
+  g.bitti = true;
+  sesler.ding();
+  if (mesaj) toast(mesaj);
+  gorevCiz();
+}
+
+/* ---------------- TOPLANABILIR ESYALAR ---------------- */
+// 3 parlayan bardak altligi (evde)
+const altliklar = [];
+function altlikKur() {
+  for (const [x, z] of [[-6, -6.8], [-3.5, 5], [-1, -5]]) {
+    const a = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.42, 0.08, 20), mat.parilti);
+    a.position.set(x, 0.15, z);
+    sahne.add(a);
+    altliklar.push({ mesh: a, alindi: false, tabanY: 0.15 });
+  }
+}
+
+// Kayip ALTIN bardak (K.Atatürk'lu) — kanepenin arkasina saklanmis
+let altinBardak, altinAlindi = false;
+function altinBardakKur() {
+  altinBardak = bardakYap(mat.altin, 0.4, 0.85);
+  altinBardak.position.set(-9.3, 0, -7.2);
+  sahne.add(altinBardak);
+  const e = etiketYap("K.Atatürk", "#ffd35c", 1.6);
+  e.position.set(0, 1.5, 0);
+  altinBardak.add(e);
+  const isik = new THREE.PointLight(0xffd35c, 0.9, 6);
+  isik.position.set(0, 1, 0);
+  altinBardak.add(isik);
+}
+
+// Kedi (yatagin ustunde uyuyor)
+let kediGrup, kediBulundu = false;
+function kediyiKur() {
+  kediGrup = new THREE.Group();
+  const govde = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.28, 0.3), mat.kedi);
+  govde.position.y = 0.14; govde.castShadow = true;
+  kediGrup.add(govde);
+  const kafa = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.24, 0.24), mat.kedi);
+  kafa.position.set(0.36, 0.3, 0); kafa.castShadow = true;
+  kediGrup.add(kafa);
+  for (const s of [-1, 1]) {
+    const kulak = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.12, 6), mat.kedi);
+    kulak.position.set(0.36, 0.48, s * 0.08);
+    kediGrup.add(kulak);
+  }
+  const kuyruk = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.06, 0.06), mat.kedi);
+  kuyruk.position.set(-0.4, 0.25, 0);
+  kuyruk.rotation.z = 0.5;
+  kediGrup.add(kuyruk);
+  kediGrup.position.set(7.8, 0.9, 4);   // yatagin ustunde
+  sahne.add(kediGrup);
+}
+
+// Mutfak isareti (parlayan halka + ok)
+let mutfakIsaret;
+function isaretKur() {
+  mutfakIsaret = new THREE.Group();
+  const halka = new THREE.Mesh(new THREE.TorusGeometry(0.8, 0.07, 10, 30), mat.parilti);
+  halka.rotation.x = Math.PI / 2;
+  mutfakIsaret.add(halka);
+  const ok = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.5, 10),
+    new THREE.MeshStandardMaterial({ color: 0xffd35c, emissive: 0x9c7414, emissiveIntensity: 0.7 }));
+  ok.rotation.x = Math.PI;
+  ok.position.y = 1.4;
+  mutfakIsaret.add(ok);
+  mutfakIsaret.position.set(1.5, 0.1, -4);
+  sahne.add(mutfakIsaret);
+}
+
+/* ---------------- CHECKPOINT'LER (bardak altliklari) ---------------- */
+const kontrolNoktalari = [];
+let sonKayit = { x: -6, z: 3 };   // varsayilan dogma noktasi (salon)
+function kontrolKur() {
+  for (const [x, z] of [[0, 10], [-5.5, 25], [5.5, 40], [10.5, 45], [5.5, 60], [-5.5, 78]]) {
+    const g = new THREE.Group();
+    const tabak = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 0.9, 0.12, 24), mat.parilti.clone());
+    tabak.position.y = 0.06;
+    g.add(tabak);
+    const e = etiketYap("CHECKPOINT", "#5cf2ff", 2.2);
+    e.position.y = 1.2;
+    g.add(e);
+    g.position.set(x, 0, z);
+    sahne.add(g);
+    kontrolNoktalari.push({ grup: g, tabak, x, z, kaydedildi: false });
+  }
+}
+
+/* ---------------- NPC'LER: yetiskinler + cocuklar ----------------
+   Yetiskinler bazen durup SOHBET eder, bazen kendi kendine mirildanir.
+   Cocuklar kosturur; ikisi bardagi gorunce yakalamaya calisir!
+   Kural ayni: YETISKIN basarsa bardak kirilir; cocuklar kirmaz, yakalar. */
+const insanlar = [];
+const cocuklar = [];
+const insanRenkleri = [0xe74c3c, 0x3498db, 0x9b59b6, 0xe67e22, 0x1abc9c, 0xf1c40f, 0xfd79a8, 0x00cec9];
+const insanAdlari = ["Ayşe Teyze", "Mehmet Amca", "Dönerci Hasan", "Öğretmen Zeynep", "Emekli Nuri", "Fırıncı Salih",
+  "Fatma Nine", "Berber Rıza", "Mühendis Elif", "Postacı Kemal", "Gazeteci Can", "Terzi Emine"];
+const cocukRenkleri = [0xff4d6d, 0xffa94d, 0x4dd2ff, 0x9dff4d, 0xd24dff];
+const cocukAdlari = ["Minik Ege", "Zeynoş", "Afacan Kerem", "Umut", "Dila"];
+
+// Sohbet diyaloglari (sirasiyla soylenir, komik olsun)
+const SOHBETLER = [
+  ["Bugün hava ne güzel!", "Evet, tam yürüyüş havası ☀️", "Parkta oturalım mı?", "Olur, çayımı da alayım ☕"],
+  ["Torunum satranç öğreniyor 😄", "Vay! Akıllı torun kimmiş?", "Dün beni yendi...", "Hadi ya! 😂"],
+  ["Bardaklar konuşsa ne derdi?", "Bence 'sıcak çay doldur!' derdi", "Benimki 'beni yıka' derdi 😂", "Hahaha!"],
+  ["Pazarda domates uçmuş fiyatı!", "Sorma, ben de gördüm 😮", "Neyse, biz çay içelim", "Her derdin ilacı çay ☕"],
+  ["Dün rüyamda uçuyordum", "Ben de zıplıyordum!", "Belki bardak olmuşuzdur 😄", "Kesin öyle!"],
+];
+const MIRILDANMALAR = ["Anahtarları nereye koydum...", "Akşama mercimek çorbası var 🍲",
+  "Şu bardak kendi kendine mi geziyor?", "Bugün çarşıda ne alsam...", "Kediler yine sokakta 🐱",
+  "Hava kararmadan eve gideyim...", "Bu sokakta bir tuhaflık var...", "Yine çarşı kalabalık bugün 🛍️",
+  "Akşam maç var, kaçırmayayım ⚽", "Az önce bir bardak mı koştu buradan? 🤔"];
+const COCUK_SOZLERI = ["Saklambaç oynayalım!", "Ben en hızlıyım! 🏃", "Dondurma istiyorum 🍦", "Yakala yakala!",
+  "Baba bana dondurma alır mısın? 🍦", "Anne bak bardak kaçıyor!", "Akşama bilgisayar oynayacağım! 🎮",
+  "Bu bardak çok komik 😄"];
+
+// --- Konusma balonu (sprite + canvas; sadece yazi degisince yeniden cizilir) ---
+function balonYap(yukseklik) {
+  const tuval = document.createElement("canvas");
+  tuval.width = 512; tuval.height = 192;
+  const doku = new THREE.CanvasTexture(tuval);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: doku, transparent: true, depthTest: false }));
+  sp.scale.set(2.7, 1.01, 1);
+  sp.position.y = yukseklik;
+  sp.visible = false;
+  return { sp, tuval, doku, sure: 0 };
+}
+function balonGoster(npc, yazi, sure) {
+  const c = npc.balon.tuval.getContext("2d");
+  c.clearRect(0, 0, 512, 192);
+  c.fillStyle = "rgba(255,255,255,0.95)";
+  c.fillRect(10, 8, 492, 118);                    // balon govdesi
+  c.beginPath();                                   // kuyruk
+  c.moveTo(226, 126); c.lineTo(256, 176); c.lineTo(286, 126);
+  c.closePath(); c.fill();
+  let boyut = 46;                                  // yaziyi sigdir
+  c.font = "bold " + boyut + "px Arial";
+  while (c.measureText(yazi).width > 460 && boyut > 20) {
+    boyut -= 4;
+    c.font = "bold " + boyut + "px Arial";
+  }
+  c.fillStyle = "#222";
+  c.textAlign = "center"; c.textBaseline = "middle";
+  c.fillText(yazi, 256, 68);
+  npc.balon.doku.needsUpdate = true;
+  npc.balon.sure = sure;
+  npc.balon.sp.visible = true;
+}
+function balonGuncelle(npc, dt) {
+  const b = npc.balon;
+  if (b.sure > 0) b.sure -= dt;
+  // Oyuncu yeraltindayken (kanalizasyon/alt gecit) balonlar gorunmesin
+  b.sp.visible = b.sure > 0 && oyuncu.y > -1;
+}
+
+function insanYap(renk, kisa) {
+  const g = new THREE.Group();
+  const govdeBoy = kisa ? 0.62 : 1;
+  const govde = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.3, govdeBoy, 12),
+    new THREE.MeshStandardMaterial({ color: renk, roughness: 0.9 }));
+  govde.position.y = kisa ? 0.45 : 0.75; govde.castShadow = true;
+  g.add(govde);
+  const kafa = new THREE.Mesh(new THREE.SphereGeometry(kisa ? 0.18 : 0.24, 14, 12),
+    new THREE.MeshStandardMaterial({ color: 0xf5cba7, roughness: 0.8 }));
+  kafa.position.y = kisa ? 0.95 : 1.5; kafa.castShadow = true;
+  g.add(kafa);
+  return g;
+}
+
+function insanlariKur() {
+  // [x1,z1] <-> [x2,z2] arasi yuruyen yetiskinler; bazi yolu capraz gecer
+  const rotalar = [
+    [[-5.5, 9], [-5.5, 90]], [[-5.5, 90], [-5.5, 9]],
+    [[5.5, 90], [5.5, 10]], [[5.5, 10], [5.5, 90]],
+    [[-8, 18], [8, 18]], [[8, 30], [-8, 30]],
+    [[-8, 48], [8, 48]], [[5.5, 40], [5.5, 56]],
+    [[-8, 62], [8, 62]], [[8, 76], [-8, 76]],
+    [[-5.5, 60], [-5.5, 88]], [[5.5, 66], [5.5, 92]],
+  ];
+  rotalar.forEach((rota, i) => {
+    const g = insanYap(insanRenkleri[i % insanRenkleri.length]);
+    g.position.set(rota[0][0], 0, rota[0][1]);
+    sahne.add(g);
+    const balon = balonYap(2.15);
+    g.add(balon.sp);
+    insanlar.push({
+      grup: g, ad: insanAdlari[i % insanAdlari.length], a: rota[0], b: rota[1], hedef: 1,
+      hiz: 1.3 + Math.random() * 0.9,
+      sallan: Math.random() * Math.PI * 2,
+      balon,
+      duruyor: false,          // sohbet ederken true
+      sohbet: null, sohbetZaman: 0, sohbetKilit: 0,
+      mirilZaman: 5 + Math.random() * 20,
+    });
+  });
+  // Cocuklar: kisa rotalarda kosusturur; 2 tanesi bardagi kovalar
+  const cocukRotalari = [
+    [[-5.5, 14], [-5.5, 24]], [[5.5, 46], [1, 46]],
+    [[-5.5, 70], [-1, 74]], [[5.5, 20], [5.5, 30]],
+    [[-5.5, 36], [-5.5, 44]],
+  ];
+  cocukRotalari.forEach((rota, i) => {
+    const g = insanYap(cocukRenkleri[i % cocukRenkleri.length], true);
+    g.position.set(rota[0][0], 0, rota[0][1]);
+    sahne.add(g);
+    const balon = balonYap(1.5);
+    g.add(balon.sp);
+    cocuklar.push({
+      grup: g, ad: cocukAdlari[i % cocukAdlari.length], a: rota[0], b: rota[1], hedef: 1,
+      hiz: 2.2 + Math.random(),
+      sallan: Math.random() * 6,
+      balon,
+      kovalayanMi: i === 0 || i === 2,   // Minik Ege ve Afacan Kerem bardak pesinde!
+      kovuluyor: false, kovulamaSure: 0, kovaKilit: 0,
+      mirilZaman: 8 + Math.random() * 15,
+    });
+  });
+}
+
+// Sohbet: iki yetiskin durur, sirayla konusur, sonra yollarina devam eder
+function sohbetBaslat(a, b) {
+  const satirlar = SOHBETLER[Math.floor(Math.random() * SOHBETLER.length)];
+  a.duruyor = true; b.duruyor = true;
+  a.sohbet = { satirlar, sira: 0, diger: b };   // konusmayi a yonetir
+  a.sohbetZaman = 0.6;
+}
+function sohbetSatir(a) {
+  const s = a.sohbet;
+  if (!s) { a.duruyor = false; return; }
+  if (s.sira >= s.satirlar.length) {
+    const simdi = performance.now() / 1000;
+    a.duruyor = false; s.diger.duruyor = false;
+    a.sohbetKilit = simdi + 25 + Math.random() * 20;
+    s.diger.sohbetKilit = simdi + 25 + Math.random() * 20;
+    a.sohbet = null;
+    return;
+  }
+  const konusan = s.sira % 2 === 0 ? a : s.diger;
+  balonGoster(konusan, s.satirlar[s.sira], 2.3);
+  s.sira++;
+  a.sohbetZaman = 2.4;
+}
+
+function insanGuncelle(dt) {
+  const simdi = performance.now() / 1000;
+  for (const insan of insanlar) {
+    balonGuncelle(insan, dt);
+    if (insan.duruyor) {
+      // Sohbet sirasinda durur, sirasi gelince konusur
+      if (insan.sohbet) {
+        insan.sohbetZaman -= dt;
+        if (insan.sohbetZaman <= 0) sohbetSatir(insan);
+      }
+    } else {
+      const h = insan.hedef === 1 ? insan.b : insan.a;
+      const dx = h[0] - insan.grup.position.x;
+      const dz = h[1] - insan.grup.position.z;
+      const mesafe = Math.hypot(dx, dz);
+      if (mesafe < 0.4) { insan.hedef = 1 - insan.hedef; }
+      else {
+        insan.grup.position.x += (dx / mesafe) * insan.hiz * dt;
+        insan.grup.position.z += (dz / mesafe) * insan.hiz * dt;
+        insan.grup.rotation.y = Math.atan2(dx, dz);
+      }
+      insan.sallan += dt * 8;
+      insan.grup.position.y = Math.abs(Math.sin(insan.sallan)) * 0.06; // yurume ziplamasi
+      // Bazen kendi kendine mirildanir
+      insan.mirilZaman -= dt;
+      if (insan.mirilZaman <= 0) {
+        balonGoster(insan, MIRILDANMALAR[Math.floor(Math.random() * MIRILDANMALAR.length)], 2.5);
+        insan.mirilZaman = 14 + Math.random() * 25;
+      }
+      // Yakindaki bir arkadasa sohbet teklifi (cok sik degil)
+      if (insan.sohbetKilit < simdi && Math.random() < 0.002) {
+        const partner = insanlar.find((o) => o !== insan && !o.duruyor && o.sohbetKilit < simdi &&
+          Math.hypot(o.grup.position.x - insan.grup.position.x, o.grup.position.z - insan.grup.position.z) < 3);
+        if (partner) sohbetBaslat(insan, partner);
+      }
+    }
+    // Insan bardaga basarsa -> KIRIL! (dogma korumasindayken ve yeraltindayken kirilmaz)
+    if (!oyuncu.kirildi && !oyuncu.yakalandi && oyuncu.dokunulmaz <= 0 && oyuncu.y > -1) {
+      const fark = Math.hypot(oyuncu.x - insan.grup.position.x, oyuncu.z - insan.grup.position.z);
+      if (fark < 0.6 && oyuncu.y < 0.8) bardagiKir("Bir insan seni ezdi! 💥");
+    }
+  }
+}
+
+/* --- Cocuklar: kosusturma + bardagi yakalama oyunu --- */
+function yakala(c) {
+  if (oyuncu.yakalandi || oyuncu.kirildi) return;
+  oyuncu.yakalandi = true;
+  oyuncu.yakalayan = c;
+  oyuncu.yakalanmaSure = 2;
+  oyuncu.kurtulmaSayi = 0;
+  oyuncu.vx = 0; oyuncu.vy = 0; oyuncu.vz = 0;
+  c.kovuluyor = false;
+  balonGoster(c, "Yakaladım! 😄", 2);
+  tonCal(500, 900, 0.15, "square", 0.2);
+  const b = document.getElementById("yakalanma");
+  b.textContent = "Yakalandın! SPACE'e bas bas kurtul! (0/6) 😱";
+  b.classList.remove("gizli");
+}
+
+function kurtulmaDene() {
+  if (!oyuncu.yakalandi) return;
+  oyuncu.kurtulmaSayi++;
+  tonCal(300 + oyuncu.kurtulmaSayi * 80, 420, 0.08, "square", 0.15);
+  document.getElementById("yakalanma").textContent =
+    "Yakalandın! SPACE'e bas bas kurtul! (" + oyuncu.kurtulmaSayi + "/6) 😱";
+  if (oyuncu.kurtulmaSayi >= 6) yakalanmaBitir(true);
+}
+
+function yakalanmaBitir(kurtuldu) {
+  const c = oyuncu.yakalayan;
+  oyuncu.yakalandi = false;
+  oyuncu.yakalayan = null;
+  document.getElementById("yakalanma").classList.add("gizli");
+  if (c) { c.kovaKilit = performance.now() / 1000 + 15; c.kovuluyor = false; }
+  if (kurtuldu) {
+    // Bardak ileri firlar + 2 sn dokunulmazlik
+    oyuncu.y = 1;
+    oyuncu.vy = 7;
+    oyuncu.vx = -Math.sin(kameraYatay) * 7;
+    oyuncu.vz = -Math.cos(kameraYatay) * 7;
+    oyuncu.yerde = false;
+    oyuncu.dokunulmaz = 2;
+    sesler.zipla();
+    toast("Kurtuldun! 💨");
+  } else {
+    // Cocuk bardagi komik sekilde birakiverir (kirilmadan)
+    const bx = c ? c.grup.position.x + (Math.random() - 0.5) * 3 : 0;
+    const bz = c ? c.grup.position.z + (Math.random() - 0.5) * 3 : 10;
+    oyuncu.x = Math.max(-19, Math.min(19, bx));
+    oyuncu.z = Math.max(6.5, Math.min(95, bz));
+    oyuncu.y = 0.5; oyuncu.vx = 0; oyuncu.vy = 0; oyuncu.vz = 0;
+    oyuncu.yerde = false;
+    oyuncu.dokunulmaz = 2;
+    toast("Çocuk seni bıraktı! Pof. 😅");
+  }
+  oyuncu.grup.position.set(oyuncu.x, oyuncu.y, oyuncu.z);
+}
+
+// Bardak cocugun elinde: hareket yok, sadece geri sayim
+function yakalanmaGuncelle(dt) {
+  const c = oyuncu.yakalayan;
+  if (!c) { yakalanmaBitir(false); return; }
+  oyuncu.yakalanmaSure -= dt;
+  oyuncu.x = c.grup.position.x - Math.sin(c.grup.rotation.y) * 0.4;
+  oyuncu.z = c.grup.position.z - Math.cos(c.grup.rotation.y) * 0.4;
+  oyuncu.y = 1.0;
+  oyuncu.grup.position.set(oyuncu.x, oyuncu.y, oyuncu.z);
+  if (oyuncu.yakalanmaSure <= 0) yakalanmaBitir(false);
+}
+
+function cocukGuncelle(dt) {
+  const simdi = performance.now() / 1000;
+  for (const c of cocuklar) {
+    balonGuncelle(c, dt);
+    let hedefX, hedefZ, hiz = c.hiz;
+    const bardakUygun = !oyuncu.kirildi && !oyuncu.yakalandi && oyuncu.dokunulmaz <= 0 && oyuncu.y > -1;
+    if (c.kovuluyor && bardakUygun) {
+      // Bardagi kovala! (oyuncudan biraz yavas)
+      hedefX = oyuncu.x; hedefZ = oyuncu.z; hiz = 2.7;
+      c.kovulamaSure += dt;
+      const mesafe = Math.hypot(oyuncu.x - c.grup.position.x, oyuncu.z - c.grup.position.z);
+      if (mesafe < 0.55 && oyuncu.y < 0.6) yakala(c);
+      else if (c.kovulamaSure > 10) {
+        c.kovuluyor = false;
+        c.kovaKilit = simdi + 15;
+        balonGoster(c, "Pes! Yakalayamadım 😤", 2.5);
+      }
+    } else {
+      c.kovuluyor = false;
+      // Normal oyun rotasinda kosustur
+      const h = c.hedef === 1 ? c.b : c.a;
+      hedefX = h[0]; hedefZ = h[1];
+      if (Math.hypot(hedefX - c.grup.position.x, hedefZ - c.grup.position.z) < 0.4) c.hedef = 1 - c.hedef;
+      // Bardagi gorunce pesine dus (sadece kovalayan cocuklar, 15 sn kilidiyle)
+      if (c.kovalayanMi && bardakUygun && simdi > c.kovaKilit) {
+        const mesafe = Math.hypot(oyuncu.x - c.grup.position.x, oyuncu.z - c.grup.position.z);
+        if (mesafe < 6) {
+          c.kovuluyor = true;
+          c.kovulamaSure = 0;
+          balonGoster(c, "Bardağı yakalayacağım! 😆", 2);
+        }
+      }
+      // Cocuklar da kendi kendine konusur
+      c.mirilZaman -= dt;
+      if (c.mirilZaman <= 0) {
+        balonGoster(c, COCUK_SOZLERI[Math.floor(Math.random() * COCUK_SOZLERI.length)], 2.2);
+        c.mirilZaman = 10 + Math.random() * 18;
+      }
+    }
+    const dx = hedefX - c.grup.position.x, dz = hedefZ - c.grup.position.z;
+    const m = Math.hypot(dx, dz);
+    if (m > 0.15) {
+      c.grup.position.x += (dx / m) * hiz * dt;
+      c.grup.position.z += (dz / m) * hiz * dt;
+      c.grup.rotation.y = Math.atan2(dx, dz);
+    }
+    c.sallan += dt * 10;
+    c.grup.position.y = Math.abs(Math.sin(c.sallan)) * 0.12;   // kosma ziplamasi
+  }
+}
+
+/* ---------------- ZOMBI BARDAKLAR ---------------- */
+const zombiler = [];
+let ezilenZombi = 0;
+let zombiKesfedildi = false;
+let zombiDalgaSayaci = 0;
+const ZOMBI_BOLGE = { x1: 8, x2: 19, z1: 42, z2: 58 };
+
+function zombiYap(x, z) {
+  const g = bardakYap(mat.zombi, 0.28, 0.58);
+  g.rotation.z = 0.28;                          // kirik dokuk, egik durus
+  // "catlak" icin koyu halka
+  const catlak = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.035, 8, 20), mat.zombiKoyu);
+  catlak.rotation.x = Math.PI / 2;
+  catlak.position.y = 0.3;
+  g.add(catlak);
+  g.position.set(x, 0, z);
+  sahne.add(g);
+  zombiler.push({ grup: g, dogma: { x, z }, ziplama: Math.random() * 6, ezildi: false, ezilmeZaman: 0 });
+}
+function zombileriKur() {
+  for (const [x, z] of [[12, 48], [15, 51], [17, 47], [11, 54], [14, 55], [17, 54]]) zombiYap(x, z);
+}
+function zombiGuncelle(dt) {
+  let canliSayisi = 0;
+  for (const z of zombiler) {
+    if (z.ezildi) {
+      // Ezilen zombi bir sure yerde yatar sonra kaybolur
+      z.ezilmeZaman -= dt;
+      if (z.ezilmeZaman <= 0 && z.grup.parent) sahne.remove(z.grup);
+      continue;
+    }
+    canliSayisi++;
+    const dx = oyuncu.x - z.grup.position.x;
+    const dz = oyuncu.z - z.grup.position.z;
+    const mesafe = Math.hypot(dx, dz);
+    // Oyuncu yakinsa kovala, uzaksa dogdugu yere don
+    const hedefX = mesafe < 12 ? oyuncu.x : z.dogma.x;
+    const hedefZ = mesafe < 12 ? oyuncu.z : z.dogma.z;
+    const hx = hedefX - z.grup.position.x, hz = hedefZ - z.grup.position.z;
+    const hm = Math.hypot(hx, hz);
+    if (hm > 0.3) {
+      z.grup.position.x += (hx / hm) * 2.3 * dt;
+      z.grup.position.z += (hz / hm) * 2.3 * dt;
+      z.grup.rotation.y = Math.atan2(hx, hz);
+    }
+    // Zombi ziplaya ziplaya gelir
+    z.ziplama += dt * 7;
+    z.grup.position.y = Math.abs(Math.sin(z.ziplama)) * 0.22;
+
+    if (!oyuncu.kirildi && oyuncu.dokunulmaz <= 0 && oyuncu.y > -1 && mesafe < 0.7) {
+      const zombiTepe = z.grup.position.y + 0.58;
+      // Ustune ziplandiysa -> EZ! (Mario usulu)
+      if (oyuncu.vy < -0.5 && oyuncu.y > zombiTepe - 0.22) {
+        z.ezildi = true;
+        z.ezilmeZaman = 1.5;
+        z.grup.scale.y = 0.12;                  // yapiskan gibi ezilir
+        z.grup.position.y = 0;
+        if (partiAktif && partiSoket && partiSoket.readyState === 1) {
+          // Partide sayac ORTAK: sunucu artirir ve herkese (bana da) yayinlar
+          partiSoket.send(JSON.stringify({ type: "zombie-squash" }));
+        } else {
+          ezilenZombi++;
+          document.getElementById("zombi-sayi").textContent = ezilenZombi;
+        }
+        oyuncu.vy = 5.5;                        // kucuk sekiyorsun
+        sesler.ezme();
+        toast("Zombi bardak ezildi! 🧟");
+      } else if (oyuncu.y < 0.45) {
+        bardagiKir("Zombi bardak seni kırdı! 🧟");
+      }
+    }
+  }
+  // Tum zombiler ezildiyse yeni dalga gelsin (oyun hic bitmez!)
+  if (zombiKesfedildi && canliSayisi === 0) {
+    zombiDalgaSayaci += dt;
+    if (zombiDalgaSayaci > 8) {
+      zombiDalgaSayaci = 0;
+      for (let i = zombiler.length - 1; i >= 0; i--) if (zombiler[i].ezildi) zombiler.splice(i, 1);
+      zombileriKur();
+      toast("Yeni zombi dalgası geliyor! 🧟🧟🧟");
+    }
+  }
+}
+
+/* ---------------- BARDAK KIRILMA / YENIDEN DOGMA ---------------- */
+function bardagiKir(mesaj) {
+  if (oyuncu.kirildi) return;
+  oyuncu.kirildi = true;
+  oyuncu.kirilmaSayaci = 1.4;
+  oyuncu.grup.visible = false;
+  kirilmaBaslat(oyuncu.x, oyuncu.y, oyuncu.z);
+  toast(mesaj + " Checkpoint'ten devam!");
+}
+function yenidenDog() {
+  oyuncu.x = sonKayit.x; oyuncu.z = sonKayit.z;
+  oyuncu.y = 0; oyuncu.vx = 0; oyuncu.vy = 0; oyuncu.vz = 0;
+  oyuncu.kirildi = false;
+  oyuncu.dokunulmaz = 3;   // 3 sn kimse kiramasin (checkpoint'te zombi baskini olmaz)
+  oyuncu.grup.visible = true;
+}
+
+/* ---------------- GIRDI: klavye, fare, dokunmatik ---------------- */
+const tuslar = {};
+let oyunBasladi = false;
+
+addEventListener("keydown", (e) => {
+  if (e.code === "Space") e.preventDefault();
+  tuslar[e.code] = true;
+  if (e.code === "Space" && oyunBasladi && !e.repeat) zipla();
+  if (e.code === "KeyM") sessizDegistir();
+});
+addEventListener("keyup", (e) => { tuslar[e.code] = false; });
+
+// Space / ZIPLA: bardak baktigi yone hop diye ziplar
+function zipla() {
+  if (oyuncu.yakalandi) { kurtulmaDene(); return; }   // yakalanmisken SPACE = kurtulma denemesi
+  if (!oyuncu.yerde || oyuncu.kirildi) return;
+  const ileriX = -Math.sin(kameraYatay);
+  const ileriZ = -Math.cos(kameraYatay);
+  oyuncu.vy = 6.4;                 // yukari firlama
+  oyuncu.vx = ileriX * 6;          // baktigi yone ucurum
+  oyuncu.vz = ileriZ * 6;
+  oyuncu.yerde = false;
+  sesler.zipla();
+}
+
+// Fare: surukleyerek kamera; tiklayinca pointer lock (Esc ile cikilir)
+let surukluyor = false;
+const tuval = cizici.domElement;
+const dokunmatikMi = "ontouchstart" in window;
+
+tuval.addEventListener("mousedown", () => { surukluyor = true; });
+addEventListener("mouseup", () => { surukluyor = false; });
+tuval.addEventListener("click", () => {
+  if (!dokunmatikMi && document.pointerLockElement !== tuval) tuval.requestPointerLock();
+});
+addEventListener("mousemove", (e) => {
+  if (document.pointerLockElement === tuval || surukluyor) {
+    kameraYatay -= e.movementX * 0.0026;
+    kameraDikey = Math.min(1.2, Math.max(-0.1, kameraDikey + e.movementY * 0.0022));
+  }
+});
+
+// Dokunmatik: sol yari kamera, ZIPLA dugmesi ziplama
+let kameraParmak = null, sonPX = 0, sonPY = 0;
+tuval.addEventListener("touchstart", (e) => {
+  for (const t of e.changedTouches) {
+    if (t.clientX < innerWidth / 2 && kameraParmak === null) {
+      kameraParmak = t.identifier; sonPX = t.clientX; sonPY = t.clientY;
+    }
+  }
+}, { passive: true });
+tuval.addEventListener("touchmove", (e) => {
+  for (const t of e.changedTouches) {
+    if (t.identifier === kameraParmak) {
+      kameraYatay -= (t.clientX - sonPX) * 0.006;
+      kameraDikey = Math.min(1.2, Math.max(-0.1, kameraDikey + (t.clientY - sonPY) * 0.005));
+      sonPX = t.clientX; sonPY = t.clientY;
+    }
+  }
+}, { passive: true });
+tuval.addEventListener("touchend", (e) => {
+  for (const t of e.changedTouches) if (t.identifier === kameraParmak) kameraParmak = null;
+});
+
+// ZIPLA dugmesi (basili tutunca arka arkaya ziplar)
+const ziplaBtn = document.getElementById("zipla-btn");
+let ziplaTekrar = null;
+if (dokunmatikMi) {
+  ziplaBtn.style.display = "block";
+  document.getElementById("ipucu").textContent = "Sol yarıyı sürükle: kamera · ZIPLA: baktığın yöne hop!";
+}
+ziplaBtn.addEventListener("touchstart", (e) => {
+  e.preventDefault();
+  zipla();
+  ziplaTekrar = setInterval(zipla, 380);
+});
+ziplaBtn.addEventListener("touchend", () => clearInterval(ziplaTekrar));
+
+// Sessiz dugmesi
+function sessizDegistir() {
+  sesKapali = !sesKapali;
+  document.getElementById("sessiz-btn").textContent = sesKapali ? "🔇" : "🔊";
+}
+document.getElementById("sessiz-btn").addEventListener("click", () => { sesHazirla(); sessizDegistir(); });
+
+/* ---------------- PARTI MODU (cok oyunculu: kodla kur / katil) ----------------
+   Sunucu sadece iletir (relay); fizik her istemcide kendi kendine calisir.
+   Zombi ezme sayaci partide ORTAKTIR (sunucu tutar). */
+let partiAktif = false;
+let partiSoket = null;
+let partiId = "";
+let partiKod = "";
+const uzakOyuncular = new Map();   // id -> { grup, hx, hy, hz, hyon, kirildi, isim }
+const uzakRenkler = [0xff6b6b, 0x4ecdc4, 0xffd166, 0xa78bfa, 0x69d18b, 0xf78fb3, 0x74b9ff, 0xe17055];
+
+function partiDurumYaz(yazi) { document.getElementById("parti-durum").textContent = yazi; }
+
+function partiRozetiGuncelle() {
+  const r = document.getElementById("parti-rozet");
+  if (!partiAktif) { r.classList.add("gizli"); return; }
+  r.classList.remove("gizli");
+  r.textContent = "🎉 Parti: " + partiKod + " · " + (uzakOyuncular.size + 1) + " bardak";
+}
+
+function partiBaglan(kurMu) {
+  if (location.protocol === "file:") { partiDurumYaz("Parti sadece sitede çalışır 🌐"); return; }
+  const isim = document.getElementById("parti-isim").value.trim() || "Bardak";
+  const kod = document.getElementById("parti-kod").value.trim().toUpperCase();
+  if (!kurMu && kod.length < 4) { partiDurumYaz("Önce 4 harfli kodu yaz!"); return; }
+  partiDurumYaz("Bağlanıyor...");
+  const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/beyaz-bardak");
+  let katildi = false;
+  ws.onopen = () => {
+    ws.send(JSON.stringify(kurMu
+      ? { type: "party-create", nickname: isim }
+      : { type: "party-join", code: kod, nickname: isim }));
+  };
+  ws.onmessage = (ev) => {
+    let m;
+    try { m = JSON.parse(ev.data); } catch { return; }
+    if (m.type === "party-joined") {
+      katildi = true;
+      partiAktif = true; partiSoket = ws; partiId = m.id; partiKod = m.code;
+      for (const p of m.players) if (p.id !== m.id) uzakOyuncuEkle(p.id, p.nickname);
+      if (m.zombies > 0) {
+        ezilenZombi = m.zombies;
+        document.getElementById("zombi-sayi").textContent = m.zombies;
+      }
+      oyunuBaslat();
+      toast("Parti kodu: " + m.code + " — arkadaşına söyle! 🎉");
+      partiRozetiGuncelle();
+    } else if (m.type === "error") {
+      partiDurumYaz(m.code === "room-full" ? "Oda dolu 😢" : "Böyle bir parti yok 😢 Kodu kontrol et!");
+    } else if (m.type === "player-joined") {
+      uzakOyuncuEkle(m.id, m.nickname);
+      toast(m.nickname + " partiye katıldı! 🥛");
+      partiRozetiGuncelle();
+    } else if (m.type === "player-left") {
+      uzakOyuncuSil(m.id);
+      toast((m.nickname || "Bir bardak") + " partiden ayrıldı.");
+      partiRozetiGuncelle();
+    } else if (m.type === "pos") {
+      const u = uzakOyuncular.get(m.id);
+      if (u) { u.hx = m.x; u.hy = m.y; u.hz = m.z; u.hyon = m.ry; u.kirildi = m.broken; }
+    } else if (m.type === "zombie-count") {
+      ezilenZombi = m.count;
+      document.getElementById("zombi-sayi").textContent = m.count;
+    }
+  };
+  ws.onclose = () => {
+    if (katildi && partiAktif) partiKoptu();
+    else if (!katildi) partiDurumYaz("Bağlanamadı 😢 Sunucu açık mı?");
+  };
+}
+
+// Diger oyuncular: renkli bardak + ustunde isim etiketi
+function uzakOyuncuEkle(id, isim) {
+  if (uzakOyuncular.has(id)) return;
+  const renk = new THREE.MeshStandardMaterial({ color: uzakRenkler[uzakOyuncular.size % uzakRenkler.length], roughness: 0.35 });
+  const grup = bardakYap(renk, 0.28, 0.58);
+  const e = etiketYap(isim || "Bardak", "#ffffff", 1.8);
+  e.position.y = 1.0;
+  grup.add(e);
+  grup.position.set(-6, 0, 3);   // dogma noktasi (salon)
+  sahne.add(grup);
+  uzakOyuncular.set(id, { grup, hx: -6, hy: 0, hz: 3, hyon: 0, kirildi: false, isim });
+}
+
+function uzakOyuncuSil(id) {
+  const u = uzakOyuncular.get(id);
+  if (!u) return;
+  sahne.remove(u.grup);
+  uzakOyuncular.delete(id);
+}
+
+// Uzak bardaklari hedef konumlarina yumusakca kaydir (lerp)
+function uzakOyuncuGuncelle(dt) {
+  for (const u of uzakOyuncular.values()) {
+    const g = u.grup;
+    const k = Math.min(1, 12 * dt);
+    g.position.x += (u.hx - g.position.x) * k;
+    g.position.y += (u.hy - g.position.y) * k;
+    g.position.z += (u.hz - g.position.z) * k;
+    let fark = u.hyon - g.rotation.y;
+    while (fark > Math.PI) fark -= Math.PI * 2;
+    while (fark < -Math.PI) fark += Math.PI * 2;
+    g.rotation.y += fark * k;
+    g.visible = !u.kirildi;   // kirildiysa o da gorunmez olur
+  }
+}
+
+// Baglanti koparsa nazikce solo moda don
+function partiKoptu() {
+  partiAktif = false;
+  partiSoket = null;
+  for (const id of [...uzakOyuncular.keys()]) uzakOyuncuSil(id);
+  partiRozetiGuncelle();
+  toast("Parti bağlantısı koptu 😢 Tek başına devam!");
+}
+
+// Kendi konumunu saniyede ~10 kez odadakilere gonder
+setInterval(() => {
+  if (!partiAktif || !oyunBasladi || !partiSoket || partiSoket.readyState !== 1) return;
+  partiSoket.send(JSON.stringify({
+    type: "pos", x: oyuncu.x, y: oyuncu.y, z: oyuncu.z, ry: oyuncu.yon, broken: oyuncu.kirildi,
+  }));
+}, 100);
+
+// Sayfa kapanirken odadan cik
+addEventListener("beforeunload", () => {
+  if (partiSoket && partiSoket.readyState === 1) partiSoket.send(JSON.stringify({ type: "leave" }));
+});
+
+/* ---------------- ANA GUNCELLEME ---------------- */
+function oyuncuGuncelle(dt) {
+  if (oyuncu.kirildi) {
+    oyuncu.kirilmaSayaci -= dt;
+    if (oyuncu.kirilmaSayaci <= 0) yenidenDog();
+    return;
+  }
+
+  // Cocuk bardagi yakaladiysa: elinde dur, SPACE ile kurtul
+  if (oyuncu.yakalandi) { yakalanmaGuncelle(dt); return; }
+
+  // Dogma korumasi: 3 sn yanip soner, bu surada kimse kiramaz
+  if (oyuncu.dokunulmaz > 0) {
+    oyuncu.dokunulmaz -= dt;
+    oyuncu.grup.visible = Math.floor(oyuncu.dokunulmaz * 8) % 2 === 0;
+    if (oyuncu.dokunulmaz <= 0) oyuncu.grup.visible = true;
+  }
+
+  // Yurumek YOK — tek hareket Space ziplamasi; yerdeyken surtinmeyle dur
+  if (oyuncu.yerde) {
+    oyuncu.vx *= Math.max(0, 1 - 10 * dt);
+    oyuncu.vz *= Math.max(0, 1 - 10 * dt);
+  }
+
+  // Yer cekimi
+  oyuncu.vy -= 16 * dt;
+  oyuncu.x += oyuncu.vx * dt;
+  oyuncu.z += oyuncu.vz * dt;
+  oyuncu.y += oyuncu.vy * dt;
+  // Zemin yuksekligi: kanalizasyondayken -6; kasa/kopru gibi platformlarin ustunde o yuzey
+  let taban = oyuncu.y < -2 ? KANAL_TABAN : 0;
+  for (const p of platformlar) {
+    if (oyuncu.x > p.minX && oyuncu.x < p.maxX && oyuncu.z > p.minZ && oyuncu.z < p.maxZ &&
+        oyuncu.y >= p.y - 0.25 && (oyuncu.vy <= 0 || oyuncu.y >= p.y - 0.05)) {
+      taban = Math.max(taban, p.y);
+    }
+  }
+  if (oyuncu.y <= taban) { oyuncu.y = taban; oyuncu.vy = 0; oyuncu.yerde = true; }
+
+  // Engellerden disari itil (daire vs kutu)
+  for (const e of engeller) {
+    if (e.ustY !== undefined && oyuncu.y >= e.ustY - 0.2) continue;  // ustune cikilabilir engel
+    const enYakinX = Math.max(e.minX, Math.min(oyuncu.x, e.maxX));
+    const enYakinZ = Math.max(e.minZ, Math.min(oyuncu.z, e.maxZ));
+    const fx = oyuncu.x - enYakinX, fz = oyuncu.z - enYakinZ;
+    const mesafe = Math.hypot(fx, fz);
+    if (mesafe < oyuncu.yaricap) {
+      if (mesafe === 0) { oyuncu.z += oyuncu.yaricap; continue; }
+      const itme = oyuncu.yaricap - mesafe;
+      oyuncu.x += (fx / mesafe) * itme;
+      oyuncu.z += (fz / mesafe) * itme;
+    }
+  }
+  // Ev/cadde genel siniri
+  oyuncu.x = Math.max(-19.3, Math.min(19.3, oyuncu.x));
+  oyuncu.z = Math.max(-15.6, Math.min(95.3, oyuncu.z));
+  // Yeraltindayken bolge sinirlarinda kal (kanalizasyon tuneli / kral arenasi)
+  if (oyuncu.y < -1.5) {
+    if (oyuncu.z > 75.5) {
+      oyuncu.x = Math.max(-7.4, Math.min(7.4, oyuncu.x));
+      oyuncu.z = Math.max(76.3, Math.min(91.7, oyuncu.z));
+    } else {
+      oyuncu.x = Math.max(-2.7, Math.min(2.7, oyuncu.x));
+      oyuncu.z = Math.max(60.5, Math.min(74.5, oyuncu.z));
+    }
+  }
+
+  // Bardak modeli: konum + baktigi yone yumusak donus
+  oyuncu.grup.position.set(oyuncu.x, oyuncu.y, oyuncu.z);
+  let hedefYon = kameraYatay;
+  let fark = hedefYon - oyuncu.yon;
+  while (fark > Math.PI) fark -= Math.PI * 2;
+  while (fark < -Math.PI) fark += Math.PI * 2;
+  oyuncu.yon += fark * Math.min(1, 12 * dt);
+  oyuncu.grup.rotation.y = oyuncu.yon;
+  // Ziplarken hafif one egil (sevimli dursun)
+  oyuncu.grup.rotation.x = oyuncu.yerde ? 0 : -0.25;
+
+  gorevKontrol(dt);
+}
+
+/* ---------------- GOREV KONTROLLERI ---------------- */
+function gorevKontrol(dt) {
+  // 1) Mutfaga git
+  const gMutfak = gorevler[0];
+  if (!gMutfak.bitti) {
+    mutfakIsaret.rotation.y += dt * 2;
+    mutfakIsaret.children[1].position.y = 1.4 + Math.sin(performance.now() / 300) * 0.15;
+    if (oyuncu.x > -2 && oyuncu.x < 10 && oyuncu.z > -8 && oyuncu.z < 0) {
+      gorevTamamla("mutfak", "Mutfak bulundu! 🍳");
+      mutfakIsaret.visible = false;
+    }
+  }
+  // 2) Uc altligi topla
+  const gAltlik = gorevler[1];
+  if (!gAltlik.bitti && gMutfak.bitti) {
+    for (const a of altliklar) {
+      if (a.alindi) continue;
+      a.mesh.rotation.y += dt * 3;
+      a.mesh.position.y = a.tabanY + Math.sin(performance.now() / 350 + a.tabanY * 50) * 0.06;
+      if (Math.hypot(oyuncu.x - a.mesh.position.x, oyuncu.z - a.mesh.position.z) < 1) {
+        a.alindi = true;
+        sahne.remove(a.mesh);
+        gAltlik.sayac++;
+        sesler.ding();
+        toast("Bardak altlığı alındı! (" + gAltlik.sayac + "/3)");
+        gorevCiz();
+        if (gAltlik.sayac >= 3) gorevTamamla("altlik", "Tüm altlıklar toplandı! ✨");
+      }
+    }
+  }
+  // 3) Kediyi bul
+  const gKedi = gorevler[2];
+  if (!gKedi.bitti && gAltlik.bitti) {
+    const mesafe = Math.hypot(oyuncu.x - kediGrup.position.x, oyuncu.z - kediGrup.position.z);
+    if (mesafe < 2.3) {
+      gorevTamamla("kedi", "Kedi bulundu: Miyav! 🐱");
+      sesler.miyav();
+    }
+  }
+  // 4) Kayip altin bardagi bul -> bardak anahtari
+  const gAltin = gorevler[3];
+  if (!gAltin.bitti && gKedi.bitti) {
+    altinBardak.rotation.y += dt * 2;
+    if (Math.hypot(oyuncu.x - altinBardak.position.x, oyuncu.z - altinBardak.position.z) < 1.1) {
+      altinAlindi = true;
+      sahne.remove(altinBardak);
+      gorevTamamla("altin", "Atatürk'lü Bardak bulundu! ⭐ Bardak anahtarı senin! 🗝️");
+      document.getElementById("anahtar-rozet").classList.remove("gizli");
+    }
+  }
+  // 5) Bardak kapisini ac ve disari cik
+  const gKapi = gorevler[4];
+  if (!gKapi.bitti && altinAlindi && !kapiAcildi) {
+    const mesafe = Math.hypot(oyuncu.x - 0, oyuncu.z - 6);
+    if (mesafe < 2) {
+      kapiAcildi = true;
+      sesler.kapi();
+      toast("Bardak kapısı açılıyor! 🚪");
+    }
+  }
+  if (kapiAcildi && kapiAnim < 1) {
+    // Kapi yukari kayarak acilir
+    kapiAnim = Math.min(1, kapiAnim + dt * 0.7);
+    kapiGrup.position.y = kapiAnim * 3;
+    if (kapiAnim >= 1) {
+      const i = engeller.indexOf(kapiEngel);
+      if (i >= 0) engeller.splice(i, 1);
+    }
+  }
+  if (!gKapi.bitti && kapiAcildi && oyuncu.z > 6.5) {
+    gorevTamamla("kapi", "Dışarı çıktın! Caddeye hoş geldin! 🏙️");
+  }
+  // 6) Caddede ilerle
+  const gCadde = gorevler[5];
+  if (!gCadde.bitti && gKapi.bitti && oyuncu.z > 38) {
+    gorevTamamla("cadde", "Caddenin ucuna geldin! Köşede bir şey var... 👀");
+  }
+  // 7) Gizli zombi kosesini kesfet
+  const gZombi = gorevler[6];
+  if (!gZombi.bitti && oyuncu.x > ZOMBI_BOLGE.x1 && oyuncu.z > ZOMBI_BOLGE.z1) {
+    zombiKesfedildi = true;
+    gorevTamamla("zombi", "ZOMBİ BARDAK İSTİLASI! Üstlerine zıplayıp ez! 🧟");
+    document.getElementById("zombi-sayac").classList.remove("gizli");
+    kesifGuncelle();
+  }
+  // Surpriz) Kirik Bardak Mezarligi — gizli kesif (gorev listesinde yok, kendin bul!)
+  if (!mezarlikBulundu && oyuncu.x < -3 && oyuncu.z > 80) {
+    mezarlikBulundu = true;
+    sesler.ding();
+    toast("Gizli bölgeyi buldun: KIRIK BARDAK MEZARLIĞI! 🪦🏆");
+    kesifGuncelle();
+  }
+  // Cadde tarafindaki 5 gizli bolgenin kontrolleri
+  gizliBolgeKontrol();
+  // Efsanevi altlik: doner, parlar; ustune zipla ve kap!
+  if (efsaneviAltlik) {
+    efsaneviAltlik.rotation.y += dt * 1.5;
+    if (oyuncu.yerde &&
+        Math.hypot(oyuncu.x - efsaneviAltlik.position.x, oyuncu.z - efsaneviAltlik.position.z) < 1.2) {
+      sahne.remove(efsaneviAltlik);
+      efsaneviAltlik = null;
+      sesler.checkpoint();
+      toast("EFSANEVİ ALTLIK koleksiyona eklendi! 🏆✨");
+    }
+  }
+
+  // Checkpoint'ler: ustune zipla, kaydet
+  for (const kn of kontrolNoktalari) {
+    kn.tabak.material.emissiveIntensity = 0.6 + Math.sin(performance.now() / 400) * 0.3;
+    if (!kn.kaydedildi && oyuncu.yerde &&
+        Math.hypot(oyuncu.x - kn.x, oyuncu.z - kn.z) < 1.1) {
+      kn.kaydedildi = true;
+      sonKayit = { x: kn.x, z: kn.z };
+      sesler.checkpoint();
+      toast("Checkpoint kaydedildi! 🎯");
+      kn.tabak.material.emissive.setHex(0x2ea84a);
+    }
+  }
+}
+
+/* ---------------- KAMERA TAKIP ---------------- */
+function kameraGuncelle() {
+  const uzaklik = 5.0;
+  const cosD = Math.cos(kameraDikey);
+  const hedefX = oyuncu.x + Math.sin(kameraYatay) * uzaklik * cosD;
+  const hedefZ = oyuncu.z + Math.cos(kameraYatay) * uzaklik * cosD;
+  const hedefY = oyuncu.y + 0.9 + Math.sin(kameraDikey) * uzaklik;
+  kamera.position.set(hedefX, hedefY, hedefZ);
+  kamera.lookAt(oyuncu.x, oyuncu.y + 0.45, oyuncu.z);
+}
+
+/* ---------------- OYUN DONGUSU ---------------- */
+const saat = new THREE.Clock();
+function dongu() {
+  requestAnimationFrame(dongu);
+  const dt = Math.min(saat.getDelta(), 0.05);
+  if (oyunBasladi) {
+    oyuncuGuncelle(dt);
+    insanGuncelle(dt);
+    cocukGuncelle(dt);
+    zombiGuncelle(dt);
+    parcacikGuncelle(dt);
+    uzakOyuncuGuncelle(dt);
+    gizliBolgeAnim(dt);
+    aksiyonGuncelle(dt);
+  }
+  kameraGuncelle();
+  cizici.render(sahne, kamera);
+}
+
+/* ---------------- BASLAT ---------------- */
+eviKur();
+kapiyiKur();
+caddeyiKur();
+gizliBolgeleriKur();
+altlikKur();
+altinBardakKur();
+kediyiKur();
+isaretKur();
+kontrolKur();
+insanlariKur();
+zombileriKur();
+kesifGuncelle();
+gorevCiz();
+dongu();
+
+function oyunuBaslat() {
+  sesHazirla();
+  if (oyunBasladi) return;
+  oyunBasladi = true;
+  document.getElementById("start-ekrani").style.display = "none";
+  toast("Görevleri tamamla ve evden kaç! 🏠");
+}
+
+document.getElementById("basla-btn").addEventListener("click", oyunuBaslat);
+
+// Parti dugmeleri: kur veya kodla katil
+document.getElementById("parti-btn").addEventListener("click", () => {
+  if (location.protocol === "file:") { toast("Parti sadece sitede çalışır 🌐"); return; }
+  document.getElementById("parti-panel").classList.toggle("gizli");
+});
+document.getElementById("parti-kur-btn").addEventListener("click", () => partiBaglan(true));
+document.getElementById("parti-katil-btn").addEventListener("click", () => partiBaglan(false));
+
+addEventListener("resize", () => {
+  kamera.aspect = innerWidth / innerHeight;
+  kamera.updateProjectionMatrix();
+  cizici.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

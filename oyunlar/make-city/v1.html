@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Make City v1.0 — Klasik 2D</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    background: linear-gradient(160deg, #0f2027, #203a43, #2c5364);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    user-select: none;
+    -webkit-user-select: none;
+    overflow: hidden;
+  }
+
+  /* ---- Ana menü ---- */
+  #menu {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 18px;
+    background: radial-gradient(circle at 50% 30%, #1c3d4d, #0b171d);
+    z-index: 10;
+    text-align: center;
+    padding: 20px;
+  }
+  #menu h1 { font-size: clamp(34px, 7vw, 64px); letter-spacing: 2px; }
+  #menu h1 span { color: #ffd54f; }
+  #menu p { color: #b0bec5; max-width: 480px; }
+  .mode-btn {
+    font-size: 22px;
+    padding: 16px 34px;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    color: #08222e;
+    font-weight: 700;
+    width: min(340px, 86vw);
+    transition: transform .12s, box-shadow .12s;
+  }
+  .mode-btn:hover { transform: translateY(-3px) scale(1.02); }
+  .mode-btn small { display: block; font-size: 13px; font-weight: 500; margin-top: 4px; opacity: .75; }
+  #btn-infinite { background: linear-gradient(135deg, #ffd54f, #ffb300); box-shadow: 0 8px 24px #ffb30055; }
+  #btn-economy  { background: linear-gradient(135deg, #69f0ae, #00c853); box-shadow: 0 8px 24px #00c85355; }
+
+  /* ---- Oyun arayüzü ---- */
+  #game-wrap { display: none; flex-direction: column; align-items: center; width: 100%; height: 100%; }
+  #hud {
+    display: flex; gap: 14px; flex-wrap: wrap;
+    align-items: center; justify-content: center;
+    padding: 8px 12px; width: 100%;
+    background: #00000066;
+    font-size: 15px;
+  }
+  .hud-item { background: #ffffff14; border-radius: 10px; padding: 5px 12px; white-space: nowrap; }
+  #hud-msg { color: #ffd54f; font-weight: 600; min-height: 1em; }
+  #new-game-btn {
+    background: #ef5350; color: #fff; border: none; border-radius: 10px;
+    padding: 5px 12px; cursor: pointer; font-weight: 600;
+  }
+  #board-area { flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; min-height: 0; }
+  canvas { background: #3e2723; border-radius: 8px; box-shadow: 0 10px 40px #000a; touch-action: none; cursor: crosshair; }
+
+  #toolbar {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    justify-content: center;
+    padding: 10px; width: 100%;
+    background: #00000066;
+  }
+  .tool {
+    border: 2px solid transparent;
+    background: #ffffff14;
+    color: #fff;
+    border-radius: 12px;
+    padding: 8px 10px;
+    cursor: pointer;
+    font-size: 14px;
+    text-align: center;
+    min-width: 76px;
+    transition: transform .1s, background .1s;
+  }
+  .tool:hover { background: #ffffff2a; }
+  .tool.selected { border-color: #ffd54f; background: #ffd54f22; transform: scale(1.06); }
+  .tool .emoji { font-size: 22px; display: block; }
+  .tool .cost { display: block; font-size: 11px; color: #ffd54f; }
+</style>
+</head>
+<body>
+
+<div id="menu">
+  <h1>🏙️ Make <span>City</span> <small style="font-size:20px; color:#b0bec5;">v1.0</small></h1>
+  <p>Klasik 2D sürüm! Yol döşe, evler ve dükkanlar yap, hastaneni unutma — yoksa hastalar komşu şehre gider, parasını da onlar kazanır!</p>
+  <button class="mode-btn" id="btn-infinite">💰 Sonsuz Para
+    <small>Her şey bedava, rahat rahat kur!</small>
+  </button>
+  <button class="mode-btn" id="btn-economy">📊 Ekonomi
+    <small>1.000.000₺ ile başla, vergilerle şehri büyüt!</small>
+  </button>
+</div>
+
+<div id="game-wrap">
+  <div id="hud">
+    <span class="hud-item" id="hud-day">📅 Gün 1</span>
+    <span class="hud-item" id="hud-money">💰 —</span>
+    <span class="hud-item" id="hud-pop">👨‍👩‍👧 Nüfus: 0</span>
+    <span class="hud-item" id="hud-happy">😊 Mutluluk: —</span>
+    <span class="hud-item" id="hud-msg"></span>
+    <button id="new-game-btn">↺ Yeni Oyun</button>
+  </div>
+  <div id="board-area"><canvas id="game"></canvas></div>
+  <div id="toolbar"></div>
+</div>
+
+<script>
+"use strict";
+
+// ---------- Ayarlar ----------
+const COLS = 22, ROWS = 13;
+const DAY_MS = 12000; // 1 gün = 12 saniye
+
+const TOOLS = [
+  { id: "road",     name: "Yol",     emoji: "🛣️", cost: 10000 },
+  { id: "house",    name: "Ev",      emoji: "🏠", cost: 50000 },
+  { id: "shop",     name: "Dükkan",  emoji: "🏪", cost: 100000 },
+  { id: "hospital", name: "Hastane", emoji: "🏥", cost: 300000 },
+  { id: "park",     name: "Park",    emoji: "🌳", cost: 20000 },
+  { id: "bulldoze", name: "Yık",     emoji: "🚜", cost: 0 },
+];
+
+const INCOME_HOUSE = 5000;    // çalışan ev başına günlük vergi
+const INCOME_SHOP = 15000;    // çalışan dükkan başına günlük kazanç
+const HOSPITAL_EARN = 3000;   // hastane varken ev başına hasta geliri
+const HOSPITAL_LOSS = 5000;   // hastane yokken ev başına hasta kaçış zararı
+const PARK_BONUS = 0.05;      // park başına gelir bonusu (+%5)
+
+// ---------- Durum ----------
+let mode = null;              // 'infinite' | 'economy'
+let grid = [];
+let money = 0;
+let day = 1;
+let selectedTool = "road";
+let message = "";
+let messageUntil = 0;
+let lastTick = 0;
+
+function newGrid() {
+  grid = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+}
+
+// ---------- Yardımcılar ----------
+function isBuilding(t) { return t === "house" || t === "shop" || t === "hospital" || t === "park"; }
+
+function hasRoadNextTo(r, c) {
+  return [[1,0],[-1,0],[0,1],[0,-1]].some(([dr,dc]) => {
+    const nr = r + dr, nc = c + dc;
+    return nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && grid[nr][nc] === "road";
+  });
+}
+
+function cityStats() {
+  let houses = 0, workingHouses = 0, shops = 0, workingShops = 0, parks = 0, hospitals = 0;
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    const t = grid[r][c];
+    if (t === "house") { houses++; if (hasRoadNextTo(r, c)) workingHouses++; }
+    else if (t === "shop") { shops++; if (hasRoadNextTo(r, c)) workingShops++; }
+    else if (t === "park" && hasRoadNextTo(r, c)) parks++;
+    else if (t === "hospital" && hasRoadNextTo(r, c)) hospitals++;
+  }
+  return { houses, workingHouses, shops, workingShops, parks, hospitals };
+}
+
+function say(text, ms = 5000) {
+  message = text;
+  messageUntil = performance.now() + ms;
+  document.getElementById("hud-msg").textContent = text;
+}
+
+// ---------- Gün döngüsü ----------
+function tickDay() {
+  day++;
+  if (mode !== "economy") return;
+
+  const s = cityStats();
+  const parkBonus = 1 + Math.min(s.parks * PARK_BONUS, 0.5);
+  let income = Math.round((s.workingHouses * INCOME_HOUSE + s.workingShops * INCOME_SHOP) * parkBonus);
+  let hospitalDiff = 0;
+
+  if (s.workingHouses > 0) {
+    if (s.hospitals > 0) {
+      hospitalDiff = s.workingHouses * HOSPITAL_EARN;
+      say(`🏥 Hastanen çalışıyor: hasta geliri +${hospitalDiff.toLocaleString("tr-TR")}₺`);
+    } else {
+      hospitalDiff = -s.workingHouses * HOSPITAL_LOSS;
+      say(`🚑 Hastane yok! Hastalar komşu şehre gitti: ${hospitalDiff.toLocaleString("tr-TR")}₺`);
+    }
+  } else {
+    say("📅 Yeni gün! Ev yap ki vergi topla.");
+  }
+
+  money += income + hospitalDiff;
+  if (money < 0) say("⚠️ Belediye borçta! Dükkan ve evlerle geliri artır.");
+}
+
+// ---------- Girdi ----------
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+let tile = 40;
+let painting = false;
+let hover = null;
+
+function resizeCanvas() {
+  const area = document.getElementById("board-area");
+  const w = area.clientWidth - 16, h = area.clientHeight - 16;
+  tile = Math.max(22, Math.floor(Math.min(w / COLS, h / ROWS)));
+  canvas.width = COLS * tile;
+  canvas.height = ROWS * tile;
+}
+window.addEventListener("resize", resizeCanvas);
+
+function eventCell(e) {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  const c = Math.floor(x / tile), r = Math.floor(y / tile);
+  if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return null;
+  return { r, c };
+}
+
+function applyTool(r, c) {
+  const tool = TOOLS.find(t => t.id === selectedTool);
+  if (!tool) return;
+  const current = grid[r][c];
+
+  if (tool.id === "bulldoze") {
+    if (!current) return;
+    // Yıkım bedava; binanın parasının yarısını iade alırsın
+    if (mode === "economy") {
+      const refund = Math.floor((TOOLS.find(t => t.id === current)?.cost || 0) / 2);
+      money += refund;
+      if (refund > 0) say(`🚜 Yıkıldı, iade: +${refund.toLocaleString("tr-TR")}₺`);
+    }
+    grid[r][c] = null;
+    return;
+  }
+
+  if (current) return; // dolu hücre
+  if (mode === "economy" && money < tool.cost) { say(`💸 ${tool.name} için ${tool.cost.toLocaleString("tr-TR")}₺ lazım, paran yetmiyor!`); return; }
+
+  grid[r][c] = tool.id;
+  if (mode === "economy") money -= tool.cost;
+
+  if (isBuilding(tool.id) && !hasRoadNextTo(r, c)) {
+    say("⚠️ Bu bina yola bağlı değil, çalışmaz! Yanına yol yap.");
+  }
+}
+
+canvas.addEventListener("pointerdown", e => {
+  painting = true;
+  canvas.setPointerCapture(e.pointerId);
+  const cell = eventCell(e);
+  if (cell) applyTool(cell.r, cell.c);
+});
+canvas.addEventListener("pointermove", e => {
+  hover = eventCell(e);
+  if (!painting || !hover) return;
+  // Sürükleyerek sadece yol ve yıkım boyanabilir
+  if (selectedTool === "road" || selectedTool === "bulldoze") applyTool(hover.r, hover.c);
+});
+canvas.addEventListener("pointerup", () => { painting = false; });
+canvas.addEventListener("pointerleave", () => { hover = null; });
+
+// ---------- Çizim ----------
+const TILE_COLORS = {
+  road: "#546e7a",
+  house: "#8d6e63",
+  shop: "#5c6bc0",
+  hospital: "#ef5350",
+  park: "#66bb6a",
+};
+
+function draw() {
+  // zemin (çimen)
+  ctx.fillStyle = "#33691e";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const x = c * tile, y = r * tile;
+      // ızgara çizgileri
+      ctx.strokeStyle = "rgba(0,0,0,0.18)";
+      ctx.strokeRect(x + .5, y + .5, tile, tile);
+
+      const t = grid[r][c];
+      if (!t) continue;
+
+      ctx.fillStyle = TILE_COLORS[t] || "#999";
+      ctx.fillRect(x + 1, y + 1, tile - 2, tile - 2);
+
+      // emoji
+      ctx.font = `${Math.floor(tile * 0.62)}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const em = TOOLS.find(tool => tool.id === t).emoji;
+      ctx.fillText(em, x + tile / 2, y + tile / 2 + 1);
+
+      // yolsuz bina uyarısı
+      if (isBuilding(t) && !hasRoadNextTo(r, c)) {
+        ctx.font = `${Math.floor(tile * 0.4)}px sans-serif`;
+        ctx.fillText("⚠️", x + tile - tile * 0.25, y + tile * 0.28);
+      }
+    }
+  }
+
+  // fare önizlemesi
+  if (hover) {
+    ctx.strokeStyle = "#ffd54f";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(hover.c * tile + 1, hover.r * tile + 1, tile - 2, tile - 2);
+    ctx.lineWidth = 1;
+  }
+}
+
+// ---------- HUD ----------
+function updateHud() {
+  const s = cityStats();
+  const population = s.workingHouses * 4;
+  document.getElementById("hud-day").textContent = `📅 Gün ${day}`;
+  document.getElementById("hud-money").textContent =
+    mode === "economy" ? `💰 ${money.toLocaleString("tr-TR")}₺` : "💰 Sonsuz";
+  document.getElementById("hud-pop").textContent = `👨‍👩‍👧 Nüfus: ${population}`;
+
+  let happy = "😐 Şehir boş";
+  if (s.workingHouses > 0) {
+    const parkRatio = s.parks / s.workingHouses;
+    happy = parkRatio >= 0.5 ? "😄 Çok mutlu" : parkRatio >= 0.25 ? "🙂 Mutlu" : "😕 Park istiyorlar";
+    if (s.hospitals === 0) happy += " + 🚑 Hastane yok!";
+  }
+  document.getElementById("hud-happy").textContent = `😊 ${happy}`;
+
+  if (performance.now() > messageUntil) {
+    document.getElementById("hud-msg").textContent = "";
+  }
+}
+
+// ---------- Araç çubuğu ----------
+function buildToolbar() {
+  const bar = document.getElementById("toolbar");
+  bar.innerHTML = "";
+  for (const t of TOOLS) {
+    const btn = document.createElement("button");
+    btn.className = "tool" + (t.id === selectedTool ? " selected" : "");
+    const costLabel = t.id === "bulldoze"
+      ? (mode === "economy" ? "%50 iade" : "bedava")
+      : (mode === "economy" ? t.cost.toLocaleString("tr-TR") + "₺" : "bedava");
+    btn.innerHTML = `<span class="emoji">${t.emoji}</span>${t.name}<span class="cost">${costLabel}</span>`;
+    btn.onclick = () => { selectedTool = t.id; buildToolbar(); };
+    bar.appendChild(btn);
+  }
+}
+
+// ---------- Ana döngü ----------
+function loop(now) {
+  if (now - lastTick >= DAY_MS) { lastTick = now; tickDay(); updateHud(); }
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ---------- Başlangıç ----------
+function startGame(selectedMode) {
+  mode = selectedMode;
+  newGrid();
+  day = 1;
+  money = mode === "economy" ? 1000000 : Infinity;
+  selectedTool = "road";
+  lastTick = performance.now();
+
+  document.getElementById("menu").style.display = "none";
+  document.getElementById("game-wrap").style.display = "flex";
+  resizeCanvas();
+  buildToolbar();
+  updateHud();
+  say(mode === "economy"
+    ? "📊 Ekonomi modu: 1.000.000₺ bütçen var. Önce yol, sonra ev!"
+    : "💰 Sonsuz para modu: her şey bedava, hayal gücün serbest!", 7000);
+}
+
+document.getElementById("btn-infinite").onclick = () => startGame("infinite");
+document.getElementById("btn-economy").onclick = () => startGame("economy");
+document.getElementById("new-game-btn").onclick = () => {
+  document.getElementById("game-wrap").style.display = "none";
+  document.getElementById("menu").style.display = "flex";
+};
+
+newGrid();
+requestAnimationFrame(loop);
+</script>
+<script src="versiyon.js"></script>
+<script>initVersionPicker("1.0");</script>
+</body>
+</html>

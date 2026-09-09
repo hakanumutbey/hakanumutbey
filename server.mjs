@@ -27,7 +27,7 @@ const voiceRooms = new Map();
 const siyahAdamRooms = new Map();
 const sesliPartiRooms = new Map();
 const yarisSehriWorlds = new Map();
-const games = ["annenden-kac", "bardak", "essiz-zindan", "skeleton-wars", "rhgpo", "siyah-adam", "birlesim-arenasi", "vale", "robot-avcisi", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "space-arena", "2d-car-simulator", "yaris-sehri", "hako-vurus"];
+const games = ["annenden-kac", "bardak", "essiz-zindan", "skeleton-wars", "rhgpo", "siyah-adam", "birlesim-arenasi", "vale", "robot-avcisi", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "space-arena", "2d-car-simulator", "yaris-sehri", "hako-vurus", "uzay-yarisi", "isin-savasi", "beyaz-bardak", "make-city", "ejderha-ucus", "karanlik-labirent"];
 const baseValues = {
   "annenden-kac": 128,
   bardak: 96,
@@ -46,6 +46,12 @@ const baseValues = {
   "2d-car-simulator": 99,
   "yaris-sehri": 195,
   "hako-vurus": 176,
+  "uzay-yarisi": 142,
+  "isin-savasi": 128,
+  "beyaz-bardak": 158,
+  "make-city": 142,
+  "ejderha-ucus": 133,
+  "karanlik-labirent": 150,
 };
 const averagePlayMinutes = {
   "annenden-kac": 6,
@@ -65,6 +71,12 @@ const averagePlayMinutes = {
   "2d-car-simulator": 8,
   "yaris-sehri": 12,
   "hako-vurus": 7,
+  "uzay-yarisi": 6,
+  "isin-savasi": 5,
+  "beyaz-bardak": 12,
+  "make-city": 15,
+  "ejderha-ucus": 6,
+  "karanlik-labirent": 10,
 };
 const voteOptionIds = ["uzay-yarisi", "market-savasi", "okul-gorevi"];
 
@@ -418,6 +430,874 @@ sesliPartiSocketServer.on("connection", (socket) => {
   });
 });
 
+// --- Işın Savaşı (oyunlar/isin-savasi) ---
+// Işın tabancalı arena savaşı: herkes tek (sona kalan kazanır) veya
+// takımlar (ortak can havuzu; can bitince yeniden doğuş yok).
+const isinRooms = new Map();
+const ISIN_MAX_PLAYERS = 10;
+const ISIN_PLAYER_HP = 100;
+const ISIN_RESPAWN_MS = 3000;
+const ISIN_LIVES_PER_PLAYER = 3;
+const ISIN_LIVES_BASE = 2;
+const ISIN_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+const ISIN_PUBLIC_CODE = "ARENA";
+
+const isinSavasiSocketServer = new WebSocketServer({ noServer: true });
+isinSavasiSocketServer.on("connection", (socket) => {
+  socket.isinPlayerId = "";
+  socket.isinRoomCode = "";
+  socket.isinLastPosAt = 0;
+  socket.isinAlive = true;
+  socket.on("pong", () => {
+    socket.isinAlive = true;
+  });
+
+  socket.on("message", (raw) => {
+    if (raw.length > 8000) return;
+    let message;
+    try {
+      message = JSON.parse(raw.toString());
+    } catch {
+      return;
+    }
+
+    if (message?.type === "quick") {
+      quickIsinRoom(socket, message);
+      return;
+    }
+    if (message?.type === "create") {
+      createIsinRoom(socket, message);
+      return;
+    }
+    if (message?.type === "join") {
+      joinIsinRoom(socket, message);
+      return;
+    }
+    if (message?.type === "char") {
+      setIsinChar(socket, message);
+      return;
+    }
+    if (message?.type === "team") {
+      setIsinTeam(socket, message);
+      return;
+    }
+    if (message?.type === "mode") {
+      setIsinMode(socket, message);
+      return;
+    }
+    if (message?.type === "start") {
+      startIsinMatch(socket);
+      return;
+    }
+    if (message?.type === "stop") {
+      stopIsinMatch(socket);
+      return;
+    }
+    if (message?.type === "pos") {
+      setIsinPos(socket, message);
+      return;
+    }
+    if (message?.type === "shoot") {
+      relayIsinShoot(socket, message);
+      return;
+    }
+    if (message?.type === "hit") {
+      applyIsinHit(socket, message);
+      return;
+    }
+    if (message?.type === "leave") {
+      leaveIsinRoom(socket);
+      return;
+    }
+  });
+
+  socket.on("close", () => {
+    leaveIsinRoom(socket);
+  });
+});
+
+// --- Beyaz Bardak Parti (oyunlar/beyaz-bardak) ---
+// Basit relay + oda yönetimi; fizik istemcide, sunucu sadece iletir.
+// Zombi ezme sayaci oda genelinde ORTAK: biri ezince herkese yayinlanir.
+const beyazBardakRooms = new Map();
+const BEYAZ_BARDAK_MAX_PLAYERS = 8;
+const BEYAZ_BARDAK_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+
+const beyazBardakSocketServer = new WebSocketServer({ noServer: true });
+beyazBardakSocketServer.on("connection", (socket) => {
+  socket.bbPlayerId = "";
+  socket.bbRoomCode = "";
+  socket.bbLastPosAt = 0;
+
+  socket.on("message", (raw) => {
+    if (raw.length > 2000) return;
+    let message;
+    try {
+      message = JSON.parse(raw.toString());
+    } catch {
+      return;
+    }
+
+    if (message?.type === "party-create") {
+      createBeyazBardakRoom(socket, message);
+      return;
+    }
+    if (message?.type === "party-join") {
+      joinBeyazBardakRoom(socket, message);
+      return;
+    }
+    if (message?.type === "pos") {
+      relayBeyazBardakPos(socket, message);
+      return;
+    }
+    if (message?.type === "zombie-squash") {
+      bumpBeyazBardakZombies(socket);
+      return;
+    }
+    if (message?.type === "leave") {
+      leaveBeyazBardakRoom(socket);
+      return;
+    }
+  });
+
+  socket.on("close", () => {
+    leaveBeyazBardakRoom(socket);
+  });
+});
+
+// --- Karanlik Labirent (oyunlar/karanlik-labirent) ---
+// Zifiri karanlik 3D labirentten kacis: 3 ORTAK altin anahtar kilitli cikis
+// kapisini acar, kapsidan gecen kazanir. Labirent seed ile istemcide uretilir.
+// Her 2 dakikada bir her oyuncuya gizlice farkli bir lanet dagitilir; lanetin
+// adi istemciye soylenmez, sadece uygulanir.
+const karanlikRooms = new Map();
+const KL_MAX_PLAYERS = 5;
+const KL_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+const KL_CURSE_MS = 120000;
+const KL_CURSES = ["kor", "gorunmez", "spin", "blue", "sahte-zafer"];
+const KL_FAKE_COOLDOWN_MS = 6000;
+
+const karanlikLabirentSocketServer = new WebSocketServer({ noServer: true });
+karanlikLabirentSocketServer.on("connection", (socket) => {
+  socket.klPlayerId = "";
+  socket.klRoomCode = "";
+  socket.klLastPosAt = 0;
+
+  socket.on("message", (raw) => {
+    if (raw.length > 2000) return;
+    let message;
+    try {
+      message = JSON.parse(raw.toString());
+    } catch {
+      return;
+    }
+
+    if (message?.type === "create") {
+      createKaranlikRoom(socket, message);
+      return;
+    }
+    if (message?.type === "join") {
+      joinKaranlikRoom(socket, message);
+      return;
+    }
+    if (message?.type === "start") {
+      startKaranlikGame(socket);
+      return;
+    }
+    if (message?.type === "pos") {
+      relayKaranlikPos(socket, message);
+      return;
+    }
+    if (message?.type === "key") {
+      collectKaranlikKey(socket, message);
+      return;
+    }
+    if (message?.type === "escape") {
+      escapeKaranlik(socket);
+      return;
+    }
+    if (message?.type === "leave") {
+      leaveKaranlikRoom(socket);
+      return;
+    }
+  });
+
+  socket.on("close", () => {
+    leaveKaranlikRoom(socket);
+  });
+});
+
+function createBeyazBardakCode() {
+  const bytes = randomBytes(4);
+  let code = "";
+  for (let i = 0; i < 4; i += 1) {
+    code += BEYAZ_BARDAK_CODE_ALPHABET[bytes[i] % BEYAZ_BARDAK_CODE_ALPHABET.length];
+  }
+  return code;
+}
+
+function sendBeyazBardak(socket, payload) {
+  if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(payload));
+}
+
+function beyazBardakSnapshot(player) {
+  return { id: player.id, nickname: player.nickname };
+}
+
+function broadcastBeyazBardak(room, payload) {
+  for (const player of room.players.values()) {
+    sendBeyazBardak(player.socket, payload);
+  }
+}
+
+function enterBeyazBardakRoom(socket, room, message) {
+  leaveBeyazBardakRoom(socket);
+  const playerId = createRecordId("bb");
+  const player = {
+    id: playerId,
+    socket,
+    nickname: safeText(message.nickname, 16) || "Bardak",
+  };
+  room.players.set(playerId, player);
+  socket.bbPlayerId = playerId;
+  socket.bbRoomCode = room.code;
+  sendBeyazBardak(socket, {
+    type: "party-joined",
+    code: room.code,
+    id: playerId,
+    zombies: room.zombies,
+    players: [...room.players.values()].map(beyazBardakSnapshot),
+  });
+  for (const other of room.players.values()) {
+    if (other.id !== playerId) {
+      sendBeyazBardak(other.socket, { type: "player-joined", id: playerId, nickname: player.nickname });
+    }
+  }
+}
+
+function createBeyazBardakRoom(socket, message) {
+  let code = createBeyazBardakCode();
+  while (beyazBardakRooms.has(code)) code = createBeyazBardakCode();
+  const room = { code, players: new Map(), zombies: 0 };
+  beyazBardakRooms.set(code, room);
+  enterBeyazBardakRoom(socket, room, message);
+}
+
+function joinBeyazBardakRoom(socket, message) {
+  const code = safeText(message.code, 8).toUpperCase();
+  const room = beyazBardakRooms.get(code);
+  if (!room) {
+    sendBeyazBardak(socket, { type: "error", code: "room-not-found" });
+    return;
+  }
+  if (room.players.size >= BEYAZ_BARDAK_MAX_PLAYERS) {
+    sendBeyazBardak(socket, { type: "error", code: "room-full" });
+    return;
+  }
+  enterBeyazBardakRoom(socket, room, message);
+}
+
+function relayBeyazBardakPos(socket, message) {
+  const room = beyazBardakRooms.get(socket.bbRoomCode);
+  const player = room?.players.get(socket.bbPlayerId);
+  if (!room || !player) return;
+  const now = Date.now();
+  if (now - socket.bbLastPosAt < 60) return;
+  socket.bbLastPosAt = now;
+  const num = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.max(-200, Math.min(200, n)) : 0;
+  };
+  const payload = {
+    type: "pos",
+    id: player.id,
+    x: num(message.x),
+    y: num(message.y),
+    z: num(message.z),
+    ry: num(message.ry),
+    broken: message.broken === true,
+  };
+  for (const other of room.players.values()) {
+    if (other.id !== player.id) sendBeyazBardak(other.socket, payload);
+  }
+}
+
+function bumpBeyazBardakZombies(socket) {
+  const room = beyazBardakRooms.get(socket.bbRoomCode);
+  if (!room || !socket.bbPlayerId) return;
+  room.zombies += 1;
+  broadcastBeyazBardak(room, { type: "zombie-count", count: room.zombies });
+}
+
+function leaveBeyazBardakRoom(socket) {
+  const room = beyazBardakRooms.get(socket.bbRoomCode);
+  const playerId = socket.bbPlayerId;
+  socket.bbPlayerId = "";
+  socket.bbRoomCode = "";
+  if (!room || !playerId) return;
+  const player = room.players.get(playerId);
+  room.players.delete(playerId);
+  if (room.players.size === 0) {
+    beyazBardakRooms.delete(room.code);
+    return;
+  }
+  broadcastBeyazBardak(room, { type: "player-left", id: playerId, nickname: player?.nickname || "Bardak" });
+}
+
+function createKaranlikCode() {
+  const bytes = randomBytes(4);
+  let code = "";
+  for (let i = 0; i < 4; i += 1) {
+    code += KL_CODE_ALPHABET[bytes[i] % KL_CODE_ALPHABET.length];
+  }
+  return code;
+}
+
+function sendKaranlik(socket, payload) {
+  if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(payload));
+}
+
+function karanlikSnapshot(player) {
+  return { id: player.id, nickname: player.nickname, escaped: player.escaped };
+}
+
+function broadcastKaranlik(room, payload, exceptId = "") {
+  for (const player of room.players.values()) {
+    if (player.id !== exceptId) sendKaranlik(player.socket, payload);
+  }
+}
+
+function enterKaranlikRoom(socket, room, message) {
+  leaveKaranlikRoom(socket);
+  const playerId = createRecordId("kl");
+  const player = {
+    id: playerId,
+    socket,
+    nickname: safeText(message.nickname, 14) || "Kaçak",
+    curse: "",
+    fakeUsed: false,
+    fakeAt: 0,
+    escaped: false,
+  };
+  room.players.set(playerId, player);
+  if (!room.hostId) room.hostId = playerId;
+  socket.klPlayerId = playerId;
+  socket.klRoomCode = room.code;
+  sendKaranlik(socket, {
+    type: "joined",
+    code: room.code,
+    id: playerId,
+    host: room.hostId,
+    phase: room.phase,
+    seed: room.seed,
+    keys: room.keys,
+    keyCount: room.keyCount,
+    players: [...room.players.values()].map(karanlikSnapshot),
+    curse: player.curse,
+  });
+  broadcastKaranlik(room, { type: "player-joined", player: karanlikSnapshot(player) }, playerId);
+}
+
+function createKaranlikRoom(socket, message) {
+  let code = createKaranlikCode();
+  while (karanlikRooms.has(code)) code = createKaranlikCode();
+  const room = {
+    code,
+    hostId: "",
+    phase: "lobby",
+    seed: 0,
+    keys: [false, false, false],
+    keyCount: 0,
+    players: new Map(),
+    curseTimer: null,
+  };
+  karanlikRooms.set(code, room);
+  enterKaranlikRoom(socket, room, message);
+}
+
+function joinKaranlikRoom(socket, message) {
+  const code = safeText(message.code, 8).toUpperCase();
+  const room = karanlikRooms.get(code);
+  if (!room) {
+    sendKaranlik(socket, { type: "error", code: "room-not-found" });
+    return;
+  }
+  if (room.players.size >= KL_MAX_PLAYERS) {
+    sendKaranlik(socket, { type: "error", code: "room-full" });
+    return;
+  }
+  enterKaranlikRoom(socket, room, message);
+}
+
+function startKaranlikGame(socket) {
+  const room = karanlikRooms.get(socket.klRoomCode);
+  if (!room || room.phase !== "lobby" || room.hostId !== socket.klPlayerId) return;
+  room.seed = randomBytes(4).readUInt32BE(0);
+  room.phase = "play";
+  room.keys = [false, false, false];
+  room.keyCount = 0;
+  for (const player of room.players.values()) {
+    player.escaped = false;
+    player.fakeUsed = false;
+    player.fakeAt = 0;
+  }
+  broadcastKaranlik(room, {
+    type: "start",
+    host: room.hostId,
+    seed: room.seed,
+    players: [...room.players.values()].map(karanlikSnapshot),
+  });
+  rotateKaranlikCurses(room);
+  if (room.curseTimer) clearInterval(room.curseTimer);
+  room.curseTimer = setInterval(() => rotateKaranlikCurses(room), KL_CURSE_MS);
+}
+
+// Herkese tekrarsiz rastgele lanet dagit (oyuncu sayisi <= lanet sayisi: 5).
+// Lanet adi hicbir toplu mesajda gecmez; herkes sadece kendi lanetini alir
+// ve istemci adini GOSTERMEDEN uygular.
+function rotateKaranlikCurses(room) {
+  if (room.phase !== "play") return;
+  const bag = [...KL_CURSES];
+  for (let i = bag.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [bag[i], bag[j]] = [bag[j], bag[i]];
+  }
+  let i = 0;
+  for (const player of room.players.values()) {
+    player.curse = bag[i % bag.length];
+    sendKaranlik(player.socket, { type: "curse", curse: player.curse });
+    i += 1;
+  }
+  broadcastKaranlik(room, { type: "curse-shift" });
+}
+
+function relayKaranlikPos(socket, message) {
+  const room = karanlikRooms.get(socket.klRoomCode);
+  const player = room?.players.get(socket.klPlayerId);
+  if (!room || !player || room.phase !== "play" || player.escaped) return;
+  const now = Date.now();
+  if (now - socket.klLastPosAt < 60) return;
+  socket.klLastPosAt = now;
+  const num = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.max(-300, Math.min(300, n)) : 0;
+  };
+  broadcastKaranlik(room, {
+    type: "pos",
+    id: player.id,
+    x: num(message.x),
+    z: num(message.z),
+    ry: num(message.ry),
+    inv: player.curse === "gorunmez",
+  }, player.id);
+}
+
+function collectKaranlikKey(socket, message) {
+  const room = karanlikRooms.get(socket.klRoomCode);
+  const player = room?.players.get(socket.klPlayerId);
+  if (!room || !player || room.phase !== "play" || player.escaped) return;
+  const idx = Math.floor(Number(message.key));
+  if (!Number.isInteger(idx) || idx < 0 || idx > 2) return;
+  if (room.keys[idx]) return;
+  room.keys[idx] = true;
+  room.keyCount += 1;
+  broadcastKaranlik(room, {
+    type: "key",
+    key: idx,
+    count: room.keyCount,
+    by: player.id,
+    nickname: player.nickname,
+  });
+  if (room.keyCount >= 3) {
+    broadcastKaranlik(room, { type: "door-open" });
+  }
+}
+
+function escapeKaranlik(socket) {
+  const room = karanlikRooms.get(socket.klRoomCode);
+  const player = room?.players.get(socket.klPlayerId);
+  if (!room || !player || room.phase !== "play" || player.escaped) return;
+  if (room.keyCount < 3) return;
+  // Sahte Zafer laneti: sadece BIR KEZ saka yapar; bir sonraki gecis gercek
+  // kacistir. Saka sonrasi kisa bir bekleme var ki istemci spawn'a donmeden
+  // tekrar "escape" gonderip aninda gercekten kacmasin.
+  if (player.curse === "sahte-zafer" && !player.fakeUsed) {
+    player.fakeUsed = true;
+    player.fakeAt = Date.now();
+    sendKaranlik(player.socket, { type: "fake-win" });
+    broadcastKaranlik(room, { type: "escaped", id: player.id, nickname: player.nickname, fake: true }, player.id);
+    return;
+  }
+  if (Date.now() - player.fakeAt < KL_FAKE_COOLDOWN_MS) return;
+  player.escaped = true;
+  broadcastKaranlik(room, { type: "escaped", id: player.id, nickname: player.nickname });
+}
+
+function leaveKaranlikRoom(socket) {
+  const room = karanlikRooms.get(socket.klRoomCode);
+  const playerId = socket.klPlayerId;
+  socket.klPlayerId = "";
+  socket.klRoomCode = "";
+  if (!room || !playerId) return;
+  const player = room.players.get(playerId);
+  room.players.delete(playerId);
+  if (room.players.size === 0) {
+    if (room.curseTimer) clearInterval(room.curseTimer);
+    karanlikRooms.delete(room.code);
+    return;
+  }
+  broadcastKaranlik(room, { type: "player-left", id: playerId, nickname: player?.nickname || "Kaçak" });
+  if (room.hostId === playerId) {
+    room.hostId = [...room.players.keys()][0];
+    broadcastKaranlik(room, { type: "host", id: room.hostId });
+  }
+}
+
+function createIsinCode() {
+  const bytes = randomBytes(6);
+  let code = "";
+  for (let i = 0; i < 6; i += 1) {
+    code += ISIN_CODE_ALPHABET[bytes[i] % ISIN_CODE_ALPHABET.length];
+  }
+  return code;
+}
+
+function normalizeIsinNickname(value) {
+  return safeText(value, 14) || "Oyuncu";
+}
+
+function normalizeIsinChar(value) {
+  const char = Math.floor(Number(value));
+  return Number.isInteger(char) && char >= 0 && char < 10 ? char : 0;
+}
+
+function isinSnapshot(player) {
+  return {
+    id: player.id,
+    name: player.name,
+    char: player.char,
+    team: player.team,
+    hp: player.hp,
+    alive: player.alive,
+    x: player.x,
+    y: player.y,
+    a: player.a,
+  };
+}
+
+function sendIsin(socket, payload) {
+  if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(payload));
+}
+
+function broadcastIsin(room, payload, exceptId = "") {
+  for (const player of room.players.values()) {
+    if (player.id !== exceptId) sendIsin(player.socket, payload);
+  }
+}
+
+function broadcastIsinState(room) {
+  broadcastIsin(room, {
+    type: "state",
+    code: room.code,
+    host: room.hostId,
+    mode: room.mode,
+    phase: room.phase,
+    lives: room.lives,
+    players: [...room.players.values()].map(isinSnapshot),
+  });
+}
+
+function createIsinRoomShell(code) {
+  return {
+    code,
+    hostId: "",
+    mode: "solo",
+    phase: "lobby",
+    lives: { A: 0, B: 0 },
+    players: new Map(),
+    timers: new Set(),
+    seed: 0,
+  };
+}
+
+function enterIsinRoom(socket, room, message) {
+  leaveIsinRoom(socket);
+  const playerId = createRecordId("is");
+  const player = {
+    id: playerId,
+    socket,
+    name: normalizeIsinNickname(message.name),
+    char: normalizeIsinChar(message.char),
+    team: "",
+    hp: ISIN_PLAYER_HP,
+    alive: false,
+    x: 0,
+    y: 0,
+    a: 0,
+  };
+  room.players.set(playerId, player);
+  if (!room.hostId) room.hostId = playerId;
+  socket.isinPlayerId = playerId;
+  socket.isinRoomCode = room.code;
+  sendIsin(socket, {
+    type: "joined",
+    code: room.code,
+    id: playerId,
+    public: room.code === ISIN_PUBLIC_CODE,
+  });
+  broadcastIsinState(room);
+}
+
+function createIsinRoom(socket, message) {
+  let code = createIsinCode();
+  while (isinRooms.has(code)) code = createIsinCode();
+  const room = createIsinRoomShell(code);
+  isinRooms.set(code, room);
+  enterIsinRoom(socket, room, message);
+}
+
+function quickIsinRoom(socket, message) {
+  let room = isinRooms.get(ISIN_PUBLIC_CODE);
+  if (!room) {
+    room = createIsinRoomShell(ISIN_PUBLIC_CODE);
+    isinRooms.set(ISIN_PUBLIC_CODE, room);
+  }
+  if (room.phase !== "lobby") {
+    sendIsin(socket, { type: "error", code: "game-started" });
+    return;
+  }
+  if (room.players.size >= ISIN_MAX_PLAYERS) {
+    sendIsin(socket, { type: "error", code: "room-full" });
+    return;
+  }
+  enterIsinRoom(socket, room, message);
+}
+
+function joinIsinRoom(socket, message) {
+  const code = safeText(message.code, 12).toUpperCase();
+  const room = isinRooms.get(code);
+  if (!room) {
+    sendIsin(socket, { type: "error", code: "room-not-found" });
+    return;
+  }
+  if (room.phase !== "lobby") {
+    sendIsin(socket, { type: "error", code: "game-started" });
+    return;
+  }
+  if (room.players.size >= ISIN_MAX_PLAYERS) {
+    sendIsin(socket, { type: "error", code: "room-full" });
+    return;
+  }
+  enterIsinRoom(socket, room, message);
+}
+
+function ownIsinRoom(socket) {
+  const room = isinRooms.get(socket.isinRoomCode);
+  const player = room?.players.get(socket.isinPlayerId);
+  return room && player ? { room, player } : { room: null, player: null };
+}
+
+function setIsinChar(socket, message) {
+  const { room, player } = ownIsinRoom(socket);
+  if (!room || room.phase !== "lobby") return;
+  player.char = normalizeIsinChar(message.char);
+  broadcastIsinState(room);
+}
+
+function setIsinTeam(socket, message) {
+  const { room, player } = ownIsinRoom(socket);
+  if (!room || room.phase !== "lobby") return;
+  const team = message.team === "A" || message.team === "B" ? message.team : "";
+  player.team = team;
+  broadcastIsinState(room);
+}
+
+function setIsinMode(socket, message) {
+  const { room } = ownIsinRoom(socket);
+  if (!room || room.phase !== "lobby" || room.hostId !== socket.isinPlayerId) return;
+  room.mode = message.mode === "team" ? "team" : "solo";
+  broadcastIsinState(room);
+}
+
+function startIsinMatch(socket) {
+  const { room } = ownIsinRoom(socket);
+  if (!room || room.phase !== "lobby" || room.hostId !== socket.isinPlayerId) return;
+  const players = [...room.players.values()];
+  if (players.length < 2) {
+    sendIsin(socket, { type: "error", code: "not-enough-players" });
+    return;
+  }
+  if (room.mode === "team") {
+    let countA = players.filter((p) => p.team === "A").length;
+    let countB = players.filter((p) => p.team === "B").length;
+    for (const player of players) {
+      if (player.team !== "A" && player.team !== "B") {
+        player.team = countA <= countB ? "A" : "B";
+        if (player.team === "A") countA += 1;
+        else countB += 1;
+      }
+    }
+    if (countA === 0 || countB === 0) {
+      countA = 0;
+      countB = 0;
+      players.forEach((player, index) => {
+        player.team = index % 2 === 0 ? "A" : "B";
+        if (player.team === "A") countA += 1;
+        else countB += 1;
+      });
+    }
+    room.lives = {
+      A: countA * ISIN_LIVES_PER_PLAYER + ISIN_LIVES_BASE,
+      B: countB * ISIN_LIVES_PER_PLAYER + ISIN_LIVES_BASE,
+    };
+  } else {
+    for (const player of players) player.team = "";
+    room.lives = { A: 0, B: 0 };
+  }
+  for (const player of players) {
+    player.hp = ISIN_PLAYER_HP;
+    player.alive = true;
+  }
+  room.seed = Math.floor(Math.random() * 2147483647);
+  room.phase = "play";
+  broadcastIsin(room, {
+    type: "start",
+    mode: room.mode,
+    seed: room.seed,
+    lives: room.lives,
+    players: players.map(isinSnapshot),
+  });
+}
+
+function stopIsinMatch(socket) {
+  const { room } = ownIsinRoom(socket);
+  if (!room || room.phase !== "play" || room.hostId !== socket.isinPlayerId) return;
+  endIsinMatch(room, { aborted: true });
+}
+
+function endIsinMatch(room, result) {
+  for (const timer of room.timers) clearTimeout(timer);
+  room.timers.clear();
+  room.phase = "lobby";
+  for (const player of room.players.values()) player.alive = false;
+  broadcastIsin(room, { type: "end", mode: room.mode, ...result });
+  broadcastIsinState(room);
+}
+
+function setIsinPos(socket, message) {
+  const { room, player } = ownIsinRoom(socket);
+  if (!room || !player.alive) return;
+  const now = Date.now();
+  if (now - socket.isinLastPosAt < 60) return;
+  socket.isinLastPosAt = now;
+  const x = Number(message.x);
+  const y = Number(message.y);
+  const a = Number(message.a);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(a)) return;
+  player.x = Math.max(0, Math.min(4000, x));
+  player.y = Math.max(0, Math.min(4000, y));
+  player.a = a;
+  broadcastIsin(room, { type: "pos", id: player.id, x: player.x, y: player.y, a: player.a }, player.id);
+}
+
+function relayIsinShoot(socket, message) {
+  const { room, player } = ownIsinRoom(socket);
+  if (!room || room.phase !== "play" || !player.alive) return;
+  const x = Number(message.x);
+  const y = Number(message.y);
+  const a = Number(message.a);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(a)) return;
+  broadcastIsin(room, { type: "shoot", id: player.id, x, y, a }, player.id);
+}
+
+function applyIsinHit(socket, message) {
+  const { room, player: attacker } = ownIsinRoom(socket);
+  if (!room || room.phase !== "play" || !attacker.alive) return;
+  const target = room.players.get(safeText(message.target, 60));
+  if (!target || !target.alive || target.id === attacker.id) return;
+  if (room.mode === "team" && target.team === attacker.team) return;
+  const dmg = Math.max(1, Math.min(40, Math.floor(Number(message.dmg)) || 0));
+  target.hp = Math.max(0, target.hp - dmg);
+  broadcastIsin(room, { type: "hp", id: target.id, hp: target.hp });
+  if (target.hp > 0) return;
+  target.alive = false;
+  broadcastIsin(room, { type: "die", id: target.id, by: attacker.id });
+  if (room.mode === "team" && room.lives[target.team] > 0) {
+    room.lives[target.team] -= 1;
+    broadcastIsin(room, { type: "lives", lives: room.lives });
+    const timer = setTimeout(() => {
+      room.timers.delete(timer);
+      if (room.phase !== "play") return;
+      if (!room.players.has(target.id) || target.alive) return;
+      target.hp = ISIN_PLAYER_HP;
+      target.alive = true;
+      broadcastIsin(room, { type: "respawn", id: target.id, hp: target.hp });
+    }, ISIN_RESPAWN_MS);
+    room.timers.add(timer);
+  }
+  checkIsinWin(room);
+}
+
+function isIsinTeamOut(room, team) {
+  if (room.lives[team] > 0) return false;
+  return ![...room.players.values()].some((p) => p.team === team && p.alive);
+}
+
+function checkIsinWin(room) {
+  if (room.phase !== "play") return;
+  const players = [...room.players.values()];
+  if (room.mode === "solo") {
+    const alive = players.filter((p) => p.alive);
+    if (players.length > 0 && alive.length <= 1) {
+      const winner = alive[0] || null;
+      endIsinMatch(room, { winner: winner?.id || "", winnerName: winner?.name || "" });
+    }
+    return;
+  }
+  const outA = isIsinTeamOut(room, "A");
+  const outB = isIsinTeamOut(room, "B");
+  if (outA && outB) endIsinMatch(room, { winnerTeam: "" });
+  else if (outA) endIsinMatch(room, { winnerTeam: "B" });
+  else if (outB) endIsinMatch(room, { winnerTeam: "A" });
+}
+
+function leaveIsinRoom(socket) {
+  const room = isinRooms.get(socket.isinRoomCode);
+  const playerId = socket.isinPlayerId;
+  socket.isinPlayerId = "";
+  socket.isinRoomCode = "";
+  if (!room || !playerId) return;
+  const player = room.players.get(playerId);
+  const wasAlive = room.phase === "play" && player?.alive;
+  const team = player?.team || "";
+  room.players.delete(playerId);
+  if (room.players.size === 0) {
+    for (const timer of room.timers) clearTimeout(timer);
+    isinRooms.delete(room.code);
+    return;
+  }
+  broadcastIsin(room, { type: "player-left", id: playerId });
+  if (room.hostId === playerId) {
+    room.hostId = [...room.players.keys()][0];
+    broadcastIsin(room, { type: "host", id: room.hostId });
+  }
+  if (room.phase === "play") {
+    if (wasAlive) {
+      broadcastIsin(room, { type: "die", id: playerId, by: "" });
+      if (room.mode === "team") {
+        const teammates = [...room.players.values()].filter((p) => p.team === team);
+        if (teammates.length === 0 && room.lives[team] > 0) {
+          room.lives[team] = 0;
+          broadcastIsin(room, { type: "lives", lives: room.lives });
+        }
+      }
+      checkIsinWin(room);
+    }
+  } else {
+    broadcastIsinState(room);
+  }
+}
+
 server.on("upgrade", (request, socket, head) => {
   const { pathname } = new URL(request.url, `http://${request.headers.host}`);
   if (pathname === "/voice") {
@@ -444,6 +1324,24 @@ server.on("upgrade", (request, socket, head) => {
     });
     return;
   }
+  if (pathname === "/isin-savasi") {
+    isinSavasiSocketServer.handleUpgrade(request, socket, head, (ws) => {
+      isinSavasiSocketServer.emit("connection", ws, request);
+    });
+    return;
+  }
+  if (pathname === "/beyaz-bardak") {
+    beyazBardakSocketServer.handleUpgrade(request, socket, head, (ws) => {
+      beyazBardakSocketServer.emit("connection", ws, request);
+    });
+    return;
+  }
+  if (pathname === "/karanlik-labirent") {
+    karanlikLabirentSocketServer.handleUpgrade(request, socket, head, (ws) => {
+      karanlikLabirentSocketServer.emit("connection", ws, request);
+    });
+    return;
+  }
   socket.destroy();
 });
 
@@ -452,6 +1350,18 @@ setInterval(() => {
   tickYarisWorlds();
   tickYarisRankedQueue();
 }, 100);
+
+// Isin Savasi: olu baglantilari temizle (oda takilmasin diye)
+setInterval(() => {
+  for (const socket of isinSavasiSocketServer.clients) {
+    if (socket.isinAlive === false) {
+      socket.terminate();
+      continue;
+    }
+    socket.isinAlive = false;
+    socket.ping();
+  }
+}, 30000);
 
 server.listen(port, () => {
   console.log(`Hakorocks Studio running on ${port}`);
@@ -1906,6 +2816,11 @@ async function serveStatic(request, response) {
     const fileStat = await stat(filePath);
     if (fileStat.isFile()) {
       streamFile(filePath, response);
+      return;
+    }
+    if (fileStat.isDirectory()) {
+      response.writeHead(302, { Location: pathname + "/" });
+      response.end();
       return;
     }
   } catch {
