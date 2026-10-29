@@ -1914,33 +1914,50 @@ function oyuncuGuncelle(dt) {
     oyuncu.vz *= Math.max(0, 1 - 10 * dt);
   }
 
-  // Yer cekimi
-  oyuncu.vy -= 16 * dt;
-  oyuncu.x += oyuncu.vx * dt;
-  oyuncu.z += oyuncu.vz * dt;
-  oyuncu.y += oyuncu.vy * dt;
-  // Zemin yuksekligi: kanalizasyondayken -6; kasa/kopru gibi platformlarin ustunde o yuzey
-  let taban = oyuncu.y < -2 ? KANAL_TABAN : 0;
-  for (const p of platformlar) {
-    if (oyuncu.x > p.minX && oyuncu.x < p.maxX && oyuncu.z > p.minZ && oyuncu.z < p.maxZ &&
-        oyuncu.y >= p.y - 0.25 && (oyuncu.vy <= 0 || oyuncu.y >= p.y - 0.05)) {
-      taban = Math.max(taban, p.y);
+  // Hareketi kucuk adimlara bol: tek karede 0.1'den fazla ilerlenmesin.
+  // Yoksa takilan karede (dt 0.05) bardagin merkezi ince duvarin icine girer ve
+  // oda koselerinden diger tarafa gecebilir.
+  const adimSayisi = Math.max(1, Math.ceil(Math.hypot(oyuncu.vx, oyuncu.vz, oyuncu.vy) * dt / 0.1));
+  const adt = dt / adimSayisi;
+  for (let adim = 0; adim < adimSayisi; adim++) {
+    // Yer cekimi
+    oyuncu.vy -= 16 * adt;
+    oyuncu.x += oyuncu.vx * adt;
+    oyuncu.z += oyuncu.vz * adt;
+    oyuncu.y += oyuncu.vy * adt;
+    // Zemin yuksekligi: kanalizasyondayken -6; kasa/kopru gibi platformlarin ustunde o yuzey
+    let taban = oyuncu.y < -2 ? KANAL_TABAN : 0;
+    for (const p of platformlar) {
+      if (oyuncu.x > p.minX && oyuncu.x < p.maxX && oyuncu.z > p.minZ && oyuncu.z < p.maxZ &&
+          oyuncu.y >= p.y - 0.25 && (oyuncu.vy <= 0 || oyuncu.y >= p.y - 0.05)) {
+        taban = Math.max(taban, p.y);
+      }
     }
-  }
-  if (oyuncu.y <= taban) { oyuncu.y = taban; oyuncu.vy = 0; oyuncu.yerde = true; }
+    if (oyuncu.y <= taban) { oyuncu.y = taban; oyuncu.vy = 0; oyuncu.yerde = true; }
 
-  // Engellerden disari itil (daire vs kutu)
-  for (const e of engeller) {
-    if (e.ustY !== undefined && oyuncu.y >= e.ustY - 0.2) continue;  // ustune cikilabilir engel
-    const enYakinX = Math.max(e.minX, Math.min(oyuncu.x, e.maxX));
-    const enYakinZ = Math.max(e.minZ, Math.min(oyuncu.z, e.maxZ));
-    const fx = oyuncu.x - enYakinX, fz = oyuncu.z - enYakinZ;
-    const mesafe = Math.hypot(fx, fz);
-    if (mesafe < oyuncu.yaricap) {
-      if (mesafe === 0) { oyuncu.z += oyuncu.yaricap; continue; }
-      const itme = oyuncu.yaricap - mesafe;
-      oyuncu.x += (fx / mesafe) * itme;
-      oyuncu.z += (fz / mesafe) * itme;
+    // Engellerden disari itil (daire vs kutu)
+    for (const e of engeller) {
+      if (e.ustY !== undefined && oyuncu.y >= e.ustY - 0.2) continue;  // ustune cikilabilir engel
+      const enYakinX = Math.max(e.minX, Math.min(oyuncu.x, e.maxX));
+      const enYakinZ = Math.max(e.minZ, Math.min(oyuncu.z, e.maxZ));
+      const fx = oyuncu.x - enYakinX, fz = oyuncu.z - enYakinZ;
+      const mesafe = Math.hypot(fx, fz);
+      if (mesafe < oyuncu.yaricap) {
+        if (mesafe === 0) {
+          // Merkez kutunun icinde: hep +z'ye itmek yerine en yakin kenardan disari cik
+          const solX = oyuncu.x - e.minX, sagX = e.maxX - oyuncu.x;
+          const solZ = oyuncu.z - e.minZ, sagZ = e.maxZ - oyuncu.z;
+          const enAz = Math.min(solX, sagX, solZ, sagZ);
+          if (enAz === solX) oyuncu.x = e.minX - oyuncu.yaricap;
+          else if (enAz === sagX) oyuncu.x = e.maxX + oyuncu.yaricap;
+          else if (enAz === solZ) oyuncu.z = e.minZ - oyuncu.yaricap;
+          else oyuncu.z = e.maxZ + oyuncu.yaricap;
+          continue;
+        }
+        const itme = oyuncu.yaricap - mesafe;
+        oyuncu.x += (fx / mesafe) * itme;
+        oyuncu.z += (fz / mesafe) * itme;
+      }
     }
   }
   // Ev/cadde genel siniri
