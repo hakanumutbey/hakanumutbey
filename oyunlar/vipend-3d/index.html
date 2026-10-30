@@ -1,0 +1,1478 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VIPEND 3D — Portal & Bulmaca Laboratuvarı (Hakorocks Studio)</title>
+  <style>
+    * { box-sizing: border-box; user-select: none; }
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      overflow: hidden; background: #050811;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: #f8fafc;
+    }
+
+    /* Göz Kapağı / Bayılma Sinematik Efekti */
+    #eyelid-top, #eyelid-bottom {
+      position: fixed; left: 0; width: 100%; height: 0%;
+      background: #000000; z-index: 35; pointer-events: none;
+      transition: height 0.9s ease-in-out;
+    }
+    #eyelid-top { top: 0; }
+    #eyelid-bottom { bottom: 0; }
+
+    /* Hasar / Elektrik Çarpma Efekti */
+    #flash-overlay {
+      position: fixed; inset: 0; pointer-events: none; z-index: 8;
+      opacity: 0; transition: opacity 0.2s;
+      background: radial-gradient(circle, transparent 40%, rgba(239,68,68,0.55) 100%);
+    }
+
+    /* Portal 2 Tarzı Ortadaki Nişangah (Crosshair) */
+    #crosshair {
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 34px; height: 34px; pointer-events: none; z-index: 15;
+    }
+    .ch-half {
+      position: absolute; width: 34px; height: 34px; border-radius: 50%;
+      border: 3px solid transparent;
+    }
+    #ch-blue { border-left-color: #38bdf8; border-top-color: #38bdf8; transform: rotate(-15deg); }
+    #ch-orange { border-right-color: #f97316; border-bottom-color: #f97316; transform: rotate(-15deg); }
+    .ch-dot {
+      position: absolute; top: 50%; left: 50%; width: 5px; height: 5px;
+      background: #ffffff; border-radius: 50%; transform: translate(-50%, -50%);
+    }
+
+    /* Üst Bölüm Bilgisi & Can Barı */
+    #top-hud {
+      position: fixed; top: 14px; left: 16px; right: 16px;
+      display: flex; justify-content: space-between; align-items: flex-start;
+      z-index: 12; pointer-events: none;
+    }
+    .hud-box {
+      background: rgba(10, 17, 32, 0.88);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      border-radius: 14px; padding: 10px 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.65);
+      backdrop-filter: blur(8px);
+    }
+    .lvl-title { font-size: 16px; font-weight: 900; color: #38bdf8; letter-spacing: 0.4px; }
+    .lvl-sub { font-size: 12px; color: #cbd5e1; margin-top: 3px; max-width: 500px; }
+
+    /* VIPEND CANLI KONUŞMA & BOSS CAN BARI */
+    #vipend-comm {
+      position: fixed; top: 92px; left: 16px; width: 390px;
+      background: rgba(15, 10, 28, 0.92);
+      border: 2px solid #a855f7; border-radius: 16px; padding: 12px 14px;
+      z-index: 12; box-shadow: 0 12px 34px rgba(0,0,0,0.75);
+    }
+    .vipend-header {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 6px;
+    }
+    .vipend-eye {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: radial-gradient(circle, #ef4444 25%, #7f1d1d 70%, #090d16 100%);
+      border: 2px solid #f87171; box-shadow: 0 0 15px #ef4444;
+      flex-shrink: 0;
+    }
+    #vipend-text {
+      font-size: 13px; color: #f3e8ff; line-height: 1.45; font-style: italic;
+    }
+
+    /* Boss HP Barı */
+    #boss-bar-wrap {
+      position: fixed; top: 18px; left: 50%; transform: translateX(-50%);
+      width: 420px; background: rgba(15, 23, 42, 0.92);
+      border: 2px solid #ef4444; border-radius: 14px; padding: 8px 14px;
+      z-index: 14; display: none; text-align: center;
+    }
+    .bar-bg {
+      width: 100%; height: 14px; background: #1e293b;
+      border-radius: 999px; overflow: hidden; margin-top: 5px;
+    }
+    #boss-hp-fill {
+      width: 100%; height: 100%;
+      background: linear-gradient(90deg, #ef4444, #a855f7);
+      transition: width 0.2s;
+    }
+
+    /* "HANGİ BUTONA NE ZAMAN BASICAM" — FAZ SENKRONİZASYON ZAMANLAMA BARI */
+    #timing-widget {
+      position: fixed; top: 96px; left: 50%; transform: translateX(-50%);
+      width: 380px; background: rgba(10, 17, 32, 0.92);
+      border: 1px solid rgba(56, 189, 248, 0.5);
+      border-radius: 14px; padding: 10px 14px; z-index: 13;
+      text-align: center; display: none;
+      box-shadow: 0 10px 28px rgba(0,0,0,0.7);
+    }
+    .timing-track {
+      position: relative; width: 100%; height: 20px;
+      background: #1e293b; border-radius: 999px; overflow: hidden;
+      margin-top: 6px; border: 1px solid rgba(255,255,255,0.15);
+    }
+    .timing-sweetspot {
+      position: absolute; left: 36%; width: 28%; top: 0; bottom: 0;
+      background: rgba(34, 197, 94, 0.75);
+      border-left: 2px solid #86efac; border-right: 2px solid #86efac;
+    }
+    #timing-needle {
+      position: absolute; top: 0; bottom: 0; width: 6px;
+      background: #ffffff; box-shadow: 0 0 10px #ffffff;
+      left: 50%;
+    }
+
+    /* Sağ Panel: Bulmaca İpuçları & Kilit Durumu */
+    #puzzle-panel {
+      position: fixed; top: 92px; right: 16px; width: 350px;
+      background: rgba(10, 17, 32, 0.9);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      border-radius: 16px; padding: 12px 14px; z-index: 12;
+      font-size: 12.5px; line-height: 1.5;
+    }
+    .clue-card {
+      background: rgba(30, 41, 59, 0.85);
+      border-left: 3px solid #38bdf8;
+      padding: 7px 10px; border-radius: 6px; margin-top: 6px;
+      color: #e2e8f0;
+    }
+
+    /* Ortadaki Etkileşim İpucu ([E] Butona Bas / [F] Küpü Al) */
+    #prompt-banner {
+      position: fixed; bottom: 115px; left: 50%; transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.94);
+      border: 2px solid #facc15; color: #fef08a;
+      padding: 9px 22px; border-radius: 999px;
+      font-weight: 800; font-size: 15px; z-index: 15;
+      pointer-events: none;
+    }
+    #prompt-banner:empty { display: none; }
+
+    /* Alt Silah ve Kontrol Çubuğu */
+    #bottom-bar {
+      position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 10px; z-index: 12;
+      background: rgba(10, 17, 32, 0.92);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      padding: 8px 14px; border-radius: 16px;
+    }
+    .w-slot {
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      padding: 6px 12px; border-radius: 10px; text-align: center; min-width: 105px;
+    }
+    .w-slot.active {
+      border-color: #38bdf8; background: rgba(56, 189, 248, 0.2);
+    }
+    .w-slot .k { font-size: 10px; color: #94a3b8; font-weight: 700; }
+    .w-slot .n { font-size: 12.5px; font-weight: 800; color: #ffffff; margin-top: 2px; }
+
+    /* Başlangıç / Zafer Ekranı */
+    #overlay-screen {
+      position: fixed; inset: 0; background: rgba(5, 8, 17, 0.92);
+      z-index: 40; display: flex; align-items: center; justify-content: center;
+      backdrop-filter: blur(10px);
+    }
+    .ov-card {
+      width: min(680px, 94vw); background: rgba(15, 23, 42, 0.97);
+      border: 2px solid #38bdf8; border-radius: 22px; padding: 28px;
+      text-align: center; box-shadow: 0 25px 70px rgba(0,0,0,0.9);
+    }
+    .ov-card h1 {
+      margin: 0; font-size: 36px; color: #38bdf8;
+      text-shadow: 0 0 25px rgba(56,189,248,0.45);
+    }
+    .ov-box {
+      text-align: left; background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 14px; padding: 16px; margin: 18px 0;
+      font-size: 14px; line-height: 1.65; color: #e2e8f0;
+    }
+    .btn-main {
+      background: linear-gradient(135deg, #0284c7, #6366f1);
+      color: white; border: none; padding: 13px 34px; border-radius: 10px;
+      font-size: 17px; font-weight: 900; cursor: pointer;
+    }
+    .btn-main:hover { filter: brightness(1.15); }
+  </style>
+</head>
+<body>
+
+  <div id="eyelid-top"></div>
+  <div id="eyelid-bottom"></div>
+  <div id="flash-overlay"></div>
+
+  <!-- Portal 2 Nişangah -->
+  <div id="crosshair">
+    <div class="ch-half" id="ch-blue"></div>
+    <div class="ch-half" id="ch-orange"></div>
+    <div class="ch-dot"></div>
+  </div>
+
+  <!-- Üst HUD -->
+  <div id="top-hud">
+    <div class="hud-box">
+      <div class="lvl-title" id="ui-lvl-title">EVİMİZ — GECE 23:40</div>
+      <div class="lvl-sub" id="ui-lvl-sub">Evinde koltukta usul usul oturuyorsun...</div>
+    </div>
+    <div class="hud-box" style="display:flex; gap:16px; align-items:center;">
+      <div>❤️ Can: <b id="ui-hp" style="color:#4ade80;">100</b></div>
+      <div>🚪 Çıkış Kilidi: <b id="ui-door-state" style="color:#ef4444;">KİLİTLİ 🔒</b></div>
+    </div>
+  </div>
+
+  <!-- Boss Can Barı -->
+  <div id="boss-bar-wrap">
+    <div style="font-size:13px; font-weight:900; color:#f87171;" id="boss-status-label">
+      🤖 VIPEND — KALKAN AKTİF (ÖNCE FREKANS BUTONLARINI ÇÖZ!)
+    </div>
+    <div class="bar-bg"><div id="boss-hp-fill"></div></div>
+  </div>
+
+  <!-- "Hangi Butona Ne Zaman Basıcam" Zamanlama Senkron Barı -->
+  <div id="timing-widget">
+    <div style="font-size:12px; font-weight:800; color:#fde047;" id="timing-label">
+      ⚡ FAZ ZAMANLAMA BARI: İbre YEŞİL BÖLGEDEYKEN [E] Tuşuna Bas!
+    </div>
+    <div class="timing-track">
+      <div class="timing-sweetspot"></div>
+      <div id="timing-needle"></div>
+    </div>
+    <div style="font-size:11px; color:#94a3b8; margin-top:4px;" id="seq-progress-text">
+      Basılan Sıra: Henüz yok | Kalan Süre: --
+    </div>
+  </div>
+
+  <!-- Sol Panel: VIPEND Canlı Diyalog -->
+  <div id="vipend-comm">
+    <div class="vipend-header">
+      <div class="vipend-eye"></div>
+      <div>
+        <div style="font-size:12px; font-weight:900; color:#c084fc;">🤖 VIPEND — YAPAY ZEKA ÇEKİRDEĞİ</div>
+        <div style="font-size:10px; color:#94a3b8;">Laboratuvar Gözetim Sistemi</div>
+      </div>
+    </div>
+    <div id="vipend-text">"..."</div>
+  </div>
+
+  <!-- Sağ Panel: Bulmaca İpuçları ve Kurallar -->
+  <div id="puzzle-panel">
+    <div style="font-weight:900; color:#38bdf8; font-size:13px;">🧩 ODA BULMACA İPUÇLARI & KURALLAR</div>
+    <div id="puzzle-clues-box"></div>
+  </div>
+
+  <div id="prompt-banner"></div>
+
+  <!-- Alt Silah ve Kontrol Barı -->
+  <div id="bottom-bar">
+    <div class="w-slot active" id="slot-portal">
+      <div class="k">[1] TUŞU</div>
+      <div class="n">🌀 Portal Silahı</div>
+      <div style="font-size:10px; color:#38bdf8;">Sol: Mavi | Sağ: Turuncu</div>
+    </div>
+    <div class="w-slot" id="slot-plasma">
+      <div class="k">[2] TUŞU</div>
+      <div class="n">⚡ Plazma Silahı</div>
+      <div style="font-size:10px; color:#c084fc;">Boss Savaşı Ateşi</div>
+    </div>
+    <div class="w-slot">
+      <div class="k">[E] TUŞU</div>
+      <div class="n">🔘 Butona Bas</div>
+      <div style="font-size:10px; color:#fde047;">Zamanlamalı Basış</div>
+    </div>
+    <div class="w-slot">
+      <div class="k">[F] TUŞU</div>
+      <div class="n">📦 Küp Tut/Bırak</div>
+      <div style="font-size:10px; color:#f472b6;">Ağırlık Küpü</div>
+    </div>
+    <div class="w-slot">
+      <div class="k">[SPACE]</div>
+      <div class="n">🦘 Zıpla</div>
+      <div style="font-size:10px; color:#4ade80;">WASD + Fare Bakış</div>
+    </div>
+  </div>
+
+  <!-- Başlangıç / Zafer Ekranı -->
+  <div id="overlay-screen">
+    <div class="ov-card">
+      <h1 id="ov-title">🌀 VIPEND 3D</h1>
+      <div style="color:#94a3b8; font-size:15px; margin-top:4px;" id="ov-sub">
+        Portal 2 Tarzı 3D Birinci Şahıs (FPS) Zeka Bulmacaları & Boss Savaşı
+      </div>
+      <div class="ov-box" id="ov-desc">
+        🛋️ <b>1. Giriş Sinematiği (Evimizde Usul Usul Otururken):</b> Evinde televizyon izlerken <b>VIPEND</b> duvarı yarıp gelir, seni bayıltır ve yeraltı test laboratuvarına atar!<br>
+        ⏱️ <b>2. Zorlu Zamanlama & Mantık Bulmacaları:</b> Hangi butona hangi sırada ve hangi saniyede (Yeşil Fazda <b>[E]</b>) basacağını duvardaki mantık ipuçlarından çözmelisin!<br>
+        🌀 <b>3. 3D Portal Silahı & Ağırlık Küpleri & Lazer Kırılması:</b> <b>Sol Tıkla Mavi Portal</b>, <b>Sağ Tıkla Turuncu Portal</b> aç; içinden geçerek yüksek balkonlara ışınlan, <b>[F]</b> ile Ağırlık Küplerini taşı ve lazer ışınlarını portallardan geçir!<br>
+        ⚡ <b>4. Vipend ile Bulmacalı Boss Savaşları:</b> Vipend'in kalkan şifresini portallarla zamanında çözüp <b>[2] Plazma Silahıyla</b> çekirdeğini vur!
+      </div>
+      <button class="btn-main" id="start-btn">🔥 OYUNA BAŞLA (FARE KİLİDİ AKTİF)</button>
+    </div>
+  </div>
+
+  <script src="three.min.js"></script>
+  <script src="levels.js"></script>
+  <script>
+    // ============================================================================
+    // SES EFEKTLERİ (Portal Açma, Buton Onay/Hata, Lazer, Plazma, Vipend Ses Tonu)
+    // ============================================================================
+    let audioCtx = null;
+    function playSfx(type) {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        if (type === 'portal_blue' || type === 'portal_orange') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(type === 'portal_blue' ? 580 : 420, now);
+          osc.frequency.exponentialRampToValueAtTime(980, now + 0.16);
+          gain.gain.setValueAtTime(0.16, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.16);
+          osc.start(now); osc.stop(now + 0.16);
+        } else if (type === 'teleport') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(220, now);
+          osc.frequency.exponentialRampToValueAtTime(740, now + 0.22);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.22);
+          osc.start(now); osc.stop(now + 0.22);
+        } else if (type === 'ok') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(520, now);
+          osc.frequency.setValueAtTime(780, now + 0.08);
+          gain.gain.setValueAtTime(0.16, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.24);
+          osc.start(now); osc.stop(now + 0.24);
+        } else if (type === 'error') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(160, now);
+          osc.frequency.setValueAtTime(110, now + 0.12);
+          gain.gain.setValueAtTime(0.22, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+          osc.start(now); osc.stop(now + 0.3);
+        } else if (type === 'plasma') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(480, now);
+          osc.frequency.exponentialRampToValueAtTime(90, now + 0.15);
+          gain.gain.setValueAtTime(0.18, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
+          osc.start(now); osc.stop(now + 0.15);
+        } else if (type === 'vipend') {
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(145, now);
+          osc.frequency.setValueAtTime(185, now + 0.07);
+          gain.gain.setValueAtTime(0.09, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.16);
+          osc.start(now); osc.stop(now + 0.16);
+        }
+      } catch (e) {}
+    }
+
+    function vipendSay(text) {
+      playSfx('vipend');
+      document.getElementById('vipend-text').textContent = `"${text}"`;
+    }
+
+    function flashScreen(colorRgba = 'rgba(239,68,68,0.55)') {
+      const el = document.getElementById('flash-overlay');
+      el.style.background = `radial-gradient(circle, transparent 40%, ${colorRgba} 100%)`;
+      el.style.opacity = '1';
+      setTimeout(() => { el.style.opacity = '0'; }, 280);
+    }
+
+    // ============================================================================
+    // THREE.JS 3D MOTORU (PORTAL 2 APERTURE TARZI TEST ODALARI — 60 FPS)
+    // ============================================================================
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x070b14);
+    scene.fog = new THREE.FogExp2(0x070b14, 0.0018);
+
+    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 1200);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    renderer.domElement.style.position = 'fixed';
+    renderer.domElement.style.inset = '0';
+    renderer.domElement.style.zIndex = '1';
+    document.body.insertBefore(renderer.domElement, document.body.firstChild);
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x0f172a, 0.92);
+    scene.add(hemiLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.75);
+    dirLight.position.set(120, 260, 140);
+    scene.add(dirLight);
+
+    // Prosedürel Portal 2 Laboratuvar Panel Dokuları
+    function createPanelTexture(bgHex, lineHex, subdiv = 4) {
+      const c = document.createElement('canvas');
+      c.width = 128; c.height = 128;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = bgHex;
+      ctx.fillRect(0, 0, 128, 128);
+      ctx.strokeStyle = lineHex;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(2, 2, 124, 124);
+      ctx.lineWidth = 1;
+      const step = 128 / subdiv;
+      for (let i = step; i < 128; i += step) {
+        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 128); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(128, i); ctx.stroke();
+      }
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(6, 3);
+      return tex;
+    }
+
+    const wallTex = createPanelTexture('#e2e8f0', '#94a3b8', 2);
+    const darkWallTex = createPanelTexture('#1e293b', '#0f172a', 2);
+    const floorTex = createPanelTexture('#334155', '#1e293b', 4);
+    floorTex.repeat.set(8, 8);
+
+    const MATS = {
+      portalWall: new THREE.MeshLambertMaterial({ map: wallTex }),
+      darkWall: new THREE.MeshLambertMaterial({ map: darkWallTex }),
+      floor: new THREE.MeshLambertMaterial({ map: floorTex }),
+      acid: new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.82 }),
+      homeWall: new THREE.MeshLambertMaterial({ color: 0x3b2f2f }),
+      homeFloor: new THREE.MeshLambertMaterial({ color: 0x5c3a21 })
+    };
+
+    // Birinci Şahıs (FPS) Elimizdeki 3D Portal / Plazma Silahı Modeli (Kameraya Bağlı)
+    const viewModelGroup = new THREE.Group();
+    const gunBody = new THREE.Mesh(
+      new THREE.CylinderGeometry(2.2, 3.2, 18, 12),
+      new THREE.MeshLambertMaterial({ color: 0xf8fafc })
+    );
+    gunBody.rotation.x = Math.PI / 2;
+    gunBody.position.set(7, -6, -13);
+    const gunCore = new THREE.Mesh(
+      new THREE.CylinderGeometry(2.5, 2.5, 7, 12),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+    );
+    gunCore.rotation.x = Math.PI / 2;
+    gunCore.position.set(7, -5.8, -14);
+    const gunClaw1 = new THREE.Mesh(new THREE.BoxGeometry(0.8, 3, 6), new THREE.MeshBasicMaterial({ color: 0x1e293b }));
+    gunClaw1.position.set(7, -4, -22);
+    viewModelGroup.add(gunBody, gunCore, gunClaw1);
+    camera.add(viewModelGroup);
+    scene.add(camera);
+
+    // ============================================================================
+    // OYUNCU FİZİK, PORTALLAR VE BÖLÜM NESNELERİ
+    // ============================================================================
+    let gameRunning = false;
+    let currentLevelIdx = 0;
+    let codes = {};
+    let yaw = 0;
+    let pitch = 0;
+
+    const player = {
+      x: 0, y: 26, z: 110,
+      vx: 0, vy: 0, vz: 0,
+      speed: 135,
+      onGround: true,
+      hp: 100,
+      weapon: 'portal', // 'portal' | 'plasma'
+      hasPortalGun: false,
+      hasPlasmaGun: false,
+      heldCube: null,
+      portalCooldown: 0
+    };
+
+    let levelGroup = new THREE.Group();
+    scene.add(levelGroup);
+
+    let shootableWalls = [];
+    let solidPlatforms = []; // { x1, x2, z1, z2, yTop }
+    let acidZones = [];      // { x1, x2, z1, z2 }
+    let interactiveButtons = [];
+    let cubes = [];
+    let pressurePlates = [];
+    let laserEmitter = null;
+    let laserReceiver = null;
+    let laserLineMesh = null;
+    let exitDoor = null;
+    let exitUnlocked = false;
+    let vipendBoss = null;
+    let plasmaBolts = [];
+    let bossBolts = [];
+
+    // Mavi ve Turuncu 3D Portallar
+    const portals = {
+      blue:   { active: false, pos: new THREE.Vector3(), normal: new THREE.Vector3(), mesh: null },
+      orange: { active: false, pos: new THREE.Vector3(), normal: new THREE.Vector3(), mesh: null }
+    };
+
+    function createPortalMesh(hexColor) {
+      const g = new THREE.Group();
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(15, 20, 28),
+        new THREE.MeshBasicMaterial({ color: hexColor, side: THREE.DoubleSide })
+      );
+      const inner = new THREE.Mesh(
+        new THREE.CircleGeometry(15, 28),
+        new THREE.MeshBasicMaterial({ color: hexColor, transparent: true, opacity: 0.42, side: THREE.DoubleSide })
+      );
+      g.add(ring, inner);
+      g.visible = false;
+      scene.add(g);
+      return g;
+    }
+    portals.blue.mesh = createPortalMesh(0x38bdf8);
+    portals.orange.mesh = createPortalMesh(0xf97316);
+
+    // 3D VIPEND BOSS MODELİ (GLaDOS / Wheatley Tarzı Dev Siber Çekirdek + Kalkan)
+    function createVipendMesh() {
+      const g = new THREE.Group();
+      const core = new THREE.Mesh(
+        new THREE.SphereGeometry(22, 20, 20),
+        new THREE.MeshLambertMaterial({ color: 0x1e293b })
+      );
+      const ring1 = new THREE.Mesh(
+        new THREE.TorusGeometry(28, 2.5, 10, 28),
+        new THREE.MeshBasicMaterial({ color: 0xa855f7 })
+      );
+      ring1.name = 'ring1';
+      const ring2 = new THREE.Mesh(
+        new THREE.TorusGeometry(33, 2, 10, 28),
+        new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+      );
+      ring2.rotation.x = Math.PI / 2;
+      ring2.name = 'ring2';
+
+      const eye = new THREE.Mesh(
+        new THREE.SphereGeometry(9, 14, 14),
+        new THREE.MeshBasicMaterial({ color: 0xef4444 })
+      );
+      eye.position.set(0, 0, 18);
+      eye.name = 'eye';
+
+      const shield = new THREE.Mesh(
+        new THREE.SphereGeometry(40, 18, 18),
+        new THREE.MeshBasicMaterial({ color: 0xa855f7, transparent: true, opacity: 0.28, wireframe: true })
+      );
+      shield.name = 'shield';
+
+      g.add(core, ring1, ring2, eye, shield);
+      return g;
+    }
+
+    // Zamanlama Barı ve Sıralı Bulmaca Durumu
+    let timingPhase = 0; // 0..1
+    let timingDir = 1;
+    let enteredSequence = [];
+    let sequenceTimer = 0;
+    let bridgeSwitchTimer = 0;
+    let introTimer = 0;
+
+    // ============================================================================
+    // BÖLÜM YÜKLEYİCİ (0: EV SİNEMATİĞİ, 1..5: PORTAL 2 BULMACA & BOSS ODALARI)
+    // ============================================================================
+    function loadLevel(idx) {
+      currentLevelIdx = idx;
+      const lvl = VIPEND_LEVELS[idx];
+
+      scene.remove(levelGroup);
+      levelGroup = new THREE.Group();
+      scene.add(levelGroup);
+
+      shootableWalls = [];
+      solidPlatforms = [];
+      acidZones = [];
+      interactiveButtons = [];
+      cubes = [];
+      pressurePlates = [];
+      plasmaBolts = [];
+      bossBolts = [];
+      laserEmitter = null;
+      laserReceiver = null;
+      laserLineMesh = null;
+      vipendBoss = null;
+      exitUnlocked = false;
+      enteredSequence = [];
+      sequenceTimer = 0;
+      bridgeSwitchTimer = 0;
+      player.heldCube = null;
+
+      portals.blue.active = false; portals.blue.mesh.visible = false;
+      portals.orange.active = false; portals.orange.mesh.visible = false;
+
+      player.hasPortalGun = lvl.hasPortalGun;
+      player.hasPlasmaGun = lvl.hasPlasmaGun;
+      selectWeapon(player.hasPortalGun ? 'portal' : 'none');
+
+      document.getElementById('ui-lvl-title').textContent = lvl.title;
+      document.getElementById('ui-lvl-sub').textContent = lvl.subtitle;
+      document.getElementById('boss-bar-wrap').style.display = 'none';
+      document.getElementById('timing-widget').style.display = 'none';
+
+      if (lvl.type === 'intro') {
+        buildIntroHomeScene();
+      } else if (lvl.id === 1) {
+        buildLevel1SequenceChamber(lvl);
+      } else if (lvl.id === 2) {
+        buildLevel2PortalLaserChamber(lvl);
+      } else if (lvl.id === 3) {
+        buildLevel3BossFight(lvl, false);
+      } else if (lvl.id === 4) {
+        buildLevel4DoubleCubeChamber(lvl);
+      } else if (lvl.id === 5) {
+        buildLevel3BossFight(lvl, true);
+      }
+    }
+
+    // Oda Duvarları ve Çıkış Kapısı Yardımcıları
+    function addWall(x, y, z, w, h, d, canPortal = true) {
+      const m = new THREE.Mesh(
+        new THREE.BoxGeometry(w, h, d),
+        canPortal ? MATS.portalWall : MATS.darkWall
+      );
+      m.position.set(x, y, z);
+      levelGroup.add(m);
+      if (canPortal) shootableWalls.push(m);
+      return m;
+    }
+
+    function addPlatform(x1, x2, z1, z2, yTop, mat = MATS.floor) {
+      const w = x2 - x1, d = z2 - z1;
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, 10, d), mat);
+      m.position.set((x1 + x2) / 2, yTop - 5, (z1 + z2) / 2);
+      levelGroup.add(m);
+      solidPlatforms.push({ x1, x2, z1, z2, yTop, mesh: m });
+      return m;
+    }
+
+    function addExitDoor(x, y, z) {
+      const g = new THREE.Group();
+      g.position.set(x, y, z);
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(44, 58, 6), new THREE.MeshBasicMaterial({ color: 0x334155 }));
+      frame.position.y = 29;
+      const field = new THREE.Mesh(
+        new THREE.BoxGeometry(36, 52, 4),
+        new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.78 })
+      );
+      field.position.y = 26;
+      field.name = 'doorField';
+      g.add(frame, field);
+      levelGroup.add(g);
+      exitDoor = { x, y, z, group: g, field };
+    }
+
+    function setExitUnlocked(state) {
+      exitUnlocked = state;
+      if (exitDoor && exitDoor.field) {
+        exitDoor.field.material.color.setHex(state ? 0x22c55e : 0xef4444);
+        exitDoor.field.material.opacity = state ? 0.35 : 0.78;
+      }
+      const el = document.getElementById('ui-door-state');
+      el.textContent = state ? 'AÇIK — KAPIYA GİT! ✅' : 'KİLİTLİ 🔒';
+      el.style.color = state ? '#4ade80' : '#ef4444';
+    }
+
+    function addButton3D(btnData) {
+      const g = new THREE.Group();
+      g.position.set(btnData.x, btnData.y || 0, btnData.z);
+      const ped = new THREE.Mesh(new THREE.CylinderGeometry(6, 8, 22, 12), MATS.darkWall);
+      ped.position.y = 11;
+      const cap = new THREE.Mesh(
+        new THREE.CylinderGeometry(7, 7, 5, 16),
+        new THREE.MeshBasicMaterial({ color: btnData.color })
+      );
+      cap.position.y = 23;
+      g.add(ped, cap);
+      levelGroup.add(g);
+      interactiveButtons.push({ ...btnData, y: btnData.y || 0, mesh: g, capMesh: cap, active: false });
+    }
+
+    function addCube3D(x, y, z) {
+      const m = new THREE.Mesh(
+        new THREE.BoxGeometry(20, 20, 20),
+        new THREE.MeshLambertMaterial({ color: 0xf472b6 })
+      );
+      m.position.set(x, y + 10, z);
+      levelGroup.add(m);
+      const cObj = { x, y: y + 10, z, vy: 0, mesh: m };
+      cubes.push(cObj);
+      return cObj;
+    }
+
+    function addPressurePlate(x, y, z, id) {
+      const ring = new THREE.Mesh(
+        new THREE.CylinderGeometry(20, 22, 3, 20),
+        new THREE.MeshBasicMaterial({ color: 0xec4899 })
+      );
+      ring.position.set(x, y + 1.5, z);
+      levelGroup.add(ring);
+      pressurePlates.push({ id, x, y, z, mesh: ring, pressed: false });
+    }
+
+    // ============================================================================
+    // SAHNE 0: EVİMİZDE USUL USUL OTURURKEN VIPEND GELİP BAYILTIYOR!
+    // ============================================================================
+    function buildIntroHomeScene() {
+      player.x = 0; player.y = 24; player.z = 55;
+      yaw = 0; pitch = 0;
+      introTimer = 0;
+
+      // Evimizin Salonu
+      addPlatform(-110, 110, -110, 110, 0, MATS.homeFloor);
+      addWall(0, 60, -110, 220, 120, 8, false);
+      addWall(-110, 60, 0, 8, 120, 220, false);
+      addWall(110, 60, 0, 8, 120, 220, false);
+
+      // Açık Televizyon ve Koltuk
+      const tv = new THREE.Mesh(new THREE.BoxGeometry(56, 34, 4), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
+      tv.position.set(0, 32, -98);
+      levelGroup.add(tv);
+
+      // Vipend yukarıda pusuda bekler, 2.5 sn sonra iner!
+      const vMesh = createVipendMesh();
+      vMesh.position.set(0, 150, -35);
+      levelGroup.add(vMesh);
+      vipendBoss = { x: 0, y: 150, z: -35, mesh: vMesh, hp: 100, maxHp: 100, shieldUp: true };
+
+      document.getElementById('puzzle-clues-box').innerHTML = `
+        <div class="clue-card">🛋️ Evinde televizyon karşısında usul usul oturuyorsun...<br><small>(Sinematiği hızlı geçmek için <b>[E]</b> tuşuna basabilirsin)</small></div>
+      `;
+      vipendSay('Evinde usul usul oturup güvende olduğunu mu sandın?! Ben VIPEND! Şimdi seni bayıltıp test laboratuvarıma atıyorum!');
+    }
+
+    // ============================================================================
+    // BÖLÜM 1: ZAMANLAMALI KOMBİNASYON & FAZ SENKRONİZASYONU ODASI
+    // ============================================================================
+    function buildLevel1SequenceChamber(lvl) {
+      player.x = 0; player.y = 26; player.z = 115;
+      yaw = 0; pitch = 0;
+
+      addPlatform(-160, 160, -160, 160, 0);
+      addWall(0, 80, -160, 320, 160, 10, true);
+      addWall(0, 80, 160, 320, 160, 10, true);
+      addWall(-160, 80, 0, 10, 160, 320, true);
+      addWall(160, 80, 0, 10, 160, 320, true);
+
+      addExitDoor(0, 0, -152);
+      setExitUnlocked(false);
+
+      for (const b of lvl.buttons) addButton3D(b);
+
+      document.getElementById('timing-widget').style.display = 'block';
+      document.getElementById('puzzle-clues-box').innerHTML = lvl.clues.map(c => `<div class="clue-card">${c}</div>`).join('');
+      vipendSay(lvl.vipendIntro);
+    }
+
+    // ============================================================================
+    // BÖLÜM 2: PORTAL SİLAHI + KÜP + PORTAL LAZER KIRILMASI + ZAMANLI ŞALTER
+    // ============================================================================
+    function buildLevel2PortalLaserChamber(lvl) {
+      player.x = 0; player.y = 26; player.z = 155;
+      yaw = 0; pitch = 0;
+
+      // Güney Başlangıç Platformu (z: 40..190)
+      addPlatform(-180, 180, 40, 190, 0);
+      // Ortadaki Ölümcül Yeşil Asit Çukuru (z: -60..40)
+      const acidMesh = new THREE.Mesh(new THREE.BoxGeometry(360, 4, 100), MATS.acid);
+      acidMesh.position.set(0, -14, -10);
+      levelGroup.add(acidMesh);
+      acidZones.push({ x1: -180, x2: 180, z1: -60, z2: 40 });
+
+      // Kuzey Çıkış Platformu (z: -190..-60)
+      addPlatform(-180, 180, -190, -60, 0);
+
+      // Sol Yüksek Balkon (Küpün Bulunduğu Yüksek Platform! yTop = 58)
+      addPlatform(-180, -70, -170, -70, 58);
+
+      // Portal Açılabilir Beyaz Test Duvarları
+      addWall(0, 95, -190, 360, 190, 10, true);
+      addWall(0, 95, 190, 360, 190, 10, true);
+      addWall(-180, 95, 0, 10, 190, 380, true);
+      addWall(180, 95, 0, 10, 190, 380, true);
+
+      addExitDoor(0, 0, -182);
+      setExitUnlocked(false);
+
+      // 1. Kilit: Sol Yüksek Balkonda Ağırlık Küpü + Güney Platformda Basınç Plakası
+      addCube3D(-125, 58, -120);
+      addPressurePlate(-95, 0, 110, 'plate1');
+
+      // 2. Kilit: Lazer Vericisi (Sol Duvar z=90 -> +X yönüne vurur) ve Lazer Alıcısı (Kuzey Duvarı x=95, z=-182)
+      laserEmitter = { x: -172, y: 24, z: 95, dir: new THREE.Vector3(1, 0, 0) };
+      laserReceiver = { x: 95, y: 24, z: -182, hit: false };
+
+      const recMesh = new THREE.Mesh(new THREE.SphereGeometry(9, 12, 12), new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
+      recMesh.position.set(laserReceiver.x, laserReceiver.y, laserReceiver.z);
+      levelGroup.add(recMesh);
+      laserReceiver.mesh = recMesh;
+
+      const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+      laserLineMesh = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xef4444, linewidth: 3 }));
+      levelGroup.add(laserLineMesh);
+
+      // 3. Kilit: Sağ Güney Köşede 10 Saniyelik Zamanlı Şalter
+      addButton3D({ id: 'timed_bridge', label: '10 SN ZAMANLI ÇIKIŞ ŞALTERİ', color: 0x38bdf8, x: 115, y: 0, z: 110 });
+
+      document.getElementById('puzzle-clues-box').innerHTML = lvl.hints.map(h => `<div class="clue-card">${h}</div>`).join('');
+      vipendSay(lvl.vipendIntro);
+    }
+
+    // ============================================================================
+    // BÖLÜM 3 VE 5: VIPEND İLE BULMACALI BOSS SAVAŞI (PORTAL + PLAZMA SİLAHI!)
+    // ============================================================================
+    let bossPuzzleRule = null;
+    function buildLevel3BossFight(lvl, isFinal) {
+      player.x = 0; player.y = 26; player.z = 150;
+      yaw = 0; pitch = 0;
+
+      addPlatform(-190, 190, -190, 190, 0);
+      addWall(0, 95, -190, 380, 190, 10, true);
+      addWall(0, 95, 190, 380, 190, 10, true);
+      addWall(-190, 95, 0, 10, 190, 380, true);
+      addWall(190, 95, 0, 10, 190, 380, true);
+
+      addExitDoor(0, 0, -182);
+      setExitUnlocked(false);
+
+      const vMesh = createVipendMesh();
+      vMesh.position.set(0, 62, -45);
+      levelGroup.add(vMesh);
+
+      vipendBoss = {
+        x: 0, y: 62, z: -45,
+        hp: isFinal ? 180 : 100,
+        maxHp: isFinal ? 180 : 100,
+        shieldUp: true,
+        shieldTimer: 0,
+        attackTimer: 2.2,
+        isFinal,
+        mesh: vMesh
+      };
+
+      // Odadaki 4 Sayılı Frekans Butonu (3, 4, 7, 8)
+      const nums = [
+        { id: 'num_3', num: 3, label: 'FREKANS [3]', color: 0x38bdf8, x: -135, z: 85 },
+        { id: 'num_4', num: 4, label: 'FREKANS [4]', color: 0xfacc15, x:  135, z: 85 },
+        { id: 'num_7', num: 7, label: 'FREKANS [7]', color: 0x22c55e, x: -135, z: -95 },
+        { id: 'num_8', num: 8, label: 'FREKANS [8]', color: 0xef4444, x:  135, z: -95 }
+      ];
+      for (const n of nums) addButton3D(n);
+
+      rollNewBossShieldPuzzle();
+
+      document.getElementById('boss-bar-wrap').style.display = 'block';
+      document.getElementById('timing-widget').style.display = 'block';
+      vipendSay(lvl.vipendIntro);
+    }
+
+    function rollNewBossShieldPuzzle() {
+      enteredSequence = [];
+      const puzzles = [
+        { desc: 'KALKAN ŞİFRESİ: Toplamı 10 yapan iki frekans butonuna KÜÇÜKTEN BÜYÜĞE doğru (Yeşil Fazda [E]) bas! (İpucu: 3 + 7 = 10)', order: ['num_3', 'num_7'] },
+        { desc: 'KALKAN ŞİFRESİ: Çarpımı 32 yapan iki frekans butonuna BÜYÜKTEN KÜÇÜĞE doğru (Yeşil Fazda [E]) bas! (İpucu: 8 x 4 = 32)', order: ['num_8', 'num_4'] },
+        { desc: 'KALKAN ŞİFRESİ: Farkı 4 olan ÇİFT sayılı iki butona KÜÇÜKTEN BÜYÜĞE doğru bas! (İpucu: 4 ve 8)', order: ['num_4', 'num_8'] }
+      ];
+      bossPuzzleRule = puzzles[Math.floor(Math.random() * puzzles.length)];
+      document.getElementById('puzzle-clues-box').innerHTML = `
+        <div class="clue-card" style="border-color:#a855f7;">⚡ <b>${bossPuzzleRule.desc}</b></div>
+        <div class="clue-card">💡 İki butona doğru sırada ve yeşil zamanlamada bastığında Vipend'in kalkanı 10 saniyeliğine çöker! O anda <b>[2] Plazma Silahına</b> geçip Vipend'i vur!</div>
+      `;
+    }
+
+    // ============================================================================
+    // BÖLÜM 4: ÇİFT KÜP + ASAL SAYILI ZAMANLI ŞALTER ODASI
+    // ============================================================================
+    function buildLevel4DoubleCubeChamber(lvl) {
+      player.x = 0; player.y = 26; player.z = 155;
+      yaw = 0; pitch = 0;
+
+      addPlatform(-185, 185, -185, 185, 0);
+      // İki Yüksek Balkon (Sol ve Sağ)
+      addPlatform(-185, -95, -165, -75, 58);
+      addPlatform(95, 185, -165, -75, 58);
+
+      addWall(0, 95, -185, 370, 190, 10, true);
+      addWall(0, 95, 185, 370, 190, 10, true);
+      addWall(-185, 95, 0, 10, 190, 370, true);
+      addWall(185, 95, 0, 10, 190, 370, true);
+
+      addExitDoor(0, 0, -177);
+      setExitUnlocked(false);
+
+      // 2 Yüksek Balkonda 2 Küp + Zeminde 2 Basınç Plakası
+      addCube3D(-140, 58, -120);
+      addCube3D(140, 58, -120);
+      addPressurePlate(-85, 0, 80, 'pA');
+      addPressurePlate(85, 0, 80, 'pB');
+
+      // 4 Şalter: Sadece ASAL SAYI olanlara (2, 5, 7) küçükten büyüğe basılmalı! (9 asal değildir, tuzaktır!)
+      const sws = [
+        { id: 'sw_2', label: 'ŞALTER [2]', color: 0x38bdf8, x: -90, z: -20 },
+        { id: 'sw_9', label: 'ŞALTER [9] (TUZAK!)', color: 0xef4444, x: -30, z: -20 },
+        { id: 'sw_5', label: 'ŞALTER [5]', color: 0xfacc15, x:  30, z: -20 },
+        { id: 'sw_7', label: 'ŞALTER [7]', color: 0x22c55e, x:  90, z: -20 }
+      ];
+      for (const s of sws) addButton3D(s);
+
+      document.getElementById('timing-widget').style.display = 'block';
+      document.getElementById('puzzle-clues-box').innerHTML = `
+        <div class="clue-card">📦 <b>1. ADIM (Çift Küp):</b> Sol ve sağ yüksek balkonlara Portal açarak çık, 2 Ağırlık Küpünü [F] ile indirip yerdeki 2 Pembe Plakaya koy!</div>
+        <div class="clue-card">🔢 <b>2. ADIM (Asal Sayı Sırası):</b> İki plaka da doluyken, ortadaki 4 şalterden <b>SADECE ASAL SAYI OLANLARA ([2] → [5] → [7])</b> küçükten büyüğe Yeşil Fazda [E] ile bas! (Dikkat: 9 asal sayı değildir!)</div>
+      `;
+      vipendSay(lvl.vipendIntro);
+    }
+
+    // ============================================================================
+    // SİLAH SEÇİMİ, PORTAL AÇMA VE PLAZMA ATEŞİ
+    // ============================================================================
+    function selectWeapon(w) {
+      if (w === 'portal' && !player.hasPortalGun) return;
+      if (w === 'plasma' && !player.hasPlasmaGun) return;
+      player.weapon = w;
+      viewModelGroup.visible = (w === 'portal' || w === 'plasma');
+      gunCore.material.color.setHex(w === 'plasma' ? 0xc084fc : 0x38bdf8);
+      document.getElementById('slot-portal').classList.toggle('active', w === 'portal');
+      document.getElementById('slot-plasma').classList.toggle('active', w === 'plasma');
+    }
+
+    const raycaster = new THREE.Raycaster();
+    function shootPortalOrPlasma(button) {
+      if (!gameRunning) return;
+
+      if (player.weapon === 'plasma' && player.hasPlasmaGun) {
+        playSfx('plasma');
+        const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize();
+        const mesh = new THREE.Mesh(
+          new THREE.SphereGeometry(3.5, 8, 8),
+          new THREE.MeshBasicMaterial({ color: 0xc084fc })
+        );
+        mesh.position.set(player.x, player.y, player.z);
+        levelGroup.add(mesh);
+        plasmaBolts.push({
+          pos: mesh.position,
+          vel: dir.multiplyScalar(380),
+          mesh,
+          life: 2.0
+        });
+        return;
+      }
+
+      if (player.weapon === 'portal' && player.hasPortalGun) {
+        raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+        const hits = raycaster.intersectObjects(shootableWalls, false);
+        if (hits.length > 0) {
+          const hit = hits[0];
+          const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
+          const pKey = (button === 0) ? 'blue' : 'orange';
+          const p = portals[pKey];
+          p.active = true;
+          p.pos.copy(hit.point).addScaledVector(normal, 0.8);
+          p.pos.y = Math.max(22, Math.min(130, p.pos.y));
+          p.normal.copy(normal);
+          p.mesh.position.copy(p.pos);
+          p.mesh.lookAt(p.pos.clone().add(normal));
+          p.mesh.visible = true;
+          playSfx(pKey === 'blue' ? 'portal_blue' : 'portal_orange');
+        }
+      }
+    }
+
+    // ============================================================================
+    // [E] BUTONA BASMA (ZAMANLAMA VE SIRA KONTROLÜ) & [F] KÜP TUTMA
+    // ============================================================================
+    function pressInteractiveButton() {
+      if (VIPEND_LEVELS[currentLevelIdx].type === 'intro') {
+        triggerIntroKnockout();
+        return;
+      }
+
+      let nearest = null, bestD = 58;
+      for (const b of interactiveButtons) {
+        const d = Math.hypot(player.x - b.x, player.z - b.z);
+        if (d < bestD) { bestD = d; nearest = b; }
+      }
+      if (!nearest) return;
+
+      // Zamanlama Barı Kontrolü (Yeşil Bölge: 0.34 .. 0.66)
+      const inGreenZone = (timingPhase >= 0.33 && timingPhase <= 0.67);
+
+      if (currentLevelIdx === 1) {
+        const lvl = VIPEND_LEVELS[1];
+        if (!inGreenZone) {
+          playSfx('error');
+          flashScreen();
+          enteredSequence = [];
+          sequenceTimer = 0;
+          vipendSay('YANLIŞ ZAMANLAMA! Üstteki Faz Barı tam YEŞİL bölgedeyken [E] tuşuna basmalısın! Sıra sıfırlandı!');
+          return;
+        }
+        const expectedId = lvl.correctOrder[enteredSequence.length];
+        if (nearest.id === expectedId) {
+          playSfx('ok');
+          if (enteredSequence.length === 0) sequenceTimer = 16.0;
+          enteredSequence.push(nearest.id);
+          if (enteredSequence.length === lvl.correctOrder.length) {
+            setExitUnlocked(true);
+            sequenceTimer = 0;
+            vipendSay('İnanılmaz! Hem doğru sırayı (Sarı → Mavi → Kırmızı → Yeşil) hem de faz zamanlamasını tutturdun! Çıkış kapısı açıldı!');
+          }
+        } else {
+          playSfx('error');
+          flashScreen();
+          enteredSequence = [];
+          sequenceTimer = 0;
+          vipendSay(`YANLIŞ BUTON SIRASI! Duvardaki 3 ipucunu dikkatli oku! (İpucu: 1. Sarı, 2. Mavi, 3. Kırmızı, 4. Yeşil!)`);
+        }
+      } else if (currentLevelIdx === 2 && nearest.id === 'timed_bridge') {
+        playSfx('ok');
+        bridgeSwitchTimer = 10.0;
+        vipendSay('10 Saniyelik Zamanlı Şalter aktif! Diğer 2 kilit (Küp Plakası ve Lazer Alıcısı) de hazırsa hemen çıkış kapısına koş!');
+      } else if (currentLevelIdx === 3 || currentLevelIdx === 5) {
+        if (!inGreenZone) {
+          playSfx('error');
+          flashScreen();
+          enteredSequence = [];
+          vipendSay('Kalkan frekansını tutturamadın! İbre YEŞİL bölgedeyken [E] bas!');
+          return;
+        }
+        const exp = bossPuzzleRule.order[enteredSequence.length];
+        if (nearest.id === exp) {
+          playSfx('ok');
+          enteredSequence.push(nearest.id);
+          if (enteredSequence.length === bossPuzzleRule.order.length) {
+            vipendBoss.shieldUp = false;
+            vipendBoss.shieldTimer = 11.0;
+            enteredSequence = [];
+            vipendSay('OLAMAZ! KALKANIM ÇÖKTÜ! Sakın [2] Plazma Silahıyla bana ateş etme!');
+          }
+        } else {
+          playSfx('error');
+          flashScreen();
+          enteredSequence = [];
+          vipendSay(`Yanlış Frekans Butonu! Sağ paneldeki şifreyi oku: ${bossPuzzleRule.desc}`);
+        }
+      } else if (currentLevelIdx === 4) {
+        const allPlates = pressurePlates.every(p => p.pressed);
+        if (!allPlates) {
+          playSfx('error');
+          vipendSay('Önce 2 Ağırlık Küpünü de yerdeki 2 Pembe Basınç Plakasına yerleştirmelisin!');
+          return;
+        }
+        if (!inGreenZone) {
+          playSfx('error');
+          flashScreen();
+          enteredSequence = [];
+          vipendSay('Zamanlama hatası! İbre Yeşil bölgedeyken [E] bas!');
+          return;
+        }
+        const primeOrder = ['sw_2', 'sw_5', 'sw_7'];
+        const exp = primeOrder[enteredSequence.length];
+        if (nearest.id === exp) {
+          playSfx('ok');
+          enteredSequence.push(nearest.id);
+          if (enteredSequence.length === primeOrder.length) {
+            setExitUnlocked(true);
+            vipendSay('Asal sayıları da doğru sırayla çözdün! Çıkış kapısı açıldı, Final Odasında görüşeceğiz!');
+          }
+        } else {
+          playSfx('error');
+          flashScreen();
+          enteredSequence = [];
+          vipendSay('Yanlış Şalter! 9 asal sayı değildir, sadece ASAL olanlara küçükten büyüğe (2 → 5 → 7) bas!');
+        }
+      }
+    }
+
+    function toggleHoldCube() {
+      if (player.heldCube) {
+        const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+        dir.y = 0; dir.normalize();
+        player.heldCube.x = player.x + dir.x * 28;
+        player.heldCube.z = player.z + dir.z * 28;
+        player.heldCube.y = player.y - 6;
+        player.heldCube = null;
+        playSfx('ok');
+        return;
+      }
+      for (const c of cubes) {
+        if (Math.hypot(player.x - c.x, player.y - c.y, player.z - c.z) < 62) {
+          player.heldCube = c;
+          playSfx('ok');
+          return;
+        }
+      }
+    }
+
+    function triggerIntroKnockout() {
+      if (introTimer >= 99) return;
+      introTimer = 99;
+      playSfx('error');
+      flashScreen('rgba(168,85,247,0.85)');
+      document.getElementById('eyelid-top').style.height = '52%';
+      document.getElementById('eyelid-bottom').style.height = '52%';
+      setTimeout(() => {
+        loadLevel(1);
+        document.getElementById('eyelid-top').style.height = '0%';
+        document.getElementById('eyelid-bottom').style.height = '0%';
+      }, 1100);
+    }
+
+    // ============================================================================
+    // KONTROLLER (FARE BAKIŞI + 4 YÖNLÜ WASD + ZIPLA)
+    // ============================================================================
+    window.addEventListener('keydown', (e) => {
+      codes[e.code] = true;
+      if (!gameRunning) return;
+      if (e.code === 'Digit1') selectWeapon('portal');
+      if (e.code === 'Digit2') selectWeapon('plasma');
+      if (e.code === 'KeyQ') selectWeapon(player.weapon === 'portal' ? 'plasma' : 'portal');
+      if (e.code === 'KeyE') pressInteractiveButton();
+      if (e.code === 'KeyF') toggleHoldCube();
+      if (e.code === 'Space' && player.onGround) {
+        player.vy = 115;
+        player.onGround = false;
+      }
+    });
+    window.addEventListener('keyup', (e) => { codes[e.code] = false; });
+    window.addEventListener('blur', () => { codes = {}; });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!gameRunning) return;
+      if (document.pointerLockElement === renderer.domElement) {
+        yaw -= e.movementX * 0.0024;
+        pitch = Math.max(-1.35, Math.min(1.35, pitch - e.movementY * 0.0024));
+      }
+    });
+
+    renderer.domElement.addEventListener('mousedown', (e) => {
+      if (!gameRunning) return;
+      if (document.pointerLockElement !== renderer.domElement) {
+        renderer.domElement.requestPointerLock();
+      }
+      if (e.button === 0 || e.button === 2) {
+        shootPortalOrPlasma(e.button);
+      }
+    });
+    window.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    // ============================================================================
+    // ANA OYUN VE PORTAL FİZİK GÜNCELLEMESİ (60 FPS)
+    // ============================================================================
+    function update(dt) {
+      if (!gameRunning) return;
+
+      // Faz Zamanlama Barı İbresi Hareketi
+      timingPhase += timingDir * dt * 0.85;
+      if (timingPhase >= 1) { timingPhase = 1; timingDir = -1; }
+      if (timingPhase <= 0) { timingPhase = 0; timingDir = 1; }
+      document.getElementById('timing-needle').style.left = `${timingPhase * 96}%`;
+
+      if (sequenceTimer > 0) {
+        sequenceTimer -= dt;
+        if (sequenceTimer <= 0 && !exitUnlocked) {
+          enteredSequence = [];
+          playSfx('error');
+          vipendSay('Süre doldu! 4 butona 16 saniye içinde basamadın, sıra sıfırlandı!');
+        }
+      }
+      document.getElementById('seq-progress-text').textContent =
+        `Basılan Adım: ${enteredSequence.length} | ${sequenceTimer > 0 ? 'Kalan Süre: ' + sequenceTimer.toFixed(1) + ' sn' : 'Hazır'}`;
+
+      // Giriş Sinematiği (Bölüm 0)
+      if (VIPEND_LEVELS[currentLevelIdx].type === 'intro') {
+        introTimer += dt;
+        if (vipendBoss && vipendBoss.y > 42) {
+          vipendBoss.y -= dt * 35;
+          vipendBoss.mesh.position.y = vipendBoss.y;
+        }
+        if (introTimer > 5.2 && introTimer < 90) {
+          triggerIntroKnockout();
+        }
+      }
+
+      // Ok Tuşları Yedek Kamera Döndürme
+      if (codes['ArrowLeft']) yaw += 2.1 * dt;
+      if (codes['ArrowRight']) yaw -= 2.1 * dt;
+      if (codes['ArrowUp']) pitch = Math.min(1.3, pitch + 1.5 * dt);
+      if (codes['ArrowDown']) pitch = Math.max(-1.3, pitch - 1.5 * dt);
+
+      camera.rotation.order = 'YXZ';
+      camera.rotation.y = yaw;
+      camera.rotation.x = pitch;
+
+      // 4 Yönlü FPS WASD Hareketi
+      let moveF = 0, moveR = 0;
+      if (codes['KeyW']) moveF += 1;
+      if (codes['KeyS']) moveF -= 1;
+      if (codes['KeyD']) moveR += 1;
+      if (codes['KeyA']) moveR -= 1;
+
+      if (moveF !== 0 || moveR !== 0) {
+        const len = Math.hypot(moveF, moveR);
+        moveF /= len; moveR /= len;
+        const fx = -Math.sin(yaw);
+        const fz = -Math.cos(yaw);
+        const rx = Math.cos(yaw);
+        const rz = -Math.sin(yaw);
+
+        const nx = player.x + (fx * moveF + rx * moveR) * player.speed * dt;
+        const nz = player.z + (fz * moveF + rz * moveR) * player.speed * dt;
+        player.x = Math.max(-168, Math.min(168, nx));
+        player.z = Math.max(-175, Math.min(175, nz));
+      }
+
+      // Yerçekimi ve Platform Yükseklik Kontrolü
+      player.vy -= 260 * dt;
+      player.y += player.vy * dt;
+
+      let groundY = -40;
+      for (const p of solidPlatforms) {
+        if (player.x >= p.x1 - 10 && player.x <= p.x2 + 10 && player.z >= p.z1 - 10 && player.z <= p.z2 + 10) {
+          if (player.y - 24 >= p.yTop - 14) {
+            groundY = Math.max(groundY, p.yTop);
+          }
+        }
+      }
+      if (player.y <= groundY + 26) {
+        player.y = groundY + 26;
+        player.vy = 0;
+        player.onGround = true;
+      }
+
+      // Asit Çukuru Kontrolü
+      for (const az of acidZones) {
+        if (player.x > az.x1 && player.x < az.x2 && player.z > az.z1 && player.z < az.z2 && player.y < 18) {
+          playSfx('error');
+          flashScreen('rgba(34,197,94,0.75)');
+          player.x = 0; player.y = 30; player.z = 145;
+          vipendSay('Asit çukuruna düştün! Karşıya yürüyerek değil, duvarlara Mavi ve Turuncu Portal açarak geçmelisin!');
+        }
+      }
+
+      // ============================================================================
+      // GERÇEK 3D PORTAL IŞINLANMA SİSTEMİ (Mavi ⇄ Turuncu)
+      // ============================================================================
+      if (player.portalCooldown > 0) player.portalCooldown -= dt;
+      if (portals.blue.active && portals.orange.active && player.portalCooldown <= 0) {
+        const dBlue = Math.hypot(player.x - portals.blue.pos.x, player.y - portals.blue.pos.y, player.z - portals.blue.pos.z);
+        const dOrange = Math.hypot(player.x - portals.orange.pos.x, player.y - portals.orange.pos.y, player.z - portals.orange.pos.z);
+
+        if (dBlue < 24) {
+          teleportThroughPortal(portals.orange);
+        } else if (dOrange < 24) {
+          teleportThroughPortal(portals.blue);
+        }
+      }
+
+      // Elimizdeki Küp veya Yerdeki Küpler ve Basınç Plakaları
+      for (const c of cubes) {
+        if (player.heldCube === c) {
+          const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+          c.x = player.x + forward.x * 32;
+          c.y = Math.max(12, player.y + forward.y * 32 - 4);
+          c.z = player.z + forward.z * 32;
+        } else {
+          let cGround = 0;
+          for (const p of solidPlatforms) {
+            if (c.x >= p.x1 && c.x <= p.x2 && c.z >= p.z1 && c.z <= p.z2 && c.y >= p.yTop) {
+              cGround = Math.max(cGround, p.yTop);
+            }
+          }
+          if (c.y > cGround + 10) c.y = Math.max(cGround + 10, c.y - 180 * dt);
+        }
+        c.mesh.position.set(c.x, c.y, c.z);
+      }
+
+      for (const pl of pressurePlates) {
+        pl.pressed = cubes.some(c => Math.hypot(c.x - pl.x, c.z - pl.z) < 24 && Math.abs(c.y - (pl.y + 10)) < 16);
+        pl.mesh.material.color.setHex(pl.pressed ? 0x22c55e : 0xec4899);
+      }
+
+      // ============================================================================
+      // BÖLÜM 2: LAZERİN PORTALDAN KIRILIP ALICIYI VURMASI + 3 KİLİT KONTROLÜ
+      // ============================================================================
+      if (currentLevelIdx === 2 && laserEmitter && laserReceiver) {
+        if (bridgeSwitchTimer > 0) bridgeSwitchTimer -= dt;
+        const pts = [new THREE.Vector3(laserEmitter.x, laserEmitter.y, laserEmitter.z)];
+        const hitWallX = 178; // Sol duvardan çıkan lazer x=178 sağ duvarına çarpar
+        const endPt = new THREE.Vector3(hitWallX, laserEmitter.y, laserEmitter.z);
+        pts.push(endPt);
+
+        laserReceiver.hit = false;
+        // Eğer lazerin çarptığı noktada bir Portal varsa, diğer Portaldan çıkıp Alıcıyı vurur!
+        if (portals.blue.active && portals.orange.active) {
+          const dB = endPt.distanceTo(portals.blue.pos);
+          const dO = endPt.distanceTo(portals.orange.pos);
+          const exitP = (dB < 34) ? portals.orange : (dO < 34 ? portals.blue : null);
+          if (exitP) {
+            pts.push(exitP.pos.clone());
+            const beamOut = exitP.pos.clone().addScaledVector(exitP.normal, 360);
+            pts.push(beamOut);
+            // Alıcıya yakın geçiyor mu?
+            const line = new THREE.Line3(exitP.pos, beamOut);
+            const closest = new THREE.Vector3();
+            line.closestPointToPoint(new THREE.Vector3(laserReceiver.x, laserReceiver.y, laserReceiver.z), true, closest);
+            if (closest.distanceTo(new THREE.Vector3(laserReceiver.x, laserReceiver.y, laserReceiver.z)) < 26) {
+              laserReceiver.hit = true;
+            }
+          }
+        }
+        laserReceiver.mesh.material.color.setHex(laserReceiver.hit ? 0x22c55e : 0xfacc15);
+        laserLineMesh.geometry.setFromPoints(pts);
+
+        const plateOk = pressurePlates[0] && pressurePlates[0].pressed;
+        const laserOk = laserReceiver.hit;
+        const switchOk = bridgeSwitchTimer > 0;
+        setExitUnlocked(plateOk && laserOk && switchOk);
+      }
+
+      // ============================================================================
+      // VIPEND BOSS HAREKETİ, KALKAN VE PLAZMA SAVAŞI (BÖLÜM 3 VE 5)
+      // ============================================================================
+      if (vipendBoss && (currentLevelIdx === 3 || currentLevelIdx === 5)) {
+        const t = performance.now() * 0.002;
+        vipendBoss.x = Math.sin(t) * 75;
+        vipendBoss.mesh.position.set(vipendBoss.x, vipendBoss.y + Math.sin(t * 2) * 8, vipendBoss.z);
+        vipendBoss.mesh.lookAt(player.x, player.y, player.z);
+
+        const shMesh = vipendBoss.mesh.getObjectByName('shield');
+        if (shMesh) shMesh.visible = vipendBoss.shieldUp;
+
+        if (!vipendBoss.shieldUp) {
+          vipendBoss.shieldTimer -= dt;
+          document.getElementById('boss-status-label').textContent =
+            `🔥 KALKAN ÇÖKTÜ (${vipendBoss.shieldTimer.toFixed(1)} sn)! [2] PLAZMA SİLAHIYLA VIPEND'İ VUR!`;
+          if (vipendBoss.shieldTimer <= 0) {
+            vipendBoss.shieldUp = true;
+            rollNewBossShieldPuzzle();
+            vipendSay('Kalkanımı yeniden devreye aldım! Yeni Frekans Şifresini çözmeden bana zarar veremezsin!');
+          }
+        } else {
+          document.getElementById('boss-status-label').textContent =
+            `🛡️ VIPEND KALKANI AKTİF — ÖNCE SAĞ PANELDEKİ FREKANS BUTONLARINA BAS!`;
+        }
+        document.getElementById('boss-hp-fill').style.width = `${(vipendBoss.hp / vipendBoss.maxHp) * 100}%`;
+      }
+
+      // Plazma Mermileri
+      for (let i = plasmaBolts.length - 1; i >= 0; i--) {
+        const b = plasmaBolts[i];
+        b.pos.addScaledVector(b.vel, dt);
+        b.life -= dt;
+
+        if (vipendBoss && (currentLevelIdx === 3 || currentLevelIdx === 5)) {
+          const d = Math.hypot(b.pos.x - vipendBoss.x, b.pos.y - vipendBoss.y, b.pos.z - vipendBoss.z);
+          if (d < 36) {
+            levelGroup.remove(b.mesh);
+            plasmaBolts.splice(i, 1);
+            if (vipendBoss.shieldUp) {
+              playSfx('error');
+              vipendSay('Haha! Kalkanım açıkken mermilerin işe yaramaz! Önce sağ paneldeki Frekans Şifresini çözüp butonlara bas!');
+            } else {
+              playSfx('ok');
+              vipendBoss.hp -= 25;
+              if (vipendBoss.hp <= 0) {
+                vipendBoss.hp = 0;
+                setExitUnlocked(true);
+                vipendSay(vipendBoss.isFinal
+                  ? 'OLAMAZ!! ANA ÇEKİRDEĞİM PATLIYOR! BENİ YENDİN... ÇIKIŞ KAPISI AÇILDI!'
+                  : 'Argh! Çekirdeğime hasar verdin! Bakalım 4. Odamdaki Çift Küp ve Asal Sayı bulmacasından çıkabilecek misin?!');
+              }
+            }
+            continue;
+          }
+        }
+        if (b.life <= 0) {
+          levelGroup.remove(b.mesh);
+          plasmaBolts.splice(i, 1);
+        }
+      }
+
+      // Çıkış Kapısından Geçiş Kontrolü
+      if (exitDoor && exitUnlocked) {
+        if (Math.hypot(player.x - exitDoor.x, player.z - exitDoor.z) < 34) {
+          playSfx('teleport');
+          if (currentLevelIdx < VIPEND_LEVELS.length - 1) {
+            loadLevel(currentLevelIdx + 1);
+          } else {
+            showVictoryScreen();
+          }
+        }
+      }
+
+      // Etkileşim Bannerı
+      updatePromptBanner();
+      camera.position.set(player.x, player.y, player.z);
+    }
+
+    function teleportThroughPortal(destPortal) {
+      playSfx('teleport');
+      player.x = destPortal.pos.x + destPortal.normal.x * 28;
+      player.y = destPortal.pos.y;
+      player.z = destPortal.pos.z + destPortal.normal.z * 28;
+      player.vy = 20;
+      player.portalCooldown = 0.65;
+      yaw = Math.atan2(-destPortal.normal.x, -destPortal.normal.z);
+    }
+
+    function updatePromptBanner() {
+      const banner = document.getElementById('prompt-banner');
+      for (const b of interactiveButtons) {
+        if (Math.hypot(player.x - b.x, player.z - b.z) < 55) {
+          banner.textContent = `🔘 ${b.label} — Basmak için [E] Tuşuna Bas!`;
+          return;
+        }
+      }
+      for (const c of cubes) {
+        if (player.heldCube !== c && Math.hypot(player.x - c.x, player.y - c.y, player.z - c.z) < 60) {
+          banner.textContent = `📦 Ağırlık Küpünü Almak için [F] Tuşuna Bas!`;
+          return;
+        }
+      }
+      if (player.heldCube) {
+        banner.textContent = `📦 Elinde Ağırlık Küpü var — Plakanın üstüne bırakmak için [F] Bas!`;
+        return;
+      }
+      banner.textContent = '';
+    }
+
+    function showVictoryScreen() {
+      gameRunning = false;
+      if (document.pointerLockElement) document.exitPointerLock();
+      const ov = document.getElementById('overlay-screen');
+      document.getElementById('ov-title').textContent = '🏆 VIPEND YOK EDİLDİ — ÖZGÜRLÜK!';
+      document.getElementById('ov-sub').textContent = 'Tüm Portal 2 bulmacalarını çözdün, Vipend\'in kalkan şifrelerini kırdın ve evine döndün!';
+      document.getElementById('start-btn').textContent = '🔄 BAŞTAN OYNA';
+      ov.style.display = 'flex';
+    }
+
+    let lastTime = performance.now();
+    function loop(now) {
+      const dt = Math.min(0.05, (now - lastTime) / 1000);
+      lastTime = now;
+      update(dt);
+      renderer.render(scene, camera);
+      requestAnimationFrame(loop);
+    }
+
+    document.getElementById('start-btn').onclick = () => {
+      document.getElementById('overlay-screen').style.display = 'none';
+      loadLevel(0);
+      gameRunning = true;
+      renderer.domElement.requestPointerLock();
+    };
+
+    loadLevel(0);
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

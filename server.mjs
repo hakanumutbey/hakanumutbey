@@ -27,7 +27,7 @@ const voiceRooms = new Map();
 const siyahAdamRooms = new Map();
 const sesliPartiRooms = new Map();
 const yarisSehriWorlds = new Map();
-const games = ["annenden-kac", "bardak", "essiz-zindan", "skeleton-wars", "rhgpo", "siyah-adam", "birlesim-arenasi", "vale", "robot-avcisi", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "space-arena", "2d-car-simulator", "yaris-sehri", "hako-vurus", "uzay-yarisi", "isin-savasi", "beyaz-bardak", "make-city", "ejderha-ucus", "karanlik-labirent"];
+const games = ["annenden-kac", "bardak", "essiz-zindan", "skeleton-wars", "rhgpo", "siyah-adam", "birlesim-arenasi", "vale", "robot-avcisi", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "space-arena", "2d-car-simulator", "yaris-sehri", "hako-vurus", "uzay-yarisi", "isin-savasi", "beyaz-bardak", "make-city", "ejderha-ucus", "karanlik-labirent", "in-a-space", "kayip-odalar", "vipend-3d"];
 const baseValues = {
   "annenden-kac": 128,
   bardak: 96,
@@ -52,6 +52,9 @@ const baseValues = {
   "make-city": 142,
   "ejderha-ucus": 133,
   "karanlik-labirent": 150,
+  "in-a-space": 170,
+  "kayip-odalar": 145,
+  "vipend-3d": 138,
 };
 const averagePlayMinutes = {
   "annenden-kac": 6,
@@ -77,6 +80,9 @@ const averagePlayMinutes = {
   "make-city": 15,
   "ejderha-ucus": 6,
   "karanlik-labirent": 10,
+  "in-a-space": 60,
+  "kayip-odalar": 25,
+  "vipend-3d": 20,
 };
 const voteOptionIds = ["uzay-yarisi", "market-savasi", "okul-gorevi"];
 

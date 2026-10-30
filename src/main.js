@@ -17,6 +17,54 @@ import {
 
 const games = [
   {
+    slug: "in-a-space",
+    title: "IN A SPACE",
+    path: "/oyunlar/in-a-space/",
+    type: "3D Uzay Macerası",
+    status: "Oynanabilir",
+    description: "ARGO-7 gemisinde tek başına uyan, mürettebatını kurtar ve eve dön! Elektrik kesintileri, uzaylı saldırıları, gövde delikleri ve oksijeni azalan uzay giysisi seni bekliyor.",
+    longDescription: "IN A SPACE — Breath of the Wild tarzında 4 perdelik uzay macerası. Geminin yapay zekâsı NOVA ile üç gezegenden enerji çekirdeği topla, kaçış kapsüllerine düşen mürettebatı kurtar, uzaylı ana gemisini patlatıp 75 saniyede kaç, Ay üssünden yakıt al ve Dünya'ya in. Kayalara tırman, jetpack ile süzül, meteorları gemi topuyla vur. Oyun bitince Dünya'da ve uzayda serbestçe dolaş.",
+    accent: "cosmos",
+    controls: "WASD, Shift koş, Space zıpla / havada süzül, E etkileşim, F fener, sol tık ateş",
+    mobileStatus: "Masaüstü önerilir",
+    mobileNote: "Fare ile bakış (pointer lock) ve klavye gerektirdiği için masaüstünde oynanır.",
+    achievements: ["Kriyo uykusundan uyan", "Üç mürettebatı kurtar", "Dünya'ya in"],
+    updates: ["4 perdelik hikâye: çekirdekler, kayıp mürettebat, ana gemi, eve dönüş", "Kalpler, dayanıklılık çarkı, tırmanma ve jetpack süzülme", "Serbest uçuş: meteor yağmuru ve gemi topu", "Oyun bitince Dünya'da dolaş"],
+    stockBase: 170,
+  },
+  {
+    slug: "kayip-odalar",
+    title: "Kayıp Odalar",
+    path: "/oyunlar/kayip-odalar/",
+    type: "3D Kaçış & Macera",
+    status: "Oynanabilir",
+    description: "Kilitli odalardan kaç: şifreleri çöz, karanlık odada fenerinle ipucu bul, bomba kur ve teknenle fırtınadan kaç!",
+    longDescription: "Kayıp Odalar — 4 bölümlük 3D kaçış oyunu. Dağınık odada çekmecelerden şifre bul ve güç odasında kabloları değiştir; karanlık odada pili biten fenerle yalnızca ışıkta görünen şifreyi oku; depoda 12 malzemeyle tarifli bombayı kur ve patlamadan masanın altına sığın; son bölümde bilgisayardaki dosyalardan kapı şifresini bul, tekne motorunu tamir et ve deniz fenerine kaç.",
+    accent: "amber",
+    controls: "WASD hareket, fare ile bak, E etkileşim, C eğil",
+    mobileStatus: "Masaüstü önerilir",
+    mobileNote: "Fare ile bakış (pointer lock) gerektirdiği için masaüstünde oynanır.",
+    achievements: ["Tuş takımını çöz", "Bombadan sağ kurtul", "Deniz fenerine ulaş"],
+    updates: ["4 bölüm: dağınık oda, karanlık oda, bomba deposu, tekne kaçışı", "Pili biten fener ve sadece ışıkta görünen şifre", "Sahte bilgisayar: e-posta, resimler, şifreli zip"],
+    stockBase: 145,
+  },
+  {
+    slug: "vipend-3d",
+    title: "VIPEND 3D",
+    path: "/oyunlar/vipend-3d/",
+    type: "3D Bulmaca FPS",
+    status: "Oynanabilir",
+    description: "Vipend seni test laboratuvarına attı! Portal silahı, ağırlık küpü ve lazerlerle 5 bölümü çöz, final çekirdek savaşını kazan.",
+    longDescription: "VIPEND 3D — Portal 2 tarzı birinci şahıs bulmaca ve aksiyon oyunu. Vipend'in seni bayıltıp attığı test laboratuvarında 5 bölüm: zamanlamalı mantık kombinasyonu, Portal Silahı + Ağırlık Küpü + lazer, Vipend kalkan şifresi ve plazma savaşı, çift küp ve asal sayı şalterleri, final çekirdek savaşı.",
+    accent: "sky",
+    controls: "WASD + fare bakış, 1 portal silahı, 2 plazma silahı, E butona bas, F küp tut/bırak",
+    mobileStatus: "Masaüstü önerilir",
+    mobileNote: "Fare ile bakış ve klavye kısayolları gerektirdiği için masaüstünde oynanır.",
+    achievements: ["İlk portalı aç", "Asal şalterleri çöz", "Çekirdeği yok et"],
+    updates: ["5 bölümlük test laboratuvarı", "Portal silahı, ağırlık küpü ve lazerler", "Final çekirdek savaşı"],
+    stockBase: 138,
+  },
+  {
     slug: "karanlik-labirent",
     title: "Karanlık Labirent",
     path: "/oyunlar/karanlik-labirent/",
@@ -400,7 +448,7 @@ const games = [
 ];
 
 const FUSION_GAME_PATH = "/oyunlar/birlesim-arenasi/";
-const NEW_GAME_SLUGS = new Set(["karanlik-labirent", "ejderha-ucus", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "2d-car-simulator", "yaris-sehri", "hako-vurus", "uzay-yarisi", "isin-savasi", "beyaz-bardak", "make-city"]);
+const NEW_GAME_SLUGS = new Set(["in-a-space", "kayip-odalar", "vipend-3d", "karanlik-labirent", "ejderha-ucus", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "2d-car-simulator", "yaris-sehri", "hako-vurus", "uzay-yarisi", "isin-savasi", "beyaz-bardak", "make-city"]);
 /** Only games the Birleşim Arenası client actually implements. */
 const FUSION_GAME_SLUGS = new Set([
   "annenden-kac",

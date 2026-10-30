@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KAYIP ODALAR — 3D Kaçış & Macera</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      background: #030712;
+      color: #f8fafc;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #gameCanvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      cursor: crosshair;
+    }
+
+    /* VIGNETTE */
+    .vignette {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(circle at center, transparent 50%, rgba(2, 6, 23, 0.75) 85%, rgba(0, 0, 0, 0.95) 100%);
+      z-index: 10;
+    }
+
+    /* RETICLE & INTERACTION PROMPT */
+    .center-hud {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .crosshair {
+      width: 8px;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 50%;
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.9);
+      transition: transform 0.1s;
+    }
+
+    .interact-pill {
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid rgba(56, 189, 248, 0.6);
+      border-radius: 99px;
+      padding: 8px 18px;
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #38bdf8;
+      display: none;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+      letter-spacing: 0.3px;
+    }
+
+    /* TOP OBJECTIVE */
+    .objective-panel {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      background: rgba(15, 23, 42, 0.88);
+      border-left: 4px solid #f59e0b;
+      border-radius: 10px;
+      padding: 12px 18px;
+      backdrop-filter: blur(8px);
+      z-index: 20;
+      max-width: 440px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+    }
+
+    .objective-title {
+      font-size: 12px;
+      font-weight: 800;
+      color: #f59e0b;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .objective-text {
+      font-size: 14.5px;
+      font-weight: 600;
+      color: #f1f5f9;
+      line-height: 1.35;
+    }
+
+    /* INVENTORY SLOTS (Envanter) */
+    .inventory-panel {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 12px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      padding: 8px 14px;
+      backdrop-filter: blur(8px);
+      z-index: 20;
+    }
+
+    .inv-slot {
+      width: 58px;
+      height: 58px;
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px dashed rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      position: relative;
+    }
+
+    .inv-slot.has-item {
+      border: 1px solid #38bdf8;
+      background: rgba(56, 189, 248, 0.15);
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+    }
+
+    .inv-name {
+      position: absolute;
+      bottom: -18px;
+      font-size: 10px;
+      font-weight: 700;
+      color: #94a3b8;
+      white-space: nowrap;
+    }
+
+    /* HUD İÇİ ŞIK NOT KARTI */
+    .note-overlay {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 320px;
+      background: #fef08a;
+      color: #1e293b;
+      padding: 24px 24px 20px 24px;
+      border-radius: 10px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+      border: 2px solid #ca8a04;
+      display: none;
+      z-index: 80;
+      font-family: 'Courier New', Courier, monospace;
+      pointer-events: auto;
+    }
+
+    .note-pin {
+      width: 14px;
+      height: 14px;
+      background: #dc2626;
+      border-radius: 50%;
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .note-close-btn {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      background: none;
+      border: none;
+      font-size: 18px;
+      font-weight: 900;
+      color: #854d0e;
+      cursor: pointer;
+    }
+
+    /* INTERACTIVE KEYPAD MODAL */
+    .keypad-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(6px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .keypad-box {
+      width: 290px;
+      background: #0f172a;
+      border: 2px solid #334155;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .keypad-screen {
+      height: 52px;
+      background: #020617;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: 8px;
+      color: #38bdf8;
+      font-family: monospace;
+    }
+
+    .keypad-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .num-btn {
+      height: 48px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: #f8fafc;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.1s, transform 0.1s;
+    }
+
+    .num-btn:hover {
+      background: #334155;
+    }
+
+    .num-btn:active {
+      transform: scale(0.95);
+    }
+
+    .keypad-resume-btn {
+      background: #10b981;
+      color: white;
+      border: none;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+      display: none;
+      text-align: center;
+    }
+
+    /* SYSTEM TOAST ALERTS */
+    .toast-box {
+      position: fixed;
+      top: 85px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid #f59e0b;
+      padding: 10px 22px;
+      border-radius: 99px;
+      font-size: 14.5px;
+      font-weight: 700;
+      color: #fef08a;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.6);
+      display: none;
+      z-index: 50;
+      text-align: center;
+    }
+
+    /* START / RESUME OVERLAY */
+    .start-screen {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at center, rgba(15, 23, 42, 0.92) 0%, rgba(2, 6, 23, 0.98) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+
+    .start-card {
+      max-width: 500px;
+      width: 90%;
+      background: rgba(15, 23, 42, 0.95);
+      border: 2px solid #38bdf8;
+      border-radius: 18px;
+      padding: 28px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+    }
+
+    .start-card h1 {
+      font-size: 26px;
+      font-weight: 900;
+      color: #38bdf8;
+      margin-bottom: 10px;
+    }
+
+    .start-card p {
+      font-size: 13.5px;
+      color: #cbd5e1;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+
+    .controls-hint {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 12px;
+      margin-bottom: 20px;
+      text-align: left;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .btn-play {
+      background: linear-gradient(135deg, #0284c7, #0369a1);
+      color: #fff;
+      border: none;
+      padding: 12px 28px;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 0 20px rgba(2, 132, 199, 0.5);
+      transition: transform 0.15s;
+    }
+
+    .btn-play:hover {
+      transform: scale(1.04);
+    }
+
+    /* BÖLÜM 2-3 HUD */
+    .battery-hud {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      background: rgba(15, 23, 42, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
+      padding: 8px 12px;
+      z-index: 20;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .battery-bar {
+      width: 110px;
+      height: 12px;
+      background: #1e293b;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .battery-fill {
+      height: 100%;
+      width: 100%;
+      background: #22c55e;
+    }
+
+    .crouch-badge {
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: none;
+      background: rgba(34, 197, 94, 0.2);
+      border: 1px solid #22c55e;
+      color: #86efac;
+      border-radius: 99px;
+      padding: 4px 14px;
+      font-size: 12px;
+      font-weight: 800;
+      z-index: 20;
+    }
+
+    .mats-hud {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      display: none;
+      background: rgba(15, 23, 42, 0.88);
+      border-left: 4px solid #a855f7;
+      border-radius: 10px;
+      padding: 10px 14px;
+      z-index: 20;
+      min-width: 190px;
+    }
+
+    .mats-title {
+      font-size: 12px;
+      font-weight: 800;
+      color: #c084fc;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+
+    .mat-row {
+      font-size: 12px;
+      color: #64748b;
+      line-height: 1.55;
+    }
+
+    .mat-row.has {
+      color: #f1f5f9;
+      font-weight: 700;
+    }
+
+    .book-overlay {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 440px;
+      max-width: 92vw;
+      background: #fef3c7;
+      color: #292524;
+      padding: 22px 26px 16px;
+      border-radius: 6px 14px 14px 6px;
+      border-left: 10px solid #b91c1c;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+      display: none;
+      z-index: 80;
+      font-family: Georgia, serif;
+    }
+
+    .book-overlay h3 {
+      color: #7f1d1d;
+      font-size: 16px;
+      margin-bottom: 10px;
+    }
+
+    .book-overlay p,
+    .book-overlay li {
+      font-size: 14px;
+      line-height: 1.5;
+      margin-bottom: 6px;
+    }
+
+    .book-overlay ol {
+      padding-left: 22px;
+    }
+
+    .book-overlay .danger {
+      color: #b91c1c;
+      font-weight: 700;
+      margin-top: 8px;
+    }
+
+    .craft-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .craft-box {
+      width: 460px;
+      max-width: 92vw;
+      background: #0f172a;
+      border: 2px solid #f59e0b;
+      border-radius: 16px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .craft-items {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .craft-btn {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: #f8fafc;
+      padding: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .craft-btn:hover {
+      background: #334155;
+    }
+
+    .craft-btn.used {
+      opacity: 0.45;
+      cursor: default;
+    }
+
+    .bomb-timer {
+      position: fixed;
+      top: 130px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 48px;
+      font-weight: 900;
+      font-family: monospace;
+      color: #ef4444;
+      text-shadow: 0 0 20px rgba(239, 68, 68, 0.8);
+      display: none;
+      z-index: 60;
+    }
+
+    .flash-overlay {
+      position: fixed;
+      inset: 0;
+      background: #fff;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 150;
+    }
+
+    .death-overlay {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle, rgba(127, 29, 29, 0.85), rgba(0, 0, 0, 0.97));
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 210;
+      text-align: center;
+    }
+
+    /* BÖLÜM 4 */
+    .pc-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 120;
+    }
+
+    .pc-screen {
+      width: 760px;
+      max-width: 96vw;
+      height: 500px;
+      max-height: 90vh;
+      background: linear-gradient(135deg, #0c4a6e, #082f49);
+      border: 10px solid #1f2937;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 0 60px rgba(56, 189, 248, 0.35);
+      font-family: 'Segoe UI', sans-serif;
+    }
+
+    .pc-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(2, 6, 23, 0.8);
+      padding: 6px 12px;
+      font-size: 13px;
+      font-weight: 800;
+      color: #7dd3fc;
+    }
+
+    .pc-bar button {
+      background: #7f1d1d;
+      color: #fecaca;
+      border: none;
+      border-radius: 6px;
+      padding: 3px 10px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .pc-body {
+      flex: 1;
+      padding: 16px;
+      overflow: auto;
+      color: #e2e8f0;
+      font-size: 14px;
+    }
+
+    .pc-icons {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 14px;
+    }
+
+    .pc-icon {
+      background: none;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      color: #f1f5f9;
+      padding: 10px 4px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .pc-icon:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .pc-icon span {
+      display: block;
+      font-size: 34px;
+      margin-bottom: 4px;
+    }
+
+    .pc-window {
+      background: rgba(2, 6, 23, 0.75);
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 14px;
+      white-space: pre-wrap;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .pc-input {
+      background: #020617;
+      border: 1px solid #38bdf8;
+      border-radius: 6px;
+      color: #e0f2fe;
+      padding: 7px 10px;
+      font-size: 15px;
+      font-family: Consolas, monospace;
+      margin: 4px 6px 4px 0;
+    }
+
+    .pc-btn {
+      background: #0284c7;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .wire-box {
+      width: 520px;
+      max-width: 94vw;
+      background: #111827;
+      border: 2px solid #f59e0b;
+      border-radius: 14px;
+      padding: 0 0 16px 0;
+      text-align: center;
+    }
+
+    .wire-area {
+      position: relative;
+      display: flex;
+      justify-content: space-between;
+      padding: 0 40px;
+      height: 260px;
+    }
+
+    .wire-col {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-around;
+      z-index: 2;
+    }
+
+    .wire-end {
+      width: 64px;
+      height: 40px;
+      border-radius: 8px;
+      border: 3px solid #475569;
+      background: #1f2937;
+      color: #fff;
+      font-size: 22px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .wire-end.picked {
+      outline: 3px solid #fff;
+    }
+
+    .wire-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .boat-hud {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      display: none;
+      background: rgba(15, 23, 42, 0.88);
+      border-left: 4px solid #22d3ee;
+      border-radius: 10px;
+      padding: 10px 16px;
+      z-index: 22;
+      font-size: 16px;
+      font-weight: 800;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="gameCanvas"></canvas>
+  <div class="vignette"></div>
+
+  <!-- RETICLE & PROMPT -->
+  <div class="center-hud">
+    <div id="crosshair" class="crosshair"></div>
+    <div id="interactPill" class="interact-pill">[E] Aç / İncele</div>
+  </div>
+
+  <!-- OBJECTIVE HUD -->
+  <div class="objective-panel">
+    <div id="objTitle" class="objective-title">GÖREV 1</div>
+    <div id="objText" class="objective-text">İlk kapıyı [E] tuşuyla aç ve dağınık odaya gir.</div>
+  </div>
+
+  <!-- INVENTORY HUD -->
+  <div class="inventory-panel">
+    <div id="slotKey" class="inv-slot">
+      <span id="iconKey"></span>
+      <span class="inv-name">Altın Anahtar</span>
+    </div>
+    <div id="slotCables" class="inv-slot">
+      <span id="iconCables"></span>
+      <span class="inv-name">Sağlam Kablo</span>
+    </div>
+  </div>
+
+  <!-- TOAST MESSAGE -->
+  <div id="toastBox" class="toast-box"></div>
+
+  <!-- BÖLÜM 2-3 HUD -->
+  <div id="batteryHud" class="battery-hud">
+    <span id="batteryText">🔦 100%</span>
+    <div class="battery-bar"><div id="batteryFill" class="battery-fill"></div></div>
+    <span style="color:#64748b; font-size:11px;">[F]</span>
+  </div>
+  <div id="crouchBadge" class="crouch-badge">EĞİLDİN [C]</div>
+  <div id="adminBadge" style="position:fixed; top:20px; left:50%; transform:translateX(-50%); display:none; z-index:30; background:#7c2d12; border:2px solid #f97316; color:#fed7aa; border-radius:8px; padding:4px 14px; font-size:12px; font-weight:900; letter-spacing:1px;">🛠️ ADMIN MODU</div>
+  <div id="matsHud" class="mats-hud">
+    <div id="matsCount" class="mats-title">MALZEMELER 0/12</div>
+    <div id="matsList"></div>
+  </div>
+  <div id="bombTimer" class="bomb-timer">6.0</div>
+  <!-- BÖLÜM 4: BİLGİSAYAR -->
+  <div id="pcOverlay" class="pc-overlay">
+    <div class="pc-screen">
+      <div class="pc-bar"><span id="pcTitle">PLATFORM-7 · TERMİNAL</span><button onclick="closeComputer()">✕ Kapat [Esc]</button></div>
+      <div id="pcBody" class="pc-body"></div>
+    </div>
+  </div>
+
+  <!-- BÖLÜM 4: KABLO BAĞLAMA -->
+  <div id="wireOverlay" class="pc-overlay">
+    <div class="wire-box">
+      <div class="pc-bar"><span>⚡ MOTOR BAĞLANTI PANELİ</span><button onclick="closeWires()">✕ Kapat [Esc]</button></div>
+      <div style="font-size:13px; color:#cbd5e1; margin:10px 0;">Soldaki kabloya, sonra sağdaki doğru uca tıkla. Yanlış uç kıvılcım çıkarır!</div>
+      <div class="wire-area">
+        <div id="wireLeft" class="wire-col"></div>
+        <svg id="wireSvg" class="wire-svg"></svg>
+        <div id="wireRight" class="wire-col"></div>
+      </div>
+      <div id="wireStatus" style="font-size:13px; font-weight:800; color:#fbbf24; margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <!-- BÖLÜM 4: TEKNE -->
+  <div id="boatHud" class="boat-hud">
+    <div id="boatSpeed">0 km/s</div>
+    <div id="boatHull">❤️❤️❤️</div>
+    <div id="boatDist">Kıyıya: ? m</div>
+    <div style="font-size:11px; color:#94a3b8;">W gaz · S geri · A/D dümen</div>
+  </div>
+
+  <div id="endOverlay" class="death-overlay" style="background:radial-gradient(circle, rgba(14,116,144,0.85), rgba(2,6,23,0.97));">
+    <div>
+      <div style="font-size:64px;">🏝️</div>
+      <h1 style="font-size:42px; font-weight:900; color:#a5f3fc; margin:10px 0;">KARAYA ULAŞTIN!</h1>
+      <p style="font-size:16px; color:#e0f2fe; margin-bottom:8px;">Platform-7'den kaçtın. Denekler artık özgür.</p>
+      <p id="endStats" style="font-size:14px; color:#7dd3fc; margin-bottom:18px;"></p>
+      <h2 style="font-size:26px; font-weight:900; color:#fde68a; letter-spacing:4px;">KAYIP ODALAR — SON</h2>
+      <p style="font-size:13px; color:#94a3b8; margin-top:10px;">Yapımcı: Hakan</p>
+    </div>
+  </div>
+  <div id="flashOverlay" class="flash-overlay"></div>
+
+  <div id="bookOverlay" class="book-overlay">
+    <div id="bookPage"></div>
+    <p style="font-size:11px; color:#78716c; margin-top:10px; text-align:center;">← → sayfa çevir · [E] kapat</p>
+  </div>
+
+  <div id="craftModal" class="craft-modal">
+    <div class="craft-box">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:14px; font-weight:800; color:#f59e0b;">🛠️ BOMBA MASASI</span>
+        <span id="craftStep" style="font-size:13px; font-weight:800; color:#94a3b8;">Adım 0/11</span>
+      </div>
+      <div style="font-size:12px; color:#cbd5e1;">Parçaları kitapçıktaki sırayla tıkla. Yanlış parça bütün düzeneği söker!</div>
+      <div id="craftItems" class="craft-items"></div>
+      <button class="keypad-resume-btn" style="display:block; background:#334155;" onclick="closeCraft()">Kapat [E]</button>
+    </div>
+  </div>
+
+  <div id="deathOverlay" class="death-overlay">
+    <div>
+      <div style="font-size:64px;">💥</div>
+      <h1 id="deathTitle" style="font-size:40px; font-weight:900; color:#fecaca; margin:10px 0;">ÖLDÜN!</h1>
+      <p id="deathText" style="font-size:15px; color:#fca5a5; margin-bottom:22px;"></p>
+      <button class="btn-play" style="background:linear-gradient(135deg,#dc2626,#991b1b); box-shadow:0 0 20px rgba(220,38,38,0.5);" onclick="deathRetry()">TEKRAR DENE (Enter)</button>
+    </div>
+  </div>
+
+  <!-- HUD İÇİ NOT KARTI -->
+  <div id="noteOverlay" class="note-overlay">
+    <div class="note-pin"></div>
+    <button class="note-close-btn" onclick="closeNote()">✕</button>
+    <h3 id="noteTitle" style="margin-bottom:10px; font-size:16px; font-weight:800; color:#854d0e;">📌 GİZLİ NOT</h3>
+    <p id="noteBody" style="font-size:13px; line-height:1.45; margin-bottom:12px; color:#334155;"></p>
+    <div id="noteBig" style="font-size:34px; font-weight:900; letter-spacing:6px; color:#b91c1c; text-align:center; padding:10px; background:rgba(0,0,0,0.06); border-radius:6px;"></div>
+    <p style="font-size:11px; color:#64748b; margin-top:12px; text-align:center;">[E] tuşuna basarak notu kapat</p>
+  </div>
+
+  <!-- KEYPAD MODAL -->
+  <div id="keypadModal" class="keypad-modal">
+    <div class="keypad-box">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span id="keypadTitle" style="font-size:12px; font-weight:700; color:#94a3b8;">KAPI TUŞ TAKIMI</span>
+        <button onclick="closeKeypad()" style="background:none; border:none; color:#ef4444; font-size:18px; cursor:pointer; font-weight:900;">✕</button>
+      </div>
+      <div id="keypadDisplay" class="keypad-screen">----</div>
+      <div id="keypadGrid" class="keypad-grid">
+        <button class="num-btn" onclick="pressKey('1')">1</button>
+        <button class="num-btn" onclick="pressKey('2')">2</button>
+        <button class="num-btn" onclick="pressKey('3')">3</button>
+        <button class="num-btn" onclick="pressKey('4')">4</button>
+        <button class="num-btn" onclick="pressKey('5')">5</button>
+        <button class="num-btn" onclick="pressKey('6')">6</button>
+        <button class="num-btn" onclick="pressKey('7')">7</button>
+        <button class="num-btn" onclick="pressKey('8')">8</button>
+        <button class="num-btn" onclick="pressKey('9')">9</button>
+        <button class="num-btn" style="color:#ef4444;" onclick="pressKey('C')">C</button>
+        <button class="num-btn" onclick="pressKey('0')">0</button>
+        <button class="num-btn" style="color:#10b981;" onclick="pressKey('OK')">OK</button>
+      </div>
+      <button id="keypadResumeBtn" class="keypad-resume-btn" onclick="closeKeypad()">✅ KAPI AÇILDI — DEVAM ET</button>
+      <div style="font-size:11px; color:#64748b; text-align:center;">Klavyeden (0-9, Enter, Esc) de yazabilirsin</div>
+    </div>
+  </div>
+
+  <!-- START OVERLAY -->
+  <div id="startScreen" class="start-screen">
+    <div class="start-card">
+      <div style="font-size:42px; margin-bottom:6px;">🚪🔑⚡</div>
+      <h1 id="startTitle">KAYIP ODALAR</h1>
+      <p id="startDesc">
+        Bölüm 1: Şifreyi çöz, anahtarı bul, güç odasını çalıştır. Bölüm 2: Karanlık odada fenerinle gizli şifreyi ara. Bölüm 3: Depoda 12 malzeme topla, tarife göre bomba yap ve patlamadan önce masanın altına saklan! Bölüm 4: Bilgisayarı araştır, tekneyi tamir et ve fırtınada karaya kaç!
+      </p>
+      <div class="controls-hint">
+        <div><strong>W, A, S, D:</strong> Hareket Et</div>
+        <div><strong>Fare:</strong> Etrafa Bak</div>
+        <div><strong>[E] Tuşu:</strong> Etkileşim (Aç / Al / Kullan)</div>
+        <div><strong>[F] Tuşu:</strong> El Feneri Aç/Kapat</div>
+        <div><strong>[C] Tuşu:</strong> Eğil / Kalk</div>
+        <div><strong>Sol Tık:</strong> Odaklan / Devam Et</div>
+      </div>
+      <button class="btn-play" onclick="startGame()">OYUNA BAŞLA</button>
+    </div>
+  </div>
+
+  <script src="three.min.js"></script>
+  <script src="blender_models.js"></script>
+  <script src="game.js"></script>
+  <script src="bolum2.js"></script>
+  <script src="bolum3.js"></script>
+  <script src="bolum4.js"></script>
+  <script>
+    // ?test ile açılınca otomatik oyun testi (playtest.js) çalışır
+    if (location.search.includes("test")) document.write('<script src="playtest.js"><\/script>');
+  </script>
+</body>
+</html>

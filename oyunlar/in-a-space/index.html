@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IN A SPACE — Uzay Gemisi Macerası</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Nunito+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    /* Arayüz dili: Zelda Breath of the Wild (Hakan'ın referansı) — koyu yarı saydam paneller, krem/altın
+       yazılar, ince çizgiler, Sheikah mavisi vurgular; ekranda yalnızca gereken kadar bilgi. */
+    :root {
+      --cream: #f3ead2; --gold: #d9c27e; --gold-dim: rgba(217, 194, 126, 0.35); --sheikah: #4fd4ff;
+      --panel: rgba(12, 14, 18, 0.72); --panel-strong: rgba(10, 12, 16, 0.9); --heart: #e8473f; --stamina: #6fdc4a;
+      --serif: 'Cinzel', Georgia, 'Times New Roman', serif; --sans: 'Nunito Sans', 'Segoe UI', system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body { background: #000; color: var(--cream); overflow: hidden; width: 100vw; height: 100vh; font-family: var(--sans); }
+    #gameCanvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+    .vignette { position: fixed; inset: 0; pointer-events: none; z-index: 5;
+      background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.45) 100%); }
+    #helmet { position: fixed; inset: 0; pointer-events: none; z-index: 6; display: none;
+      background: radial-gradient(ellipse 78% 72% at center, transparent 72%, rgba(18,26,34,0.75) 88%, #04070a 100%); }
+    #damage { position: fixed; inset: 0; pointer-events: none; z-index: 7; opacity: 0;
+      background: radial-gradient(ellipse at center, transparent 45%, rgba(200,20,20,0.85) 100%); }
+    #alarmTint { position: fixed; inset: 0; pointer-events: none; z-index: 7; background: #ff2a1a; opacity: 0; }
+    #fade { position: fixed; inset: 0; pointer-events: none; z-index: 60; background: #000; opacity: 1; transition: opacity 0.6s; }
+    #cold { position: fixed; inset: 0; pointer-events: none; z-index: 6; opacity: 0;
+      background: radial-gradient(ellipse at center, transparent 55%, rgba(170,220,255,0.55) 100%); }
+
+    /* ---- nişangâh ve etkileşim balonu */
+    .center { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 20; pointer-events: none; }
+    .crosshair { width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,0.9); box-shadow: 0 0 4px rgba(0,0,0,0.8); }
+    #interactPill { display: none; position: fixed; left: calc(50% + 38px); top: calc(50% + 24px); z-index: 20; pointer-events: none;
+      background: var(--panel); border-radius: 99px; padding: 6px 16px 6px 6px; font-size: 16px; font-weight: 600; white-space: nowrap;
+      color: var(--cream); border: 1px solid var(--gold-dim); align-items: center; gap: 10px; }
+    #interactPill .k { width: 26px; height: 26px; border-radius: 50%; background: var(--cream); color: #1a1a1a; font-weight: 800;
+      display: inline-flex; align-items: center; justify-content: center; font-size: 14px; }
+    #holdBar { display: none; position: fixed; left: calc(50% + 38px); top: calc(50% + 64px); z-index: 20; width: 190px; height: 6px;
+      border-radius: 3px; background: rgba(255,255,255,0.15); overflow: hidden; }
+    #holdFill { height: 100%; width: 0; background: linear-gradient(90deg, var(--gold), #fff3b0); }
+
+    /* ---- kalpler ve küçük göstergeler (sol üst) */
+    #hearts { position: fixed; top: 22px; left: 26px; z-index: 20; display: flex; gap: 5px; pointer-events: none; }
+    .heart { position: relative; width: 30px; height: 27px; }
+    .heart svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .heart .full { clip-path: inset(0 0 0 0); }
+    #hearts.low .heart { animation: beat 0.7s infinite; }
+    @keyframes beat { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+    #miniBars { position: fixed; top: 58px; left: 28px; z-index: 20; pointer-events: none; display: flex; flex-direction: column; gap: 5px; }
+    .mini { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 800; color: var(--cream);
+      text-shadow: 0 1px 2px #000; letter-spacing: 1px; }
+    .mini .bg { width: 110px; height: 5px; border-radius: 3px; background: rgba(0,0,0,0.5); overflow: hidden; border: 1px solid rgba(255,255,255,0.15); }
+    .mini .fg { height: 100%; width: 100%; }
+    #batFill { background: #f4d35e; } #heatFill { background: #ff8a3d; }
+
+    /* ---- görev kartı ve sayaçlar (sağ üst) */
+    #objective { position: fixed; top: 22px; right: 26px; z-index: 20; max-width: 380px; pointer-events: none; text-align: right; }
+    #objective .t { font-family: var(--serif); font-size: 12px; letter-spacing: 3px; color: var(--gold); }
+    #objective .t::before { content: "◆ "; }
+    #objText { font-size: 15px; font-weight: 600; margin-top: 4px; line-height: 1.4; text-shadow: 0 1px 3px #000, 0 0 8px rgba(0,0,0,0.6); }
+    #counters { position: fixed; top: 92px; right: 26px; z-index: 20; pointer-events: none; text-align: right; font-size: 13px;
+      font-weight: 700; line-height: 1.7; text-shadow: 0 1px 3px #000; color: var(--cream); }
+    #counters span { color: var(--gold); }
+
+    /* ---- dayanıklılık ve oksijen çarkları */
+    #wheels { position: fixed; left: calc(50% + 70px); top: calc(50% - 70px); z-index: 19; pointer-events: none; display: flex; gap: 6px; }
+    .wheel { width: 54px; height: 54px; transition: opacity 0.4s; opacity: 0; position: relative; }
+    .wheel svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .wheel .lbl { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11px;
+      font-weight: 800; color: var(--cream); text-shadow: 0 1px 2px #000; }
+    #stWheel.tired circle.fg { stroke: #e8473f; }
+    #o2Wheel.low circle.fg { stroke: #ff5a5a; animation: blink 0.5s infinite alternate; }
+    @keyframes blink { from { opacity: 1; } to { opacity: 0.35; } }
+
+    /* ---- mini harita (sağ alt) */
+    #mapWrap { position: fixed; right: 24px; bottom: 22px; z-index: 20; pointer-events: none; display: flex; align-items: flex-end; gap: 8px; }
+    #minimap { width: 176px; height: 176px; border-radius: 10px; border: 2px solid rgba(243,234,210,0.55);
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.6), 0 6px 18px rgba(0,0,0,0.5); background: rgba(8,10,12,0.55); }
+    #mapInfo { position: absolute; right: 2px; bottom: 184px; text-align: right; font-size: 13px; font-weight: 700; text-shadow: 0 1px 3px #000; }
+    #mapInfo .zone { font-family: var(--serif); color: var(--cream); letter-spacing: 1px; }
+    #thermo { width: 14px; height: 120px; border-radius: 7px; border: 2px solid rgba(243,234,210,0.55); background: rgba(0,0,0,0.5);
+      position: relative; overflow: hidden; margin-bottom: 26px; }
+    #thermoFill { position: absolute; left: 0; right: 0; bottom: 0; height: 50%; background: linear-gradient(0deg, #4fa3ff, #9fe0ff); }
+    #thermoVal { position: absolute; right: 196px; bottom: 2px; font-size: 13px; font-weight: 800; text-shadow: 0 1px 3px #000; }
+
+    /* ---- bildirimler */
+    #toast { position: fixed; left: 50%; bottom: 170px; transform: translateX(-50%); z-index: 30; pointer-events: none;
+      background: var(--panel); border-top: 1px solid var(--gold-dim); border-bottom: 1px solid var(--gold-dim);
+      padding: 9px 26px; font-size: 16px; font-weight: 600; opacity: 0; transition: opacity 0.25s; max-width: 80vw; text-align: center; }
+    /* Konuşmalar "Görev güncellendi" bildiriminin hemen altında (Hakan'ın isteği) */
+    #subtitle { position: fixed; left: 50%; top: calc(13% + 76px); transform: translateX(-50%); z-index: 30; pointer-events: none;
+      width: min(760px, 80vw); display: none; background: rgba(0,0,0,0.72); border-radius: 16px; padding: 16px 26px 18px; }
+    #subtitle .who { position: absolute; top: -13px; left: 26px; font-size: 13px; font-weight: 800; letter-spacing: 1px;
+      color: #ffb547; background: rgba(0,0,0,0.85); padding: 3px 12px; border-radius: 99px; }
+    #subtitle .txt { font-size: 19px; line-height: 1.45; color: #fff; }
+    #subtitle .more { position: absolute; right: 18px; bottom: 8px; color: var(--cream); font-size: 12px; animation: blink 0.7s infinite alternate; }
+
+    #banner { position: fixed; left: 50%; top: 34%; transform: translateX(-50%); z-index: 25; pointer-events: none; text-align: center;
+      opacity: 0; transition: opacity 0.8s; }
+    #banner .title { font-family: var(--serif); font-size: 46px; font-weight: 700; color: var(--cream); letter-spacing: 3px;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.85); display: flex; align-items: center; gap: 22px; white-space: nowrap; }
+    #banner .title::before, #banner .title::after { content: ""; width: 120px; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--cream), transparent); }
+    #banner .sub { font-size: 15px; letter-spacing: 4px; color: var(--gold); margin-top: 6px; text-shadow: 0 1px 4px #000; }
+    #banner.small .title { font-size: 26px; }
+    #banner.small .title::before, #banner.small .title::after { width: 70px; }
+
+    #quest { position: fixed; left: 50%; top: 13%; transform: translateX(-50%); z-index: 25; pointer-events: none; text-align: center;
+      opacity: 0; transition: opacity 0.5s; background: linear-gradient(90deg, transparent, rgba(0,0,0,0.7) 20%, rgba(0,0,0,0.7) 80%, transparent);
+      padding: 10px 90px; }
+    #quest .h { font-family: var(--serif); font-size: 13px; letter-spacing: 4px; color: var(--gold); }
+    #quest .q { font-size: 18px; font-weight: 600; margin-top: 3px; }
+
+    #marker { position: fixed; z-index: 15; pointer-events: none; display: none; transform: translate(-50%, -50%);
+      color: var(--gold); font-size: 12px; font-weight: 800; text-align: center; text-shadow: 0 0 4px #000; }
+    #marker .d { width: 12px; height: 12px; border: 2px solid var(--gold); background: rgba(217,194,126,0.25); transform: rotate(45deg);
+      margin: 0 auto 4px; box-shadow: 0 0 8px rgba(217,194,126,0.8); }
+
+    /* ---- Sheikah Slate tarzı pencereler */
+    .overlay { position: fixed; inset: 0; z-index: 40; display: none; align-items: center; justify-content: center;
+      background: radial-gradient(ellipse at center, rgba(8,12,18,0.72), rgba(0,0,0,0.92)); }
+    .panel { background: var(--panel-strong); border: 1px solid var(--gold-dim); border-radius: 4px; padding: 30px 36px;
+      max-width: 660px; width: 92vw; position: relative; box-shadow: 0 0 0 1px rgba(0,0,0,0.8), 0 20px 60px rgba(0,0,0,0.6); }
+    .panel::before, .panel::after { content: ""; position: absolute; left: 18px; right: 18px; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--gold), transparent); }
+    .panel::before { top: 8px; } .panel::after { bottom: 8px; }
+    .panel h1 { font-family: var(--serif); font-size: 52px; letter-spacing: 6px; color: var(--cream); font-weight: 700;
+      text-shadow: 0 0 24px rgba(79,212,255,0.35); }
+    .panel h2 { font-family: var(--serif); font-size: 22px; letter-spacing: 3px; color: var(--cream); margin-bottom: 14px; font-weight: 700; }
+    .panel p { line-height: 1.6; color: #d9d2bf; margin: 10px 0; }
+    .sub-title { font-size: 13px; letter-spacing: 6px; color: var(--sheikah); margin-top: 4px; }
+    .btn { display: inline-block; margin: 10px 10px 0 0; padding: 10px 22px; border-radius: 2px; border: 1px solid var(--gold-dim);
+      background: rgba(255,255,255,0.04); color: var(--cream); font-size: 16px; font-weight: 700; cursor: pointer; font-family: var(--sans);
+      letter-spacing: 1px; transition: all 0.15s; }
+    .btn:hover:not(:disabled) { border-color: var(--sheikah); color: #fff; box-shadow: 0 0 14px rgba(79,212,255,0.45); background: rgba(79,212,255,0.08); }
+    .btn:disabled { opacity: 0.3; cursor: default; }
+    .keys { font-size: 13px; color: #a9a291; margin-top: 18px; line-height: 1.9; }
+    .keys b { color: #1a1a1a; background: var(--cream); padding: 1px 7px; border-radius: 99px; font-size: 12px; }
+
+    #menu { background: linear-gradient(90deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.55) 45%, transparent 75%); justify-content: flex-start; }
+    #menu .panel { background: transparent; border: none; box-shadow: none; margin-left: 7vw; max-width: 560px; }
+    #menu .panel::before, #menu .panel::after { display: none; }
+    #menu .btn { display: block; border: none; background: none; font-family: var(--serif); font-size: 22px; padding: 8px 0; margin: 6px 0;
+      text-align: left; letter-spacing: 2px; }
+    #menu .btn::before { content: "◆  "; color: transparent; transition: color 0.15s; }
+    #menu .btn:hover:not(:disabled) { box-shadow: none; background: none; color: #fff; text-shadow: 0 0 12px var(--sheikah); }
+    #menu .btn:hover:not(:disabled)::before { color: var(--sheikah); }
+
+    #mapList { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+    .planetBtn { padding: 14px; border-radius: 3px; border: 1px solid var(--gold-dim); background: rgba(255,255,255,0.03); color: var(--cream);
+      cursor: pointer; text-align: left; font-size: 14px; font-family: var(--sans); transition: all 0.15s; }
+    .planetBtn .ball { width: 48px; height: 48px; border-radius: 50%; float: left; margin-right: 12px; box-shadow: 0 0 14px rgba(255,255,255,0.15); }
+    .planetBtn b { font-family: var(--serif); font-size: 17px; display: block; margin-bottom: 3px; letter-spacing: 1px; }
+    .planetBtn:disabled { opacity: 0.35; cursor: default; }
+    .planetBtn:not(:disabled):hover { border-color: var(--sheikah); box-shadow: 0 0 14px rgba(79,212,255,0.35); }
+
+    #kpDisplay { font-family: Consolas, monospace; font-size: 34px; letter-spacing: 14px; text-align: center; background: rgba(0,0,0,0.6);
+      border: 1px solid var(--gold-dim); padding: 10px; margin: 10px 0; color: var(--sheikah); text-shadow: 0 0 10px var(--sheikah); }
+    #kpGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    #kpGrid button { padding: 14px; font-size: 20px; font-weight: 800; border-radius: 2px; border: 1px solid var(--gold-dim);
+      background: rgba(255,255,255,0.04); color: var(--cream); cursor: pointer; }
+    #kpGrid button:hover { border-color: var(--sheikah); }
+    #padText { white-space: pre-wrap; font-size: 16px; color: #e9e2cf; line-height: 1.7; background: rgba(0,0,0,0.35);
+      padding: 16px 18px; border-left: 2px solid var(--sheikah); }
+
+    #deathScreen { background: rgba(0,0,0,0.9); }
+    #deathScreen .panel { background: transparent; border: none; box-shadow: none; text-align: center; }
+    #deathScreen .panel::before, #deathScreen .panel::after { display: none; }
+    #deathScreen h1 { color: #e9e2cf; text-shadow: 0 0 20px rgba(232,71,63,0.6); }
+
+    #adminBadge { position: fixed; top: 22px; left: 50%; transform: translateX(-50%); z-index: 25; display: none;
+      background: rgba(120,40,10,0.85); color: #fed7aa; padding: 5px 12px; border-radius: 3px; font-weight: 800; font-size: 13px; }
+    #clickHint { position: fixed; left: 50%; top: 62%; transform: translateX(-50%); z-index: 25; display: none; color: var(--cream);
+      background: var(--panel); padding: 8px 16px; border-radius: 99px; font-size: 14px; pointer-events: none; }
+    #turretHud { position: fixed; inset: 0; z-index: 19; pointer-events: none; display: none; }
+    #turretHud .ring { position: absolute; left: 50%; top: 50%; width: 74px; height: 74px; transform: translate(-50%, -50%);
+      border: 2px solid var(--sheikah); border-radius: 50%; box-shadow: 0 0 14px var(--sheikah); }
+    #turretHud .ring::after { content: ""; position: absolute; inset: 30px; border-radius: 50%; background: var(--sheikah); }
+    #turretHud .txt { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); color: var(--cream); font-weight: 700;
+      background: var(--panel); padding: 6px 16px; border-radius: 99px; font-size: 14px; }
+    body:not(.playing) #hearts, body:not(.playing) #miniBars, body:not(.playing) #objective, body:not(.playing) #counters,
+    body:not(.playing) #mapWrap, body:not(.playing) #wheels, body:not(.playing) .crosshair { display: none !important; }
+    #escape { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 26; pointer-events: none; display: none;
+      font-family: var(--serif); font-size: 44px; font-weight: 700; color: #ff6b5a; text-shadow: 0 0 18px rgba(255,60,40,0.8), 0 2px 4px #000; }
+    #testLog { position: fixed; right: 10px; bottom: 210px; z-index: 100; width: 460px; max-height: 50vh; overflow: auto;
+      background: rgba(0,0,0,0.88); color: #a3e635; font: 12px Consolas, monospace; padding: 8px; display: none; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+  <div class="vignette"></div>
+  <div id="cold"></div>
+  <div id="helmet"></div>
+  <div id="damage"></div>
+  <div id="alarmTint"></div>
+
+  <div class="center"><div class="crosshair"></div></div>
+  <div id="interactPill"></div>
+  <div id="holdBar"><div id="holdFill"></div></div>
+
+  <div id="hearts"></div>
+  <div id="miniBars">
+    <div class="mini">🔦 <div class="bg"><div class="fg" id="batFill"></div></div></div>
+    <div class="mini" id="heatRow" style="display:none">🔥 <div class="bg"><div class="fg" id="heatFill"></div></div></div>
+  </div>
+
+  <div id="objective"><div class="t">GÖREV</div><div id="objText">—</div></div>
+  <div id="counters">⚡ Çekirdek <span id="coreCount">0/3</span><br>📜 Not <span id="logCount">0/6</span><br>✦ Kristal <span id="crystalCount">0/9</span></div>
+
+  <div id="wheels">
+    <div class="wheel" id="stWheel"><svg viewBox="0 0 54 54">
+      <circle cx="27" cy="27" r="21" fill="rgba(0,0,0,0.45)" stroke="rgba(0,0,0,0.6)" stroke-width="9"/>
+      <circle class="fg" id="stArc" cx="27" cy="27" r="21" fill="none" stroke="#6fdc4a" stroke-width="7" stroke-linecap="round" stroke-dasharray="132 132"/>
+    </svg></div>
+    <div class="wheel" id="o2Wheel"><svg viewBox="0 0 54 54">
+      <circle cx="27" cy="27" r="21" fill="rgba(0,0,0,0.45)" stroke="rgba(0,0,0,0.6)" stroke-width="9"/>
+      <circle class="fg" id="o2Arc" cx="27" cy="27" r="21" fill="none" stroke="#4fd4ff" stroke-width="7" stroke-linecap="round" stroke-dasharray="132 132"/>
+    </svg><div class="lbl">O₂</div></div>
+  </div>
+
+  <div id="mapWrap">
+    <div id="thermo"><div id="thermoFill"></div></div>
+    <canvas id="minimap" width="176" height="176"></canvas>
+    <div id="mapInfo"><div class="zone" id="zoneName">ARGO-7</div></div>
+    <div id="thermoVal">21°C</div>
+  </div>
+
+  <div id="toast"></div>
+  <div id="subtitle"></div>
+  <div id="banner"><div class="title" id="bannerTitle"></div><div class="sub" id="bannerSub"></div></div>
+  <div id="quest"><div class="h">◆ GÖREV GÜNCELLENDİ ◆</div><div class="q" id="questText"></div></div>
+  <div id="marker"><div class="d"></div><span id="markerDist"></span></div>
+  <div id="adminBadge">🛠️ ADMIN MODU</div>
+  <div id="escape"></div>
+  <div id="turretHud"><div class="ring"></div><div class="txt">GEMİ TOPU · Sol tık: ateş · E: koltuktan kalk</div></div>
+  <div id="clickHint">Devam etmek için ekrana tıkla</div>
+
+  <!-- ANA MENÜ -->
+  <div class="overlay" id="menu" style="display:flex">
+    <div class="panel">
+      <h1>IN A SPACE</h1>
+      <div class="sub-title">— ARGO-7'NİN SON YOLCUSU —</div>
+      <p>Kriyo uykusundan uyanıyorsun. Mürettebat yok. Geminin yapay zekâsı NOVA, eve dönmek için üç gezegenden üç
+        enerji çekirdeği bulman gerektiğini söylüyor…</p>
+      <button class="btn" id="btnNew">Yeni Oyun</button>
+      <button class="btn" id="btnContinue" disabled>Devam Et</button>
+      <div class="keys">
+        <b>W A S D</b> yürü · <b>Shift</b> koş · <b>Space</b> zıpla — havada tekrar: jetpack süzülme<br>
+        Kayaya doğru <b>W</b>: tırman · <b>E</b> etkileşim · <b>F</b> fener · <b>Sol tık</b> ateş · <b>Esc</b> duraklat
+      </div>
+    </div>
+  </div>
+
+  <!-- DURAKLAT -->
+  <div class="overlay" id="pauseMenu">
+    <div class="panel">
+      <h2>Duraklatıldı</h2>
+      <p>Fare hassasiyeti: <input type="range" id="sens" min="0.6" max="3" step="0.1" value="1.4"></p>
+      <button class="btn" id="btnResume">Devam</button>
+      <button class="btn" id="btnMainMenu">Ana menü</button>
+    </div>
+  </div>
+
+  <!-- YILDIZ HARİTASI -->
+  <div class="overlay" id="starMap">
+    <div class="panel">
+      <h2>Yıldız Haritası</h2>
+      <div id="mapList"></div>
+      <button class="btn" id="btnMapClose">Kapat</button>
+    </div>
+  </div>
+
+  <!-- TUŞ TAKIMI -->
+  <div class="overlay" id="keypad">
+    <div class="panel" style="max-width:330px">
+      <h2>Cephanelik</h2>
+      <div id="kpDisplay">____</div>
+      <div id="kpGrid"></div>
+      <button class="btn" id="btnKpClose">Kapat</button>
+    </div>
+  </div>
+
+  <!-- NOT DEFTERİ -->
+  <div class="overlay" id="datapad">
+    <div class="panel">
+      <h2 id="padTitle"></h2>
+      <div id="padText"></div>
+      <button class="btn" id="btnPadClose">Kapat (E)</button>
+    </div>
+  </div>
+
+  <!-- ÖLÜM -->
+  <div class="overlay" id="deathScreen">
+    <div class="panel">
+      <h1>ÖLDÜN</h1>
+      <p id="deathReason"></p>
+      <button class="btn" id="btnRetry">Tekrar dene</button>
+    </div>
+  </div>
+
+  <!-- SON -->
+  <div class="overlay" id="endScreen">
+    <div class="panel" style="text-align:center">
+      <h1>IN A SPACE</h1>
+      <div class="sub-title">— SON —</div>
+      <p>ARGO-7 Dünya yörüngesine ulaştı. NOVA: "Eve hoş geldin. Kaçış kapsüllerindeki mürettebatın sinyalini aldım —
+        hepsi hayatta, seni bekliyorlar."</p>
+      <p id="endStats"></p>
+      <p>Hikâye bitti ama uzay seni bekliyor: <b>serbest uçuşta</b> istediğin gezegene git. Yolda meteorlar,
+        uzaylılar, elektrik kesintileri ve gövde delikleri hâlâ var!</p>
+      <button class="btn" id="btnFree">Serbest uçuşa devam</button>
+      <button class="btn" id="btnEndMenu">Ana menü</button>
+    </div>
+  </div>
+
+  <div id="fade"></div>
+  <div id="testLog"></div>
+
+  <script src="three.min.js"></script>
+  <script src="engine.js"></script>
+  <script src="world.js"></script>
+  <script src="story.js"></script>
+  <script>
+    if (location.search.includes("test")) document.write('<script src="playtest.js"><\/script>');
+  </script>
+</body>
+</html>

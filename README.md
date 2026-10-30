@@ -26,6 +26,9 @@ Buradaki hedef basit: yeni oyunları ve projeleri aynı çatı altında toplamak
 
 | Oyun | Tür | Durum |
 | --- | --- | --- |
+| **IN A SPACE** | 3D uzay macerası | Tarayıcıdan oynanabilir |
+| **Kayıp Odalar** | 3D kaçış & macera | Tarayıcıdan oynanabilir |
+| **VIPEND 3D** | 3D bulmaca FPS | Tarayıcıdan oynanabilir |
 | **Karanlık Labirent** | 3D korku kaçış | Tarayıcıdan oynanabilir |
 | **Ejderha Uçuşu** | 3D uçuş | Tarayıcıdan oynanabilir |
 | **Make City** | Şehir kurma | Tarayıcıdan oynanabilir |
