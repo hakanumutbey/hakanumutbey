@@ -207,7 +207,11 @@ async function injectGameTools(filePath) {
     /((?:src|href)=")(?!https?:|\/|data:|#)([^"?]+\.(?:js|css))(?:\?[^"]*)?(")/g,
     `$1$2?v=${buildId}$3`
   );
-  if (html.includes("/site-game-tools.js")) return;
-  html = html.replace("</body>", '  <script type="module" src="/site-game-tools.js"></script>\n  </body>');
+  // Arac cubugu da ?v= alir: yoksa telefonlar 30 gun eski surumu kullaniyordu (mobil duzeltmeler ulasmiyordu)
+  if (html.includes("/site-game-tools.js")) {
+    html = html.replace(/\/site-game-tools\.js(?:\?[^"]*)?"/g, `/site-game-tools.js?v=${buildId}"`);
+  } else {
+    html = html.replace("</body>", `  <script type="module" src="/site-game-tools.js?v=${buildId}"></script>\n  </body>`);
+  }
   await writeFile(filePath, html, "utf8");
 }
