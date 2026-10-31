@@ -26,6 +26,7 @@ Buradaki hedef basit: yeni oyunları ve projeleri aynı çatı altında toplamak
 
 | Oyun | Tür | Durum |
 | --- | --- | --- |
+| **IN A SPACE 2** | 3D hikâye macerası (seçimli diyalog, 5 son) | Tarayıcıdan ve telefondan oynanabilir |
 | **IN A SPACE** | 3D uzay macerası | Tarayıcıdan oynanabilir |
 | **Kayıp Odalar** | 3D kaçış & macera | Tarayıcıdan oynanabilir |
 | **VIPEND 3D** | 3D bulmaca FPS | Tarayıcıdan oynanabilir |

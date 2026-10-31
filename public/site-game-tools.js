@@ -26,6 +26,7 @@ const gameTitles = {
   "ejderha-ucus": "Ejderha Uçuşu",
   "karanlik-labirent": "Karanlık Labirent",
   "in-a-space": "IN A SPACE",
+  "in-a-space-2": "IN A SPACE 2",
   "kayip-odalar": "Kayıp Odalar",
   "vipend-3d": "VIPEND 3D",
 };

@@ -41,6 +41,7 @@ await copyStaticGame("karanlik-labirent");
 await copyStaticGame("make-city");
 await copyStaticGame("ejderha-ucus");
 await copyStaticGame("in-a-space");
+await copyStaticGame("in-a-space-2");
 await copyStaticGame("kayip-odalar");
 await copyStaticGame("vipend-3d");
 await copyRobotAvcisi();
