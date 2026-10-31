@@ -337,7 +337,7 @@ addInteract(W.ship, {
     const t = exitTarget();
     if (!t) return toast(G.travel ? "Hiper yolculukta dış kapak açılmaz!" : "Dışarıda gidilecek bir yer yok.");
     if (!player.suit && G.zones[t].vacuum) { sfx("wrong"); return toast("Giysisiz çıkarsan boşlukta ölürsün! Dolaptan giysiyi giy."); }
-    transition(() => {
+    exitAnim(t, () => {   // features.js: hava kilidi + iniş aracı animasyonu
       if (t === "hull") setZone("hull", 8, 3.4, Math.PI / 2);
       else { const sp = G.zones[t].spawn; setZone(t, sp[0], sp[2] === 0 ? 1.5 : sp[2], t === "anagemi" ? -Math.PI / 2 : 0); }
       resetCans(t);

@@ -475,8 +475,24 @@ W.suitMesh = new THREE.Group();
 }
 W.p.locker = [0.95, 1.4, 6.5];
 cyl(SHIP, 5, 1.4, 9.82, 1.1, 0.1, M.trim, 24).rotation.x = Math.PI / 2;
-cyl(SHIP, 5, 1.4, 9.76, 0.85, 0.08, M.door, 24).rotation.x = Math.PI / 2;
-cyl(SHIP, 5, 1.4, 9.72, 0.2, 0.08, M.yellow, 12).rotation.x = Math.PI / 2;
+// Dış kapak: çıkış animasyonunda dönerek açılır, sonra yana kayar
+W.hatchDoor = new THREE.Group();
+{
+  const door = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.08, 24), M.door);
+  door.rotation.x = Math.PI / 2;
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.08, 12), M.yellow);
+  hub.rotation.x = Math.PI / 2; hub.position.z = -0.04;
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.1, 0.05), M.yellow);
+  bar.position.z = -0.06;
+  W.hatchDoor.add(door, hub, bar);
+  W.hatchDoor.position.set(5, 1.4, 9.76);
+  SHIP.group.add(W.hatchDoor);
+  // kapak açılınca görünen karanlık geçit
+  const hole = new THREE.Mesh(new THREE.CircleGeometry(0.85, 24), basic(0x05070a));
+  hole.position.set(5, 1.4, 9.765);
+  hole.rotation.y = Math.PI;
+  SHIP.group.add(hole);
+}
 W.p.hatch = [5, 1.4, 9.7];
 for (let i = 0; i < 6; i++) box(SHIP, 2.0 + i * 1.2, 0.006, 8.6, 0.6, 0.01, 1.4, i % 2 ? M.dark : M.yellow, false);
 box(SHIP, 9.5, 0.25, 5, 0.6, 0.5, 2.2, M.trim);
@@ -840,7 +856,8 @@ function buildPlanet(P) {
   const sun = new THREE.DirectionalLight(P.sun, P.sunI);
   sun.position.set(...(P.sunDir || [0.4, 0.5, -0.6]).map(v => v * 100));
   zone.group.add(sun);
-  // iniş aracı
+  // iniş aracı (parçaları iniş animasyonu için ayrıca tutulur)
+  const landerFrom = zone.group.children.length;
   if (P.lander !== false) {
     box(zone, 0, 1.7, 6.5, 4, 2.6, 5, M.white);
     box(zone, 0, 3.2, 6.5, 3, 0.5, 4, M.trim, false);
@@ -851,7 +868,9 @@ function buildPlanet(P) {
     box(zone, 0, 2.85, 3.97, 1.0, 0.14, 0.05, M.screenGreen, false);
   }
   const cans = P.cans || [];
-  W.planets[P.id] = { zone, hatch: [0, 1.4, 3.9], core: site, cans, h, name: P.name, crystals: [] };
+  const landerParts = zone.group.children.slice(landerFrom);
+  for (const m of landerParts) m.userData.y0 = m.position.y;
+  W.planets[P.id] = { zone, hatch: [0, 1.4, 3.9], core: site, cans, h, name: P.name, crystals: [], landerParts };
   const r = rng(P.seed);
   const segDist = (x, z) => {
     const t = Math.max(0, Math.min(1, (x * cx + z * cz) / (cx * cx + cz * cz)));

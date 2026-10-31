@@ -597,6 +597,8 @@ let shake = 0;
 // meteorları kapatıyordu), fare yalnızca dar bir açıda nişan alır.
 const TURRET_EYE = new THREE.Vector3(43.6, 2.0, 0);
 function updateCamera(dt) {
+  // Sinematik sahneler (iniş aracının inişi) kamerayı kendisi yönetir
+  if (G.camOverride) { G.camOverride(camera, dt); return; }
   if (player.moving && player.onGround) bobT += dt * (player.running ? 13 : 9);
   const bob = player.moving && player.onGround ? Math.sin(bobT) * 0.035 : 0;
   if (G.turret) {

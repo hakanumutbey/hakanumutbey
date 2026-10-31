@@ -570,6 +570,7 @@ function freeSpot(zone, x, z) {
 function adminJump(label, cp) {
   closeUI();
   // sürmekte olan sahne, soru ve konuşmalar biter
+  if (exitSt) endExit();
   wake = null;
   G.cutscene = false;
   canvas.style.filter = "";
@@ -634,6 +635,129 @@ addEventListener("keydown", e => {
 });
 visuals.push(() => { $("btnAdminJump").style.display = G.admin ? "inline-block" : "none"; });
 
+// ---------------------------------------------------------------- dışarı çıkma animasyonu
+// Hava kilidi: kapıya yürü, sarı uyarı ışığı ve bip, hava boşalır (tıslama), yuvarlak kapak dönüp yana kayar, içinden geç.
+// Gezegene çıkışta dışarıdan görüntü: iniş aracı ateş püskürterek iner, toz kalkar, sarsılarak konar; sonra rampadan yürüyerek inersin.
+SFX.clank = () => { tone(180, 0.18, "square", 0.08, -40); noise(0.12, 0.12, 2000); };
+SFX.rumble = () => { noise(2.6, 0.16, 300); tone(48, 2.4, "sawtooth", 0.05, 30); };
+SFX.thump = () => { tone(55, 0.5, "sine", 0.45, -25); noise(0.6, 0.3, 500); };
+let exitSt = null;
+function exitAnim(t, fn) {
+  if (TEST) return transition(fn);
+  exitSt = { t: 0, phase: "lock", target: t, fn, x0: player.pos.x, z0: player.pos.z, yaw0: player.yaw, pitch0: player.pitch, beeps: 0, hissed: false, clanked: false };
+  G.cutscene = true;
+  document.body.classList.remove("playing");
+  showBanner("HAVA KİLİDİ", "BASINÇ BOŞALTILIYOR", true);
+}
+function landerFx(P) {
+  if (P.flame) return P.flame;
+  const g = new THREE.Group();
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(0.7, 2.6, 12, 1, true), new THREE.MeshBasicMaterial({ color: 0xffa23a, transparent: true, opacity: 0.85, depthWrite: false }));
+  cone.rotation.x = Math.PI; cone.position.y = -1.3;
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: CLOUD_TEX, color: 0xffc070, transparent: true, opacity: 0.9, depthWrite: false, fog: false }));
+  glow.scale.set(5, 5, 1); glow.position.y = -1;
+  g.add(cone, glow);
+  const dust = new THREE.Sprite(new THREE.SpriteMaterial({ map: CLOUD_TEX, color: 0xd6c3a0, transparent: true, opacity: 0, depthWrite: false }));
+  P.zone.group.add(g, dust);
+  P.flame = g; P.dust = dust; P.cone = cone;
+  return g;
+}
+function setLanderY(P, dy) { for (const m of P.landerParts) m.position.y = m.userData.y0 + dy; }
+visuals.push(dt => {
+  const e = exitSt;
+  if (!e) return;
+  e.t += dt;
+  const t = e.t, amber = $("airlockTint");
+  if (e.phase === "lock") {
+    // kapının önüne geç, kapıya dön
+    const k = ease(t / 0.9);
+    player.pos.x = e.x0 + (5 - e.x0) * k;
+    player.pos.z = e.z0 + (8.5 - e.z0) * k;
+    let dyaw = Math.PI - e.yaw0; dyaw = Math.atan2(Math.sin(dyaw), Math.cos(dyaw));
+    player.yaw = e.yaw0 + dyaw * k;
+    player.pitch = e.pitch0 * (1 - k);
+    amber.style.opacity = (0.12 + 0.12 * Math.sin(t * 9)).toFixed(2);
+    if (e.beeps < 3 && t > 0.2 + e.beeps * 0.4) { sfx("beep"); e.beeps++; }
+    if (!e.hissed && t > 1.1) { e.hissed = true; sfx("hiss"); setTimeout(() => sfx("hiss"), 500); shake = 0.25; }
+    // kapak döner (kilit açılır), sonra yana kayar
+    W.hatchDoor.rotation.z = -Math.PI * 1.5 * ease((t - 1.3) / 1.0);
+    if (!e.clanked && t > 2.3) { e.clanked = true; sfx("clank"); shake = 0.3; }
+    W.hatchDoor.position.x = 5 + 1.9 * ease((t - 2.3) / 0.6);
+    if (t > 2.9) player.pos.z = 8.5 + 1.1 * ease((t - 2.9) / 0.7);
+    if (t > 3.0 && !e.faded) { e.faded = true; fadeTo(1); }
+    if (t > 3.7) {
+      amber.style.opacity = 0;
+      e.fn();
+      W.hatchDoor.rotation.z = 0;
+      W.hatchDoor.position.x = 5;
+      const P = W.planets[e.target];
+      e.t = 0;
+      if (P && P.landerParts && P.landerParts.length) {
+        e.phase = "land"; e.P = P;
+        landerFx(P);
+        $("helmet").style.display = "none";
+        const h0 = P.h(10, 13);
+        G.camOverride = cam => {
+          cam.position.set(10, h0 + 3.2, 14);
+          cam.lookAt(0, 2.2 + e.dy * 0.7, 6.5);
+          if (shake > 0) { cam.position.x += (Math.random() - 0.5) * shake * 0.2; cam.position.y += (Math.random() - 0.5) * shake * 0.2; shake = Math.max(0, shake - 0.03); }
+        };
+        e.dy = 24;
+        setLanderY(P, e.dy);
+        fadeTo(0);
+        sfx("rumble");
+      } else { e.phase = "out"; fadeTo(0); }
+    }
+  } else if (e.phase === "land") {
+    const P = e.P, k = Math.min(1, t / 3.0);
+    e.dy = 24 * Math.pow(1 - k, 2);
+    setLanderY(P, e.dy);
+    const on = k < 1;
+    P.flame.visible = on;
+    P.flame.position.set(0, 0.4 + e.dy, 6.5);
+    P.cone.scale.set(1, 0.7 + Math.random() * 0.5 + (1 - k), 1);
+    // yere yaklaşınca toz bulutu
+    const near = Math.max(0, 1 - e.dy / 7);
+    P.dust.position.set(0, P.h(0, 6.5) + 0.8, 6.5);
+    P.dust.scale.set(4 + near * 10, 2 + near * 4, 1);
+    P.dust.material.opacity = on ? near * 0.75 : Math.max(0, P.dust.material.opacity - dt * 0.6);
+    if (!e.landed && k >= 1) { e.landed = true; sfx("thump"); shake = 1.2; }
+    if (t > 3.7 && !e.faded2) { e.faded2 = true; fadeTo(1); }
+    if (t > 4.3) {
+      // rampanın başına geç, ilk şahısta aşağı yürü
+      G.camOverride = null;
+      P.flame.visible = false;
+      P.dust.material.opacity = 0;
+      $("helmet").style.display = player.suit ? "block" : "none";
+      e.phase = "ramp"; e.t = 0;
+      player.yaw = 0; player.pitch = -0.08;
+      fadeTo(0);
+    }
+  } else if (e.phase === "ramp") {
+    const P = e.P, k = ease(t / 1.4);
+    player.pos.z = 3.6 - 2.1 * k;
+    player.pos.x = 0;
+    player.pos.y = Math.max(P.h(0, player.pos.z), 0.55 * (1 - k));
+    bobT += dt * 9;
+    if (t > 1.5) endExit();
+  } else if (e.phase === "out") {
+    if (t > 0.7) endExit();
+  }
+});
+function endExit() {
+  const e = exitSt;
+  exitSt = null;
+  G.camOverride = null;
+  G.cutscene = false;
+  player.vy = 0;
+  player.onGround = true;
+  document.body.classList.add("playing");
+  $("airlockTint").style.opacity = 0;
+  W.hatchDoor.rotation.z = 0;
+  W.hatchDoor.position.x = 5;
+  if (e && e.P) { setLanderY(e.P, 0); e.P.flame.visible = false; e.P.dust.material.opacity = 0; }
+}
+
 // ---------------------------------------------------------------- elde alet görünümü, sallanma, geri tepme
 const _shootBase = onShoot;
 onShoot = () => holdingPick() ? swing() : _shootBase();
@@ -641,9 +765,9 @@ G.onGunFired = () => { recoil = 1; };
 let oreHudT = 0;
 visuals.push(dt => {
   swingCd = Math.max(0, swingCd - dt);
-  const pick = holdingPick() && G.running;
+  const pick = holdingPick() && G.running && !G.camOverride;
   W.pickView.visible = pick;
-  W.gunView.visible = player.gun && !pick;
+  W.gunView.visible = player.gun && !pick && !G.camOverride;
   const walkBob = player.moving && player.onGround ? Math.sin(bobT) : 0;
   // kazma vuruşu: geri kalkar, öne iner
   swingT = Math.max(0, swingT - dt);
