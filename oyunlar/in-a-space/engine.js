@@ -168,6 +168,8 @@ function toggleAdmin() {
 
 addEventListener("keydown", e => {
   if (handleAdminCombo(e)) return;
+  // M her yerde çalışır (konuşma kutusu, duraklat menüsü, harita açıkken de): yoksa müzik kapanmıyordu
+  if (e.code === "KeyM" && !e.repeat) toggleMusic();
   if (G.uiOpen) {
     if (G.uiOpen === "datapad" && (e.code === "KeyE" || e.code === "Escape")) closeUI();
     else if (e.code === "Escape") closeUI();
@@ -179,7 +181,6 @@ addEventListener("keydown", e => {
   keys[e.code] = true;
   if (e.code === "KeyE" && !e.repeat) interactRequested = true;
   if (e.code === "KeyF" && !e.repeat && G.running) toggleFlashlight();
-  if (e.code === "KeyM" && !e.repeat && G.running) toggleMusic();
   if (e.code === "Space") { e.preventDefault(); if (!e.repeat) spaceTap = true; }
 });
 addEventListener("keyup", e => {
@@ -436,9 +437,16 @@ function updateMusic(dt) {
 function toggleMusic() {
   music.on = !music.on;
   try { localStorage.setItem("inaspace_music", music.on ? "on" : "off"); } catch (e) { /* depolama kapalı */ }
-  if (music.out && AC) music.out.gain.setTargetAtTime(music.on ? 1 : 0, AC.currentTime, 0.15);
+  if (music.out && AC) {
+    music.out.gain.cancelScheduledValues(AC.currentTime);
+    music.out.gain.setValueAtTime(music.on ? 1 : 0, AC.currentTime);
+  }
+  syncMusicButton();
   toast(music.on ? "🎵 Müzik açık (M)" : "🔇 Müzik kapalı (M)", 1600);
 }
+function syncMusicButton() { $("btnMusic").textContent = music.on ? "🎵 Müzik: Açık (M)" : "🔇 Müzik: Kapalı (M)"; }
+$("btnMusic").onclick = () => toggleMusic();
+syncMusicButton();
 
 // ---------------------------------------------------------------- fener, oksijen, dayanıklılık
 function toggleFlashlight() {
