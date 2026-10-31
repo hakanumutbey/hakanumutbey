@@ -758,6 +758,249 @@ function endExit() {
   if (e && e.P) { setLanderY(e.P, 0); e.P.flame.visible = false; e.P.dust.material.opacity = 0; }
 }
 
+// ---------------------------------------------------------------- menü: Envanter · Ayarlar · Sistem
+// Esc menüyü açar (son açık sekme), I ya da Tab doğrudan envanteri. ←/→ sekme değiştirir.
+const MENU = { tab: "inv", cat: "alet", sel: 0 };
+const INV_CATS = [["alet", "⚒️", "ALETLER"], ["maden", "⛏️", "MADENLER"], ["onemli", "🔑", "ÖNEMLİ EŞYALAR"], ["not", "📜", "NOT DEFTERLERİ"], ["gelisim", "⬆️", "GELİŞTİRMELER"]];
+const LOG_TITLES = { log1: "NOVA — Bakım kaydı", log2: "Mühendis Deniz", log3: "Pilot Arda", log4: "Doktor Elif", log5: "Kaptan Mert", log6: "Aşçı Zeynep" };
+function invItems(cat) {
+  const fl = G.flags, b = oreBag(), it = [];
+  if (cat === "alet") {
+    if (player.gun) it.push({ icon: "🔫", name: "Plazma Tüfeği", eq: holdingPick() ? "" : "ELDE",
+      desc: `Sol tık ile ateş eder. Çok hızlı ateş edersen ısınır, biraz beklemen gerekir.\nIsı: %${Math.round(player.heat)}${upLv("sogutucu") ? ` · Soğutucu seviye ${upLv("sogutucu")}` : ""}`,
+      act: ["Eline al", () => { setTool("gun"); }] });
+    if (fl.pickaxe) it.push({ icon: "⛏️", name: upLv("kazma") ? "Elmas Uçlu Kazma" : "Kazma", eq: holdingPick() ? "ELDE" : "",
+      desc: `Gezegenlerdeki maden damarlarını kırar; uzaylılara yakından da vurabilirsin.\nBir damar ${Math.max(1, 3 - upLv("kazma"))} vuruşta kırılır.`,
+      act: ["Eline al", () => { setTool("pick"); }] });
+    it.push({ icon: "🔦", name: "El Feneri", count: Math.round(player.battery) + "%", desc: "F ile açılır, kapanır. Açıkken pil azalır; pil paketleri doldurur." });
+    it.push({ icon: "🧑‍🚀", name: "Uzay Giysisi", eq: player.suit ? "GİYİLİ" : "", count: player.suit ? Math.round(player.suitO2) + "%" : "",
+      desc: `Boşlukta hayatta kalmanı sağlar. Giysinin oksijeni azalır; gezegenlerdeki tüpler doldurur.\nHava kilidindeki dolapta durur.${upLv("tup") ? `\nBüyük tüp seviye ${upLv("tup")}` : ""}` });
+  } else if (cat === "maden") {
+    for (const k of ORE_KEYS) it.push({ icon: W.ORES[k].icon, name: W.ORES[k].name, count: "x" + (b[k] || 0), dim: !b[k],
+      desc: { demir: "Her gezegende bol. Atölyede neredeyse her geliştirmede lazım.", buz: "Soğuk dünyalarda (Buz Gezegeni, Kristal Ay) bol bulunur.",
+        altin: "Sıcak dünyalarda (Kızıl Gezegen, Kum Ayı, Mor Gezegen) parlar.", elmas: "Her gezegende ama çok nadir; damarı parlıyor. Güçlü geliştirmeler için." }[k] });
+  } else if (cat === "onemli") {
+    it.push({ icon: "⚡", name: "Enerji Çekirdekleri", count: (fl.cores || 0) + "/3", desc: "Hiper sürücü için. Üçü de takılınca eve atlayabilirsin." });
+    it.push({ icon: "✦", name: "Yıldız Kristalleri", count: crystalsFound() + "/" + G.crystalTotal, desc: "Kaya sütunlarının tepesinde. Her biri dayanıklılık çarkını büyütür." });
+    if (fl.code) it.push({ icon: "🔢", name: "Cephanelik Şifresi", desc: "Kaptan Mert'in notundan: 2719" });
+    if (fl.medkit && !fl.elif_healed) it.push({ icon: "🩹", name: "İlk Yardım Çantası", desc: "Elif'in yaralı bacağı için. Zehir Bataklığı'ndaki kapsüle götür." });
+    if (flagCount("cell_") && !fl.deniz_found) it.push({ icon: "🔋", name: "Güç Hücreleri", count: flagCount("cell_") + "/3", desc: "Deniz'in kapsülünü açmak için üç tane lazım." });
+    if (flagCount("fuel_") && !fl.aygorev_done) it.push({ icon: "⛽", name: "Yakıt Hücreleri", count: flagCount("fuel_") + "/3", desc: "Ay üssünden. Eve dönüş yakıtı." });
+  } else if (cat === "not") {
+    for (const id in LOG_TITLES) if (fl[id]) it.push({ icon: "📜", name: LOG_TITLES[id], desc: "Okumak için seç.", act: ["Oku", () => { closeUI(); readLog(id); }] });
+  } else if (cat === "gelisim") {
+    for (const k in UPGRADES) {
+      const U = UPGRADES[k], l = upLv(k);
+      it.push({ icon: U.name.split(" ")[0], name: U.name.slice(U.name.indexOf(" ") + 1), lv: "◆".repeat(l) + "◇".repeat(U.max - l), dim: !l,
+        desc: `${U.desc}.\nSeviye ${l}/${U.max}${l < U.max ? ` · Sonraki: ${costText(U.cost(l))}` : " · TAMAM"}\nHava kilidindeki atölyede yapılır.` });
+    }
+  }
+  return it;
+}
+function renderMenu() {
+  for (const b of document.querySelectorAll(".mt")) b.classList.toggle("on", b.dataset.tab === MENU.tab);
+  for (const t of ["inv", "set", "sys"]) $("tab_" + t).classList.toggle("on", MENU.tab === t);
+  const hearts = Math.ceil(player.maxHealth / 20), full = Math.ceil(Math.max(0, player.health) / 20);
+  $("menuHearts").textContent = "♥".repeat(full) + "♡".repeat(Math.max(0, hearts - full));
+  const b = oreBag();
+  $("menuOre").innerHTML = ORE_KEYS.map(k => `<span>${W.ORES[k].icon} ${b[k] || 0}</span>`).join("");
+  if (MENU.tab === "inv") renderInv();
+}
+function renderInv() {
+  $("invCats").innerHTML = "";
+  for (const [id, icon, name] of INV_CATS) {
+    const c = document.createElement("div");
+    c.className = "ic" + (MENU.cat === id ? " on" : "");
+    c.textContent = icon;
+    c.title = name;
+    c.onclick = () => { MENU.cat = id; MENU.sel = 0; sfx("click"); renderInv(); };
+    $("invCats").appendChild(c);
+  }
+  $("invCatName").textContent = INV_CATS.find(c => c[0] === MENU.cat)[2];
+  const items = invItems(MENU.cat), grid = $("invGrid");
+  MENU.sel = Math.min(MENU.sel, Math.max(0, items.length - 1));
+  grid.innerHTML = "";
+  for (let i = 0; i < Math.max(15, Math.ceil(items.length / 5) * 5); i++) {
+    const it = items[i], s = document.createElement("div");
+    if (!it) { s.className = "slot empty"; grid.appendChild(s); continue; }
+    s.className = "slot" + (i === MENU.sel ? " sel" : "");
+    if (it.dim) s.style.filter = "grayscale(0.8) brightness(0.7)";
+    s.innerHTML = `<span>${it.icon}</span>${it.count ? `<span class="cnt">${it.count}</span>` : ""}${it.eq ? `<span class="eq">●</span>` : ""}${it.lv ? `<span class="lv">${it.lv}</span>` : ""}`;
+    s.onclick = () => { MENU.sel = i; sfx("choice"); renderInv(); };
+    grid.appendChild(s);
+  }
+  const it = items[MENU.sel];
+  $("invName").textContent = it ? it.name : "Boş";
+  $("invDesc").textContent = it ? it.desc : "Bu bölmede henüz bir şey yok.";
+  $("invHave").innerHTML = it && it.count ? `Sende: <b>${it.count}</b>` : it && it.eq ? `<b style="color:var(--sheikah);font-size:15px">● ${it.eq}</b>` : "";
+  const act = $("invAct");
+  act.textContent = it && it.act ? it.act[0] : "";
+  act.onclick = () => { if (it && it.act) { it.act[1](); sfx("pickup"); if (G.uiOpen === "pauseMenu") renderInv(); } };
+}
+for (const b of document.querySelectorAll(".mt")) b.onclick = () => { MENU.tab = b.dataset.tab; sfx("click"); renderMenu(); };
+{
+  const base = openUI;
+  openUI = function (id) { base(id); if (id === "pauseMenu") renderMenu(); };
+}
+addEventListener("keydown", e => {
+  if (G.uiOpen === "pauseMenu" && (e.code === "ArrowLeft" || e.code === "ArrowRight")) {
+    const tabs = ["inv", "set", "sys"], i = tabs.indexOf(MENU.tab);
+    MENU.tab = tabs[(i + (e.code === "ArrowRight" ? 1 : 2)) % 3];
+    sfx("click");
+    renderMenu();
+  }
+  if ((e.code === "KeyI" || e.code === "Tab") && !e.repeat && G.running) {
+    e.preventDefault();
+    if (G.uiOpen === "pauseMenu" && MENU.tab === "inv") closeUI();
+    else if (!G.uiOpen && !G.cutscene && !player.dead) { MENU.tab = "inv"; openUI("pauseMenu"); }
+  }
+});
+// Envanterin sağında dönen astronot (kendi küçük sahnesi)
+let hero = null;
+function heroScene() {
+  const r = new THREE.WebGLRenderer({ canvas: $("invHero"), alpha: true, antialias: true });
+  r.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5));
+  r.setSize(240, 400, false);
+  const sc = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 240 / 400, 0.1, 50);
+  cam.position.set(0, 1.15, 5.2);
+  cam.lookAt(0, 1.0, 0);
+  sc.add(new THREE.HemisphereLight(0xdff2ff, 0x2a2014, 1.0));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.9); sun.position.set(2, 4, 3); sc.add(sun);
+  const mk = suit => {
+    const p = W.makePerson(suit ? 0xe5e7eb : 0x2563eb, 0xf0c8a0, 0x3b2a1e);
+    if (suit) {
+      const helm = new THREE.Mesh(new THREE.SphereGeometry(0.3, 18, 14), new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: TOON, transparent: true, opacity: 0.35 }));
+      helm.position.y = 0.02;
+      const visor = new THREE.Mesh(new THREE.SphereGeometry(0.31, 18, 14, Math.PI * 0.75, Math.PI * 0.5, Math.PI * 0.3, Math.PI * 0.35), new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.55 }));
+      p.userData.rig.headG.add(helm, visor);
+      const pack = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.55, 0.22), new THREE.MeshToonMaterial({ color: 0xcbd5e1, gradientMap: TOON }));
+      pack.position.set(0, 0.45, 0.32);
+      p.userData.rig.torso.add(pack);
+    }
+    p.rotation.y = Math.PI;
+    sc.add(p);
+    return p;
+  };
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.0, 0.08, 32), new THREE.MeshBasicMaterial({ color: 0x4fd4ff, transparent: true, opacity: 0.18 }));
+  sc.add(base);
+  return { r, sc, cam, suitP: mk(true), plainP: mk(false), t: 0 };
+}
+visuals.push(dt => {
+  document.body.classList.toggle("inMenu", G.uiOpen === "pauseMenu");
+  if (G.uiOpen !== "pauseMenu" || MENU.tab !== "inv") return;
+  if (!hero) hero = heroScene();
+  hero.t += dt;
+  hero.suitP.visible = player.suit; hero.plainP.visible = !player.suit;
+  const p = player.suit ? hero.suitP : hero.plainP;
+  p.rotation.y = Math.PI + Math.sin(hero.t * 0.6) * 0.7;
+  W.animPerson(p, dt);
+  hero.r.render(hero.sc, hero.cam);
+});
+
+// ---------------------------------------------------------------- ayarlar
+const SET_ROWS = [
+  ["Müzik sesi", "range", "music", 0, 1, 0.05, v => { if (music.out && music.on) music.out.gain.value = v; }],
+  ["Efekt sesleri", "range", "sfx", 0, 1, 0.05, v => { if (sfxGain) sfxGain.gain.value = v; }],
+  ["Fare hassasiyeti", "range", "sens", 0.6, 3, 0.1, v => { mouseSens = 0.0022 * v; }],
+  ["Görüş alanı (FOV)", "range", "fov", 60, 95, 1, v => { camera.fov = v; camera.updateProjectionMatrix(); }],
+  ["Grafik kalitesi", "seg", "quality", [["dusuk", "Düşük"], ["orta", "Orta"], ["yuksek", "Yüksek"]], v => {
+    renderer.setPixelRatio(v === "dusuk" ? 0.65 : v === "orta" ? 1 : Math.min(devicePixelRatio || 1, 1.75));
+    renderer.setSize(innerWidth, innerHeight);
+  }, "Düşük: yavaş bilgisayarlarda daha akıcı"],
+  ["Fareyi ters çevir", "seg", "invertY", [[false, "Kapalı"], [true, "Açık"]], () => {}, "Yukarı bakmak için fareyi aşağı çek"],
+  ["Yürürken kafa sallanması", "seg", "bob", [[true, "Açık"], [false, "Kapalı"]], () => {}],
+  ["Altyazı boyutu", "seg", "subSize", [["kucuk", "Küçük"], ["normal", "Normal"], ["buyuk", "Büyük"]], v => {
+    document.body.classList.toggle("subS", v === "kucuk"); document.body.classList.toggle("subL", v === "buyuk");
+  }]
+];
+function buildSettings() {
+  const list = $("setList");
+  list.innerHTML = "";
+  for (const r of SET_ROWS) {
+    const [name, kind, key] = r, apply = kind === "range" ? r[6] : r[4], note = kind === "range" ? r[7] : r[5];
+    const row = document.createElement("div");
+    row.className = "setRow";
+    row.innerHTML = `<div class="nm">${name}${note ? `<small>${note}</small>` : ""}</div>`;
+    const ctl = document.createElement("div");
+    if (kind === "range") {
+      const inp = document.createElement("input");
+      Object.assign(inp, { type: "range", min: r[3], max: r[4], step: r[5], value: SET[key] });
+      inp.id = "set_" + key;
+      inp.oninput = () => { SET[key] = parseFloat(inp.value); apply(SET[key]); saveSettings(); };
+      ctl.appendChild(inp);
+    } else {
+      ctl.className = "seg";
+      for (const [val, label] of r[3]) {
+        const btn = document.createElement("button");
+        btn.textContent = label;
+        btn.className = SET[key] === val ? "on" : "";
+        btn.onclick = () => { SET[key] = val; apply(val); saveSettings(); sfx("click"); buildSettings(); };
+        ctl.appendChild(btn);
+      }
+    }
+    row.appendChild(ctl);
+    list.appendChild(row);
+  }
+}
+for (const r of SET_ROWS) r[r[1] === "range" ? 6 : 4](SET[r[2]]);
+buildSettings();
+
+// ---------------------------------------------------------------- uzay giysisi giyme animasyonu
+// Dolaba dön → giysi sana doğru gelir → beyaz parlama (giyildi) → fermuar/kilit sesleri → kask camı yukarıdan iner,
+// oksijen tıslaması. Çıkarırken kask kalkar.
+let suitSt = null;
+{
+  const it = G.I.locker, old = it.act, home = W.suitMesh.position.clone();
+  it.act = () => {
+    if (suitSt) return;
+    if (TEST) return old();
+    suitSt = { t: 0, on: !player.suit, old, home, yaw0: player.yaw, pitch0: player.pitch, steps: 0 };
+    G.cutscene = true;
+  };
+  visuals.push(dt => {
+    const s = suitSt;
+    if (!s) return;
+    s.t += dt;
+    const t = s.t, v = $("visor");
+    if (s.on) {
+      const look = ease(t / 0.45);
+      const dx = W.p.locker[0] - player.pos.x, dz = W.p.locker[2] - player.pos.z;
+      let dyaw = Math.atan2(-dx, -dz) - s.yaw0; dyaw = Math.atan2(Math.sin(dyaw), Math.cos(dyaw));
+      if (t < 0.5) { player.yaw = s.yaw0 + dyaw * look; player.pitch = s.pitch0 * (1 - look) - 0.1 * look; }
+      // giysi sana doğru süzülür
+      const k = ease((t - 0.45) / 0.75);
+      W.suitMesh.position.lerpVectors(s.home, new THREE.Vector3(player.pos.x, -0.2, player.pos.z), k);
+      if (s.steps === 0 && t > 0.5) { s.steps++; sfx("swoosh"); }
+      if (s.steps === 1 && t > 1.2) {
+        s.steps++;
+        s.old();                              // giysi giyildi (bayrak, toast)
+        W.suitMesh.position.copy(s.home);
+        $("helmet").style.display = "none";
+        $("suitFlash").style.opacity = 0.9;
+        sfx("clank");
+      }
+      if (t > 1.2) $("suitFlash").style.opacity = Math.max(0, 0.9 - (t - 1.2) * 2.2).toFixed(2);
+      if (s.steps === 2 && t > 1.55) { s.steps++; sfx("click"); setTimeout(() => sfx("click"), 140); }
+      // kask camı iner
+      if (t > 1.7) { v.style.display = "block"; v.style.transform = `translateY(${(-100 * (1 - ease((t - 1.7) / 0.55))).toFixed(1)}%)`; }
+      if (s.steps === 3 && t > 2.25) { s.steps++; sfx("clank"); shake = 0.2; setTimeout(() => sfx("hiss"), 120); }
+      if (t > 2.6) {
+        v.style.display = "none";
+        $("helmet").style.display = "block";
+        sfx("beep");
+        showBanner("UZAY GİYSİSİ", "OKSİJEN %100", true);
+        suitSt = null;
+        G.cutscene = false;
+      }
+    } else {
+      // çıkarma: kask camı kalkar, sonra giysi dolaba
+      if (s.steps === 0) { s.steps++; sfx("hiss"); $("helmet").style.display = "none"; v.style.display = "block"; }
+      v.style.transform = `translateY(${(-100 * ease(t / 0.5)).toFixed(1)}%)`;
+      if (t > 0.6) { v.style.display = "none"; s.old(); suitSt = null; G.cutscene = false; }
+    }
+  });
+}
+
 // ---------------------------------------------------------------- elde alet görünümü, sallanma, geri tepme
 const _shootBase = onShoot;
 onShoot = () => holdingPick() ? swing() : _shootBase();

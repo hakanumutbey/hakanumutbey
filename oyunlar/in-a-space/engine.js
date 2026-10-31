@@ -44,7 +44,11 @@ const player = {
 const keys = {};
 let interactRequested = false;
 let spaceTap = false;
-let mouseSens = 0.0022 * 1.4;
+// Ayarlar (menüdeki Ayarlar sekmesi değiştirir, tarayıcıda saklanır)
+const SET = { music: 1, sfx: 1, sens: 1.4, fov: 72, quality: "orta", invertY: false, bob: true, subSize: "normal" };
+try { Object.assign(SET, JSON.parse(localStorage.getItem("inaspace_settings") || "{}")); } catch (e) { /* depolama kapalı */ }
+function saveSettings() { try { localStorage.setItem("inaspace_settings", JSON.stringify(SET)); } catch (e) { /* depolama kapalı */ } }
+let mouseSens = 0.0022 * SET.sens;
 const updaters = [];          // world/story her karede çağrılacak fonksiyonları buraya ekler
 let onShoot = null;           // story.js atar
 const STEP = 0.35;            // bu kadar alçak kenara çıkılabilir
@@ -199,7 +203,7 @@ addEventListener("mousedown", e => {
 addEventListener("mousemove", e => {
   if (document.pointerLockElement !== canvas || G.uiOpen) return;
   player.yaw -= e.movementX * mouseSens;
-  player.pitch -= e.movementY * mouseSens;
+  player.pitch -= e.movementY * mouseSens * (SET.invertY ? -1 : 1);
   player.pitch = Math.max(-1.45, Math.min(1.45, player.pitch));
 });
 document.addEventListener("pointerlockchange", () => {
@@ -227,7 +231,7 @@ function closeUI() {
   }
 }
 $("btnResume").onclick = () => closeUI();
-$("sens").oninput = e => { mouseSens = 0.0022 * parseFloat(e.target.value); };
+// Ayarlar sekmesi (features.js) fare hassasiyeti dahil hepsini kurar
 
 // ---------------------------------------------------------------- bildirimler
 let toastTimer = 0;
@@ -327,8 +331,15 @@ function tone(freq, dur, type, vol, slide) {
   if (slide) o.frequency.linearRampToValueAtTime(Math.max(20, freq + slide), a.currentTime + dur);
   g.gain.setValueAtTime(vol || 0.1, a.currentTime);
   g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + dur);
-  o.connect(g); g.connect(a.destination);
+  o.connect(g); g.connect(sfxOut(a));
   o.start(); o.stop(a.currentTime + dur + 0.02);
+}
+// Efekt sesleri ortak bir ses düğmesinden geçer (Ayarlar → Efekt sesi)
+let sfxGain = null;
+function sfxOut(a) {
+  if (!sfxGain) { sfxGain = a.createGain(); sfxGain.connect(a.destination); }
+  sfxGain.gain.value = SET.sfx;
+  return sfxGain;
 }
 function noise(dur, vol, freq) {
   const a = ac(); if (!a) return;
@@ -336,7 +347,7 @@ function noise(dur, vol, freq) {
   for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
   const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
   s.buffer = buf; f.type = "lowpass"; f.frequency.value = freq || 1000; g.gain.value = vol || 0.2;
-  s.connect(f); f.connect(g); g.connect(a.destination); s.start();
+  s.connect(f); f.connect(g); g.connect(sfxOut(a)); s.start();
 }
 const SFX = {
   click: () => tone(880, 0.06, "square", 0.05),
@@ -405,7 +416,7 @@ function startMusic() {
   music.started = true;
   // Bozuk kaydın sertliğini biraz yumuşat
   const lp = a.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 9000;
-  music.out = a.createGain(); music.out.gain.value = music.on ? 1 : 0;
+  music.out = a.createGain(); music.out.gain.value = music.on ? SET.music : 0;
   lp.connect(music.out); music.out.connect(a.destination);
   music.lp = lp;
   loadTrack("normal"); loadTrack("battle");
@@ -439,7 +450,7 @@ function toggleMusic() {
   try { localStorage.setItem("inaspace_music", music.on ? "on" : "off"); } catch (e) { /* depolama kapalı */ }
   if (music.out && AC) {
     music.out.gain.cancelScheduledValues(AC.currentTime);
-    music.out.gain.setValueAtTime(music.on ? 1 : 0, AC.currentTime);
+    music.out.gain.setValueAtTime(music.on ? SET.music : 0, AC.currentTime);
   }
   syncMusicButton();
   toast(music.on ? "🎵 Müzik açık (M)" : "🔇 Müzik kapalı (M)", 1600);
@@ -600,7 +611,7 @@ function updateCamera(dt) {
   // Sinematik sahneler (iniş aracının inişi) kamerayı kendisi yönetir
   if (G.camOverride) { G.camOverride(camera, dt); return; }
   if (player.moving && player.onGround) bobT += dt * (player.running ? 13 : 9);
-  const bob = player.moving && player.onGround ? Math.sin(bobT) * 0.035 : 0;
+  const bob = player.moving && player.onGround && SET.bob ? Math.sin(bobT) * 0.035 : 0;
   if (G.turret) {
     player.yaw = Math.max(-Math.PI / 2 - 0.9, Math.min(-Math.PI / 2 + 0.9, player.yaw));
     player.pitch = Math.max(-0.55, Math.min(0.55, player.pitch));
