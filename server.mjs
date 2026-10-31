@@ -133,6 +133,8 @@ const mimeTypes = {
   ".mp4": "video/mp4",
   ".webm": "video/webm",
   ".wav": "audio/wav",
+  ".mp3": "audio/mpeg",
+  ".m4a": "audio/mp4",
 };
 
 await mkdir(dataRoot, { recursive: true });

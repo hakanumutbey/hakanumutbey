@@ -88,9 +88,9 @@
     #toast { position: fixed; left: 50%; bottom: 170px; transform: translateX(-50%); z-index: 30; pointer-events: none;
       background: var(--panel); border-top: 1px solid var(--gold-dim); border-bottom: 1px solid var(--gold-dim);
       padding: 9px 26px; font-size: 16px; font-weight: 600; opacity: 0; transition: opacity 0.25s; max-width: 80vw; text-align: center; }
-    /* Konuşmalar "Görev güncellendi" bildiriminin hemen altında (Hakan'ın isteği) */
-    #subtitle { position: fixed; left: 50%; top: calc(13% + 76px); transform: translateX(-50%); z-index: 30; pointer-events: none;
-      width: min(760px, 80vw); display: none; background: rgba(0,0,0,0.72); border-radius: 16px; padding: 16px 26px 18px; }
+    /* Konuşmalar ekranın en üstünde (Hakan'ın isteği: "konuşmalar daha üstte") */
+    #subtitle { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); z-index: 30; pointer-events: none;
+      width: clamp(420px, 46vw, 600px); display: none; background: rgba(0,0,0,0.72); border-radius: 16px; padding: 16px 26px 18px; }
     #subtitle .who { position: absolute; top: -13px; left: 26px; font-size: 13px; font-weight: 800; letter-spacing: 1px;
       color: #ffb547; background: rgba(0,0,0,0.85); padding: 3px 12px; border-radius: 99px; }
     #subtitle .txt { font-size: 19px; line-height: 1.45; color: #fff; }
@@ -183,6 +183,38 @@
     body:not(.playing) #mapWrap, body:not(.playing) #wheels, body:not(.playing) .crosshair { display: none !important; }
     #escape { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 26; pointer-events: none; display: none;
       font-family: var(--serif); font-size: 44px; font-weight: 700; color: #ff6b5a; text-shadow: 0 0 18px rgba(255,60,40,0.8), 0 2px 4px #000; }
+    /* ---- seçmeli diyalog (konuşmaların yerinde, seçenekler altında) */
+    #choiceBox { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); z-index: 41; display: none; flex-direction: column;
+      width: clamp(420px, 46vw, 600px); background: rgba(0,0,0,0.82); border-radius: 16px; padding: 18px 26px 16px; border: 1px solid var(--gold-dim); }
+    #choiceWho { position: absolute; top: -13px; left: 26px; font-size: 13px; font-weight: 800; letter-spacing: 1px;
+      color: #ffb547; background: rgba(0,0,0,0.9); padding: 3px 12px; border-radius: 99px; }
+    #choiceText { font-size: 19px; line-height: 1.45; color: #fff; margin-bottom: 12px; }
+    #choiceOpts { display: flex; flex-direction: column; gap: 7px; }
+    #choiceOpts .opt { text-align: left; background: rgba(255,255,255,0.05); border: 1px solid var(--gold-dim); color: var(--cream);
+      font: 600 16px var(--sans); padding: 9px 14px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 12px; transition: all 0.12s; }
+    #choiceOpts .opt:hover { border-color: var(--sheikah); background: rgba(79,212,255,0.1); color: #fff; }
+    #choiceOpts .n { width: 24px; height: 24px; border-radius: 50%; background: var(--cream); color: #1a1a1a; font-weight: 800; font-size: 13px;
+      display: inline-flex; align-items: center; justify-content: center; flex: none; }
+    /* ---- atölye */
+    #wsOres { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 14px; margin-bottom: 12px; color: #d9d2bf; }
+    #wsOres b { color: var(--gold); }
+    .wsRow { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 9px 0; border-bottom: 1px solid rgba(217,194,126,0.15); }
+    .wsRow small { color: #a9a291; font-size: 13px; }
+    .wsRow .lv { color: var(--sheikah); letter-spacing: 2px; font-size: 13px; }
+    .wsRow .btn { margin: 0; min-width: 130px; font-size: 14px; padding: 8px 12px; }
+    /* ---- maden çantası (sol üst, göstergelerin altında) */
+    #oreBar { position: fixed; top: 108px; left: 26px; z-index: 20; pointer-events: none; display: none; gap: 12px;
+      font-size: 14px; font-weight: 800; color: var(--cream); text-shadow: 0 1px 3px #000; }
+    body:not(.playing) #oreBar { display: none !important; }
+    /* ---- uyanış: göz kapakları, kapsül camındaki buz, asit */
+    #lids { position: fixed; inset: 0; z-index: 58; pointer-events: none; display: none; }
+    #lidTop, #lidBot { position: absolute; left: -5%; right: -5%; height: 50%; background: #000; }
+    #lidTop { top: 0; border-radius: 0 0 50% 50% / 0 0 30px 30px; box-shadow: 0 10px 30px 10px #000; }
+    #lidBot { bottom: 0; border-radius: 50% 50% 0 0 / 30px 30px 0 0; box-shadow: 0 -10px 30px 10px #000; }
+    #frost { position: fixed; inset: 0; z-index: 8; pointer-events: none; opacity: 0;
+      background: radial-gradient(ellipse at center, rgba(220,240,255,0.25) 20%, rgba(200,230,255,0.85) 100%); }
+    #acid { position: fixed; inset: 0; z-index: 7; pointer-events: none; opacity: 0;
+      background: radial-gradient(ellipse at center, transparent 40%, rgba(120,255,40,0.75) 100%); }
     #testLog { position: fixed; right: 10px; bottom: 210px; z-index: 100; width: 460px; max-height: 50vh; overflow: auto;
       background: rgba(0,0,0,0.88); color: #a3e635; font: 12px Consolas, monospace; padding: 8px; display: none; white-space: pre-wrap; }
   </style>
@@ -193,6 +225,9 @@
   <div id="cold"></div>
   <div id="helmet"></div>
   <div id="damage"></div>
+  <div id="acid"></div>
+  <div id="frost"></div>
+  <div id="lids"><div id="lidTop"></div><div id="lidBot"></div></div>
   <div id="alarmTint"></div>
 
   <div class="center"><div class="crosshair"></div></div>
@@ -204,6 +239,7 @@
     <div class="mini">🔦 <div class="bg"><div class="fg" id="batFill"></div></div></div>
     <div class="mini" id="heatRow" style="display:none">🔥 <div class="bg"><div class="fg" id="heatFill"></div></div></div>
   </div>
+  <div id="oreBar"></div>
 
   <div id="objective"><div class="t">GÖREV</div><div id="objText">—</div></div>
   <div id="counters">⚡ Çekirdek <span id="coreCount">0/3</span><br>📜 Not <span id="logCount">0/6</span><br>✦ Kristal <span id="crystalCount">0/9</span></div>
@@ -235,6 +271,7 @@
   <div id="escape"></div>
   <div id="turretHud"><div class="ring"></div><div class="txt">GEMİ TOPU · Sol tık: ateş · E: koltuktan kalk</div></div>
   <div id="clickHint">Devam etmek için ekrana tıkla</div>
+  <div id="choiceBox"><div id="choiceWho"></div><div id="choiceText"></div><div id="choiceOpts"></div></div>
 
   <!-- ANA MENÜ -->
   <div class="overlay" id="menu" style="display:flex">
@@ -247,7 +284,7 @@
       <button class="btn" id="btnContinue" disabled>Devam Et</button>
       <div class="keys">
         <b>W A S D</b> yürü · <b>Shift</b> koş · <b>Space</b> zıpla — havada tekrar: jetpack süzülme<br>
-        Kayaya doğru <b>W</b>: tırman · <b>E</b> etkileşim · <b>F</b> fener · <b>Sol tık</b> ateş · <b>Esc</b> duraklat
+        Kayaya doğru <b>W</b>: tırman · <b>E</b> etkileşim · <b>F</b> fener · <b>M</b> müzik · <b>Sol tık</b> ateş / kaz · <b>Q</b> tüfek ↔ kazma · <b>Esc</b> duraklat
       </div>
     </div>
   </div>
@@ -290,6 +327,16 @@
     </div>
   </div>
 
+  <!-- ATÖLYE -->
+  <div class="overlay" id="workshop">
+    <div class="panel">
+      <h2>⚒️ Atölye</h2>
+      <div id="wsOres"></div>
+      <div id="wsList"></div>
+      <button class="btn" id="btnWsClose">Kapat (Esc)</button>
+    </div>
+  </div>
+
   <!-- ÖLÜM -->
   <div class="overlay" id="deathScreen">
     <div class="panel">
@@ -321,6 +368,7 @@
   <script src="engine.js"></script>
   <script src="world.js"></script>
   <script src="story.js"></script>
+  <script src="features.js"></script>
   <script>
     if (location.search.includes("test")) document.write('<script src="playtest.js"><\/script>');
   </script>

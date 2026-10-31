@@ -483,7 +483,10 @@ function spawnAlien(zone, x, z, opts) {
   zone.group.add(mesh);
   mesh.scale.setScalar(opts.scale || 1);
   const e = { zone, mesh, pos: mesh.position, hp: opts.hp || 3, dmg: opts.dmg || 10, scale: opts.scale || 1, speed: opts.speed || 2.2, dormant: !!opts.dormant, home: [x, z],
-    wander: null, wt: 0, dead: false, dieT: 0, hitT: 0, growl: Math.random() * 3, see: opts.see || 15, anim: Math.random() * 6, lastSeen: null, moving: false };
+    wander: null, wt: 0, dead: false, dieT: 0, hitT: 0, growl: Math.random() * 3, see: opts.see || 15, anim: Math.random() * 6, lastSeen: null, moving: false,
+    // akıllı davranış: yandan sarma, asit tükürme, kaçma, sıçrayıp kaçınma
+    maxHp: opts.hp || 3, side: Math.random() < 0.5 ? -1 : 1, spitT: 1.5 + Math.random() * 2, dodgeT: 0, dodgeDir: null, fleeT: 0, fled: false,
+    alerted: false, atk: 0, lean: 0 };
   G.enemies.push(e);
   return e;
 }
@@ -496,17 +499,37 @@ function clearAliens(zone) {
 }
 const aliveIn = zone => G.enemies.filter(e => e.zone === zone && !e.dead).length;
 
+// Bir adım dene; yol kapalıysa açıyı sağa/sola çevirerek engelin etrafından dolaşmayı dene
+function alienStep(e, ux, uz, sp) {
+  for (const a of [0, 0.6, -0.6, 1.2, -1.2, 1.8, -1.8]) {
+    const c = Math.cos(a * e.side), s = Math.sin(a * e.side);
+    const vx = ux * c - uz * s, vz = ux * s + uz * c;
+    const nx = e.pos.x + vx * sp, nz = e.pos.z + vz * sp;
+    if (!blockedAt(e.zone, nx, nz, 0.45)) { e.pos.x = nx; e.pos.z = nz; return [vx, vz]; }
+  }
+  return null;
+}
+function killAlien(e) {
+  e.dead = true;
+  e.dieT = 0;
+  G.stats.kills++;
+  sfx("alienDie");
+  if (G.stage && G.stage.onKill) G.stage.onKill();
+}
 function updateEnemies(dt) {
   for (const e of G.enemies) {
     if (e.zone !== G.zone) continue;
     const m = e.mesh;
     if (e.dead) {
+      // ters dönüp yere çöker, küçülerek kaybolur
       e.dieT += dt;
-      m.scale.setScalar(Math.max(0.01, (1 - e.dieT * 2.5) * e.scale));
-      if (e.dieT > 0.4) m.visible = false;
+      m.rotation.z = Math.min(Math.PI, e.dieT * 7);
+      m.position.y = e.zone.ground(e.pos.x, e.pos.z) + Math.sin(Math.min(1, e.dieT * 3) * Math.PI) * 0.5 * e.scale;
+      m.scale.setScalar(Math.max(0.01, (1 - Math.max(0, e.dieT - 0.3) * 2) * e.scale));
+      if (e.dieT > 0.8) m.visible = false;
       continue;
     }
-    e.anim += dt * (e.moving ? 10 : 2);
+    e.anim += dt * (e.moving ? 12 : 2);
     m.userData.legs.forEach((l, i) => { l.rotation.x = Math.sin(e.anim + i * 1.7) * 0.5; });
     e.hitT = Math.max(0, e.hitT - dt);
     m.userData.eyes.color.set(e.hitT > 0 ? 0xffffff : 0xff2d55);
@@ -514,29 +537,98 @@ function updateEnemies(dt) {
     if (e.dormant) continue;
     const dx = player.pos.x - e.pos.x, dz = player.pos.z - e.pos.z, d = Math.hypot(dx, dz);
     const sees = d < e.see && !lineBlocked(e.pos.x, e.pos.z, player.pos.x, player.pos.z);
-    let tx, tz;
-    if (sees) { tx = player.pos.x; tz = player.pos.z; e.lastSeen = [tx, tz]; }
-    else if (e.lastSeen) {
+    // Gören uzaylı çığlık atıp yakındaki arkadaşlarını çağırır
+    if (sees && !e.alerted) {
+      e.alerted = true;
+      sfx("alienAlert");
+      for (const o of G.enemies) {
+        if (o === e || o.zone !== e.zone || o.dead || o.dormant) continue;
+        if (Math.hypot(o.pos.x - e.pos.x, o.pos.z - e.pos.z) < 18) { o.lastSeen = [player.pos.x, player.pos.z]; o.alerted = true; }
+      }
+    }
+    if (!sees && !e.lastSeen) e.alerted = false;
+    // Çok yaralanınca bir kez geri çekilir
+    if (!e.fled && e.maxHp >= 3 && e.hp === 1) { e.fled = true; e.fleeT = 2.2; }
+    let tx, tz, speed = e.speed;
+    if (e.fleeT > 0) {
+      e.fleeT -= dt;
+      tx = e.pos.x - dx; tz = e.pos.z - dz; speed = e.speed * 1.2;
+    } else if (sees) {
+      e.lastSeen = [player.pos.x, player.pos.z];
+      // Yandan sarar: her biri oyuncunun bir yanına doğru kavis çizerek yaklaşır
+      const k = d > 2.5 ? Math.min(3, d * 0.35) : 0;
+      tx = player.pos.x - dz / d * k * e.side; tz = player.pos.z + dx / d * k * e.side;
+    } else if (e.lastSeen) {
       [tx, tz] = e.lastSeen;
       if (Math.hypot(tx - e.pos.x, tz - e.pos.z) < 0.6) e.lastSeen = null;
     } else {
       e.wt -= dt;
       if (e.wt <= 0 || !e.wander) { e.wt = 2 + Math.random() * 3; e.wander = [e.home[0] + (Math.random() - 0.5) * 8, e.home[1] + (Math.random() - 0.5) * 8]; }
       [tx, tz] = e.wander;
+      speed = e.speed * 0.45;
     }
-    const ddx = tx - e.pos.x, ddz = tz - e.pos.z, dd = Math.hypot(ddx, ddz);
-    if (dd > (sees ? 1.0 : 0.3)) {
-      const sp = (sees || e.lastSeen ? e.speed : e.speed * 0.45) * dt;
-      const nx = e.pos.x + ddx / dd * sp, nz = e.pos.z + ddz / dd * sp;
-      if (!blockedAt(e.zone, nx, e.pos.z, 0.45)) { e.pos.x = nx; e.moving = true; }
-      if (!blockedAt(e.zone, e.pos.x, nz, 0.45)) { e.pos.z = nz; e.moving = true; }
-      if (!e.moving) { e.wt = 0; if (!sees) e.lastSeen = null; }
-      m.rotation.y = Math.atan2(-ddx, -ddz);
+    if (e.dodgeT > 0) {
+      // vurulunca yana sıçrar
+      e.dodgeT -= dt;
+      if (alienStep(e, e.dodgeDir[0], e.dodgeDir[1], 6 * dt)) e.moving = true;
+    } else {
+      const ddx = tx - e.pos.x, ddz = tz - e.pos.z, dd = Math.hypot(ddx, ddz);
+      if (dd > (sees ? 1.0 : 0.3)) {
+        const v = alienStep(e, ddx / dd, ddz / dd, speed * dt);
+        if (v) e.moving = true;
+        else { e.wt = 0; if (!sees) e.lastSeen = null; }
+      }
     }
+    // Yüzü oyuncuya (görüyorsa) ya da gittiği yöne dönük
+    const fx = sees && e.fleeT <= 0 ? dx : tx - e.pos.x, fz = sees && e.fleeT <= 0 ? dz : tz - e.pos.z;
+    if (fx || fz) m.rotation.y = Math.atan2(-fx, -fz);
     e.pos.y = e.zone.ground(e.pos.x, e.pos.z);
+    // Yakındayken atılma hamlesi (öne eğilip geri çekilir)
+    if (sees && d < 2.2 * e.scale) e.atk += dt * 9; else e.atk = 0;
+    e.lean += ((e.atk > 0 ? Math.abs(Math.sin(e.atk)) * 0.45 : 0) - e.lean) * Math.min(1, dt * 12);
+    m.rotation.x = -e.lean;
     if (sees && d < 1.45 * e.scale) hurt(e.dmg * dt, "Uzaylılar seni yakaladı.");
+    // Uzaktan asit tükürür
+    e.spitT -= dt;
+    if (sees && e.fleeT <= 0 && d > 3.5 && d < 12 && e.spitT <= 0) {
+      e.spitT = 2.4 + Math.random() * 2.2;
+      spit(e);
+    }
     e.growl -= dt;
     if (sees && e.growl <= 0) { sfx("alien"); e.growl = 2 + Math.random() * 3; }
+  }
+  updateSpit(dt);
+}
+
+// ---------------------------------------------------------------- uzaylı asidi
+const spits = [];
+const spitGeo = new THREE.SphereGeometry(0.13, 10, 8), spitMat = new THREE.MeshBasicMaterial({ color: 0x9cff3a });
+function spit(e) {
+  const m = new THREE.Mesh(spitGeo, spitMat);
+  m.scale.setScalar(e.scale);
+  const y0 = e.pos.y + 1.25 * e.scale;
+  m.position.set(e.pos.x, y0, e.pos.z);
+  e.zone.group.add(m);
+  // oyuncunun gövdesine nişan alır, biraz da sapar
+  const tx = player.pos.x + (Math.random() - 0.5) * 0.8, ty = player.pos.y + 1.1, tz = player.pos.z + (Math.random() - 0.5) * 0.8;
+  const v = new THREE.Vector3(tx - e.pos.x, ty - y0, tz - e.pos.z).normalize().multiplyScalar(10);
+  spits.push({ m, v, zone: e.zone, dmg: e.dmg * 0.7, t: 0 });
+  sfx("spit");
+}
+function updateSpit(dt) {
+  for (let i = spits.length - 1; i >= 0; i--) {
+    const s = spits[i], p = s.m.position;
+    s.t += dt;
+    p.addScaledVector(s.v, dt);
+    let gone = s.t > 2.5 || s.zone !== G.zone;
+    if (!gone && Math.hypot(p.x - player.pos.x, p.z - player.pos.z) < 0.55 && Math.abs(p.y - (player.pos.y + 1.0)) < 1.0) {
+      hurt(s.dmg, "Uzaylı asidi seni yaktı.");
+      G.acidFlash = 1;
+      sfx("splat");
+      gone = true;
+    }
+    if (!gone && (blockedAt(s.zone, p.x, p.z, 0.05, p.y) || p.y < s.zone.ground(p.x, p.z))) gone = true;
+    if (gone) { s.zone.group.remove(s.m); spits.splice(i, 1); }
   }
 }
 
@@ -549,10 +641,11 @@ const _sd = new THREE.Vector3();
 function shoot() {
   if (!player.gun || player.overheat > 0 || G.cutscene || player.dead) return false;
   if (!G.admin) {
-    player.heat += 17;
+    player.heat += 17 * (G.heatMult || 1);
     if (player.heat >= 100) { player.overheat = 1.6; toast("Tüfek aşırı ısındı! Soğumasını bekle.", 1300); }
   }
   sfx("laser");
+  if (G.onGunFired) G.onGunFired();
   updateCamera(0);   // atış, oyuncunun şu anki bakışına gitsin (kamera bir kare geriden geliyordu)
   camera.getWorldDirection(_sd);
   const origin = camera.position.clone();
@@ -593,11 +686,12 @@ function shoot() {
     hit.hitT = 0.15;
     hit.dormant = false;
     hit.lastSeen = [player.pos.x, player.pos.z];
-    if (hit.hp <= 0) {
-      hit.dead = true;
-      G.stats.kills++;
-      sfx("alien");
-      if (G.stage && G.stage.onKill) G.stage.onKill();
+    if (hit.hp <= 0) killAlien(hit);
+    else if (Math.random() < 0.55) {
+      // vurulan uzaylı yana sıçrar (her seferinde değil: yoksa hiç vurulamaz)
+      const s = Math.random() < 0.5 ? -1 : 1;
+      hit.dodgeT = 0.28;
+      hit.dodgeDir = [-_sd.z * s, _sd.x * s];
     }
   }
   return !!hit;
@@ -642,10 +736,7 @@ const shipOnly = p => inShip() ? p : null;
 
 stage("uyanis", {
   enter: o => {
-    if (!o.loaded) {
-      later(1200, () => nova("Uyandırma protokolü tamamlandı. Merhaba, yolcu.", "Ben NOVA, ARGO-7 gemisinin yapay zekâsıyım.",
-        "Çok uzun uyudun… ve gemide senden başka kimse yok.", "Lütfen köprüye gel. Koridorun doğu ucu."));
-    }
+    if (!o.loaded) wakeUp();   // features.js: kapsülde uyanma sahnesi + NOVA ile seçmeli ilk konuşma
   },
   obj: () => "Kriyo odasından çık ve köprüye git (koridorun doğu ucu)",
   marker: () => shipOnly([33, 1.6, 0]),
@@ -1584,6 +1675,7 @@ function beginPlay() {
   $("endScreen").style.display = "none";
   G.running = true;
   G.ended = false;
+  startMusic();
   later(300, () => fadeTo(0));
   if (!TEST) canvas.requestPointerLock();
 }

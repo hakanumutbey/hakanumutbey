@@ -179,6 +179,7 @@ addEventListener("keydown", e => {
   keys[e.code] = true;
   if (e.code === "KeyE" && !e.repeat) interactRequested = true;
   if (e.code === "KeyF" && !e.repeat && G.running) toggleFlashlight();
+  if (e.code === "KeyM" && !e.repeat && G.running) toggleMusic();
   if (e.code === "Space") { e.preventDefault(); if (!e.repeat) spaceTap = true; }
 });
 addEventListener("keyup", e => {
@@ -283,6 +284,7 @@ function updateSay(dt) {
   el.style.display = "block";
   sayTimer = (1.6 + text.length * 0.05) / (TEST ? 6 : 1);
   if (who === "NOVA") sfx("beep");
+  if (G.onSayLine) G.onSayLine(who, sayTimer);
 }
 
 let damageFlash = 0;
@@ -356,9 +358,87 @@ const SFX = {
   jet: () => noise(0.25, 0.06, 1800),
   tired: () => { tone(300, 0.25, "sine", 0.06, -120); setTimeout(() => tone(260, 0.3, "sine", 0.05, -100), 300); },
   wrong: () => tone(180, 0.35, "square", 0.08),
-  step: () => noise(0.05, 0.03, 600)
+  step: () => noise(0.05, 0.03, 600),
+  // kazma, maden, kapsül, uyanış, uzaylı tükürüğü, seçmeli diyalog, atölye
+  pick: () => { tone(1900, 0.07, "square", 0.05); tone(1250, 0.1, "triangle", 0.06); noise(0.08, 0.12, 4200); },
+  swoosh: () => noise(0.15, 0.05, 2600),
+  oreBreak: () => { noise(0.5, 0.3, 900); tone(140, 0.35, "triangle", 0.14, -60); },
+  oreGet: () => { tone(880, 0.09, "triangle", 0.08); setTimeout(() => tone(1320, 0.16, "triangle", 0.08), 80); },
+  podOpen: () => { noise(1.0, 0.14, 2200); tone(110, 0.4, "square", 0.05, -40); setTimeout(() => tone(220, 0.12, "square", 0.06), 550); },
+  heartbeat: () => { tone(60, 0.16, "sine", 0.4, -15); setTimeout(() => tone(52, 0.2, "sine", 0.32, -15), 230); },
+  spit: () => { noise(0.18, 0.14, 1400); tone(520, 0.2, "sawtooth", 0.04, -300); },
+  splat: () => { noise(0.3, 0.2, 700); tone(90, 0.2, "sine", 0.12, -30); },
+  alienAlert: () => { tone(300, 0.45, "sawtooth", 0.06, 520); setTimeout(() => tone(760, 0.3, "sawtooth", 0.045, -260), 200); },
+  alienDie: () => { tone(420, 0.5, "sawtooth", 0.06, -360); noise(0.35, 0.12, 900); },
+  choice: () => { tone(660, 0.08, "sine", 0.06); setTimeout(() => tone(990, 0.1, "sine", 0.05), 70); },
+  upgrade: () => { [392, 523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, 0.3, "triangle", 0.07), i * 70)); }
 };
 function sfx(name) { try { if (SFX[name]) SFX[name](); } catch (e) { /* ses yoksa oyun sürsün */ } }
+
+// ---------------------------------------------------------------- müzik (Hakan'ın Suno şarkıları)
+// Normalde "normal" çalar; savaşta (meteor dalgası, seni gören uzaylı) "battle"a geçer, savaş bitince
+// birkaç saniye sonra geri döner. Savaş dosyası yoksa normal müzik çalmaya devam eder. M: aç/kapa.
+const MUSIC_FILES = { normal: "muzik/standart.m4a", battle: null };
+const MUSIC_VOL = 0.32;          // kayıt çok yüksek (tepeleri kesik); efektlerin altında kalsın
+const music = { on: true, started: false, buffers: {}, tracks: {}, want: "normal", battleT: 0, out: null };
+try { music.on = localStorage.getItem("inaspace_music") !== "off"; } catch (e) { /* depolama kapalı */ }
+
+async function loadTrack(name) {
+  const a = ac(), url = MUSIC_FILES[name];
+  if (!a || !url) return;
+  try {
+    const buf = await a.decodeAudioData(await (await fetch(url)).arrayBuffer());
+    // Kaydın başındaki ve sonundaki sessizliği atla, döngü boşluksuz olsun
+    const d = buf.getChannelData(0), th = 0.02;
+    let s = 0, e = d.length - 1;
+    while (s < e && Math.abs(d[s]) < th) s++;
+    while (e > s && Math.abs(d[e]) < th) e--;
+    music.buffers[name] = { buf, start: s / buf.sampleRate, end: e / buf.sampleRate };
+  } catch (err) { /* müzik yüklenemese de oyun sürsün */ }
+}
+function startMusic() {
+  const a = ac();
+  if (!a) return;
+  if (a.state === "suspended") a.resume();
+  if (music.started) return;
+  music.started = true;
+  // Bozuk kaydın sertliğini biraz yumuşat
+  const lp = a.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 9000;
+  music.out = a.createGain(); music.out.gain.value = music.on ? 1 : 0;
+  lp.connect(music.out); music.out.connect(a.destination);
+  music.lp = lp;
+  loadTrack("normal"); loadTrack("battle");
+}
+function playTrack(name) {
+  const a = ac(), b = music.buffers[name];
+  if (!a || !b || music.tracks[name]) return;
+  const src = a.createBufferSource(), g = a.createGain();
+  src.buffer = b.buf; src.loop = true; src.loopStart = b.start; src.loopEnd = b.end;
+  g.gain.value = 0;
+  src.connect(g); g.connect(music.lp);
+  src.start(0, b.start);
+  music.tracks[name] = { src, g };
+}
+function updateMusic(dt) {
+  const a = AC;
+  if (!a || !music.started) return;
+  const fighting = !!G.meteorWave || G.enemies.some(e => e.zone === G.zone && !e.dead && !e.dormant && e.lastSeen);
+  music.battleT = fighting ? 4 : Math.max(0, music.battleT - dt);
+  const want = music.battleT > 0 && music.buffers.battle ? "battle" : "normal";
+  for (const name in music.buffers) {
+    if (name === want) playTrack(name);
+    const t = music.tracks[name];
+    if (!t) continue;
+    const target = name === want ? MUSIC_VOL : 0;
+    t.g.gain.setTargetAtTime(target, a.currentTime, name === want ? 0.6 : 0.4);
+  }
+}
+function toggleMusic() {
+  music.on = !music.on;
+  try { localStorage.setItem("inaspace_music", music.on ? "on" : "off"); } catch (e) { /* depolama kapalı */ }
+  if (music.out && AC) music.out.gain.setTargetAtTime(music.on ? 1 : 0, AC.currentTime, 0.15);
+  toast(music.on ? "🎵 Müzik açık (M)" : "🔇 Müzik kapalı (M)", 1600);
+}
 
 // ---------------------------------------------------------------- fener, oksijen, dayanıklılık
 function toggleFlashlight() {
@@ -482,7 +562,7 @@ function movePlayer(dt) {
   }
   spaceTap = false;
   if (player.gliding) {
-    useStamina(12 * dt);
+    useStamina(12 * (G.glideCost || 1) * dt);
     if (Math.random() < dt * 5) sfx("jet");
   }
   const ground = groundAt(zone, player.pos.x, player.pos.z, player.pos.y);
@@ -773,6 +853,7 @@ function tick(dt, withHud) {
   }
   if (G.running) {
     updateSay(dt);
+    updateMusic(dt);
     for (const f of visuals) f(dt);
     updateCamera(dt);
     if (withHud) updateHUD(dt);

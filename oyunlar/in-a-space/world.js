@@ -480,6 +480,24 @@ cyl(SHIP, 5, 1.4, 9.72, 0.2, 0.08, M.yellow, 12).rotation.x = Math.PI / 2;
 W.p.hatch = [5, 1.4, 9.7];
 for (let i = 0; i < 6; i++) box(SHIP, 2.0 + i * 1.2, 0.006, 8.6, 0.6, 0.01, 1.4, i % 2 ? M.dark : M.yellow, false);
 box(SHIP, 9.5, 0.25, 5, 0.6, 0.5, 2.2, M.trim);
+// Atölye tezgâhı (madenlerden geliştirme) ve üstündeki kazma
+box(SHIP, 9.35, 0.45, 8.3, 0.9, 0.9, 1.8, M.trim);
+box(SHIP, 9.35, 0.92, 8.3, 0.8, 0.05, 1.7, M.dark, false);
+box(SHIP, 9.78, 1.55, 8.75, 0.06, 0.6, 0.8, M.dark, false);
+box(SHIP, 9.74, 1.55, 8.75, 0.02, 0.48, 0.68, M.screenGreen, false);
+W.p.workbench = [9.6, 1.4, 8.75];
+W.pickRack = new THREE.Group();
+{
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 0.75, 8), std(0x8b5a2b));
+  handle.rotation.x = Math.PI / 2;
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.07, 0.07), std(0x9ca3af));
+  head.position.z = -0.36;
+  W.pickRack.add(handle, head);
+  W.pickRack.position.set(9.25, 0.99, 7.9);
+  W.pickRack.rotation.y = 0.4;
+  SHIP.group.add(W.pickRack);
+}
+W.p.pickaxe = [9.25, 1.0, 7.9];
 
 // Yemekhane
 for (const x of [14, 24]) for (const z of [5.0, 7.6]) {
@@ -570,6 +588,25 @@ W.gunView = new THREE.Group();
   W.gunView.position.set(0.28, -0.25, -0.55);
   W.gunView.visible = false;
   camera.add(W.gunView);
+}
+// Elde kazma: sap omuzdan aşağı, baş öne bakar; vuruşta pivot öne döner
+W.pickView = new THREE.Group();
+{
+  const pivot = new THREE.Group();
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.028, 0.62, 8), std(0x8b5a2b));
+  handle.position.y = 0.2;
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.06, 0.06), std(0xb8c0cc));
+  head.position.y = 0.5;
+  const tipL = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.12, 6), std(0xe5e7eb));
+  tipL.rotation.z = Math.PI / 2; tipL.position.set(-0.26, 0.5, 0);
+  const tipR = tipL.clone(); tipR.rotation.z = -Math.PI / 2; tipR.position.x = 0.26;
+  pivot.add(handle, head, tipL, tipR);
+  pivot.rotation.set(-0.35, 0, -0.25);
+  W.pickView.add(pivot);
+  W.pickView.userData.pivot = pivot;
+  W.pickView.position.set(0.3, -0.42, -0.5);
+  W.pickView.visible = false;
+  camera.add(W.pickView);
 }
 
 // =============================================================== GÖVDE DIŞI (uzay yürüyüşü)
@@ -751,6 +788,18 @@ function grass(zone, h, count, colA, colB, seed, glow, radius) {
   return mesh;
 }
 
+// Maden türleri ve gezegenlere göre dağılımları (sıcak gezegenlerde altın, soğuklarda buz kristali, elmas her yerde ama az)
+W.ORES = {
+  demir: { name: "Demir", icon: "🔩", color: 0xc8ccd2, emissive: 0x3a1a08 },
+  buz: { name: "Buz Kristali", icon: "❄️", color: 0x9fe7ff, emissive: 0x15506a },
+  altin: { name: "Altın", icon: "🪙", color: 0xfacc15, emissive: 0x5a3a00 },
+  elmas: { name: "Uzay Elması", icon: "💎", color: 0x5eead4, glow: true }
+};
+const ORE_MIX = {
+  kizil: { demir: 5, altin: 3, elmas: 1 }, buz: { demir: 3, buz: 5, elmas: 1 }, mor: { demir: 3, altin: 3, elmas: 2 },
+  kum: { demir: 4, altin: 4, elmas: 1 }, bataklik: { demir: 5, altin: 2, buz: 1, elmas: 1 }, kristal: { buz: 5, demir: 2, elmas: 2 },
+  ay: { demir: 5, buz: 2, altin: 1, elmas: 1 }, dunya: { demir: 4, altin: 2, buz: 1, elmas: 1 }
+};
 function buildPlanet(P) {
   const vacuum = P.vacuum !== false;
   const zone = makeZone(P.id, { vacuum, o2Rate: P.o2Rate || 1.1, gravity: P.gravity, jump: P.jump, speed: 3.4,
@@ -885,6 +934,38 @@ function buildPlanet(P) {
   });
   if (P.deco) P.deco(zone, h, r);
   if (P.grass) grass(zone, h, P.grass.count, P.grass.a, P.grass.b, P.seed + 3, P.grass.glow, P.grass.radius || half * 0.9);
+  // Maden damarları (kazmayla kazılır). Ayrı rastgele dizisi var: dekorların yeri değişmesin.
+  const mix = ORE_MIX[P.id] || { demir: 1 }, ro = rng(P.seed + 7), rockDark = std(new THREE.Color(P.rock).multiplyScalar(0.7).getHex());
+  const pool = [];
+  for (const t in mix) for (let i = 0; i < mix[t]; i++) pool.push(t);
+  W.planets[P.id].ores = [];
+  for (let tries = 0; tries < 600 && W.planets[P.id].ores.length < (P.oreCount || 18); tries++) {
+    const x = (ro() - 0.5) * half * 1.75, z = (ro() - 0.5) * half * 1.75;
+    if (!clearSpot(x, z, 1.2) || blockedAt(zone, x, z, 1.8)) continue;
+    const i = W.planets[P.id].ores.length, type = i === 0 ? "elmas" : pool[Math.floor(ro() * pool.length)];
+    const O = W.ORES[type], y = h(x, z);
+    const g = new THREE.Group();
+    g.position.set(x, y, z);
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.75, 0), rockDark);
+    rock.position.y = 0.35; rock.scale.y = 0.8; rock.rotation.set(ro() * 3, ro() * 3, ro() * 3);
+    g.add(rock);
+    const oreMat = O.glow ? basic(O.color) : std(O.color, { emissive: O.emissive || 0x000000 });
+    for (let k = 0; k < 6; k++) {
+      const a = k / 6 * Math.PI * 2 + ro(), s = 0.13 + ro() * 0.14;
+      const bit = new THREE.Mesh(type === "demir" ? new THREE.BoxGeometry(s * 1.4, s, s * 1.2) : new THREE.OctahedronGeometry(s), oreMat);
+      bit.position.set(Math.cos(a) * 0.55, 0.35 + ro() * 0.45, Math.sin(a) * 0.55);
+      bit.rotation.set(ro() * 3, ro() * 3, ro() * 3);
+      g.add(bit);
+    }
+    if (O.glow) {
+      const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: CLOUD_TEX, color: O.color, transparent: true, opacity: 0.55, depthWrite: false, fog: false }));
+      glow.scale.set(2.4, 2.4, 1); glow.position.y = 0.6;
+      g.add(glow);
+    }
+    zone.group.add(g);
+    const col = addCollider(zone, x - 0.6, x + 0.6, z - 0.6, z + 0.6, { ore: true });
+    W.planets[P.id].ores.push({ id: `ore_${P.id}_${i}`, type, pid: P.id, zone, pos: new THREE.Vector3(x, y + 0.5, z), group: g, col, hp: 0 });
+  }
   return zone;
 }
 
@@ -1032,30 +1113,114 @@ W.makeAlienMesh = () => {
 };
 
 // =============================================================== İNSANLAR (mürettebat, köylüler)
+// Eklemli insan: bacak ve kollar kalça/omuzdan döner (yürüme), gözler kırpar, baş yakındaki oyuncuya döner.
+// Yüz -z yönüne bakar.
 W.makePerson = (suit, skin, hair) => {
   const g = new THREE.Group();
-  const suitM = std(suit), dark = std(0x2b313b);
-  const legs = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.2, 0.75, 10), dark); legs.position.y = 0.38;
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.29, 0.8, 10), suitM); body.position.y = 1.15;
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 14, 10), std(skin || 0xf0c8a0)); head.position.y = 1.78;
-  const hairM = new THREE.Mesh(new THREE.SphereGeometry(0.215, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), std(hair || 0x3b2a1e));
-  hairM.position.y = 1.8;
-  const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.7, 8), suitM); armL.position.set(-0.35, 1.15, 0); armL.rotation.z = 0.12;
-  const armR = armL.clone(); armR.position.x = 0.35; armR.rotation.z = -0.12;
-  for (const x of [-0.08, 0.08]) {
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.028, 6, 5), basic(0x1a1a1a));
-    eye.position.set(x, 1.8, -0.18);
-    g.add(eye);
+  const suitM = std(suit), dark = std(0x2b313b), skinM = std(skin || 0xf0c8a0);
+  const limb = (x, y, r0, r1, len, mat) => {
+    const pivot = new THREE.Group();
+    pivot.position.set(x, y, 0);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, len, 8), mat);
+    m.position.y = -len / 2;
+    pivot.add(m);
+    g.add(pivot);
+    return pivot;
+  };
+  const legL = limb(-0.11, 0.76, 0.1, 0.09, 0.76, dark), legR = limb(0.11, 0.76, 0.1, 0.09, 0.76, dark);
+  for (const leg of [legL, legR]) {
+    const boot = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.12, 0.26), std(0x1f2937));
+    boot.position.set(0, -0.72, -0.04);
+    leg.add(boot);
   }
-  g.add(legs, body, head, hairM, armL, armR);
+  const torso = new THREE.Group();
+  torso.position.y = 0.76;
+  g.add(torso);
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.27, 0.78, 10), suitM); body.position.y = 0.39;
+  const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.275, 0.275, 0.08, 10), dark); belt.position.y = 0.06;
+  const badge = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.02), basic(0xfacc15)); badge.position.set(0.12, 0.55, -0.25);
+  torso.add(body, belt, badge);
+  const headG = new THREE.Group();
+  headG.position.y = 1.02;
+  torso.add(headG);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 14, 10), skinM);
+  const hairM = new THREE.Mesh(new THREE.SphereGeometry(0.215, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), std(hair || 0x3b2a1e));
+  hairM.position.y = 0.02; hairM.rotation.x = 0.25;
+  const eyes = [];
+  for (const x of [-0.075, 0.075]) {
+    const white = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), basic(0xffffff));
+    white.position.set(x, 0.03, -0.165);
+    white.scale.z = 0.5;
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.025, 6, 5), basic(0x1a1a1a));
+    pupil.position.z = -0.03;
+    white.add(pupil);
+    headG.add(white);
+    eyes.push(white);
+  }
+  const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.015, 0.01), basic(0x7a2e2e));
+  mouth.position.set(0, -0.08, -0.19);
+  headG.add(head, hairM, mouth);
+  const arm = x => {
+    const pivot = new THREE.Group();
+    pivot.position.set(x, 0.72, 0);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.065, 0.66, 8), suitM);
+    m.position.y = -0.33;
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 6), skinM);
+    hand.position.y = -0.69;
+    pivot.add(m, hand);
+    pivot.rotation.z = x < 0 ? -0.1 : 0.1;
+    torso.add(pivot);
+    return pivot;
+  };
+  const armL = arm(-0.34), armR = arm(0.34);
+  g.userData.rig = { legL, legR, armL, armR, torso, headG, eyes, mouth, walk: 0, blinkT: 1 + Math.random() * 3, t0: Math.random() * 6,
+    speed: 0, wave: 0, sit: 0, talkT: 0 };
   return g;
+};
+// Bir kare animasyon: speed (m/s) yürüyüş hızı; wave > 0 el sallar; sit 0..1 oturma; talkT > 0 ağız oynar
+W.animPerson = (p, dt) => {
+  const r = p.userData.rig;
+  if (!r) return;
+  const k = Math.min(1, r.speed / 2);
+  r.walk += dt * (4 + r.speed * 3.2);
+  const sw = Math.sin(r.walk) * 0.65 * k;
+  r.legL.rotation.x = sw - r.sit * 1.45;
+  r.legR.rotation.x = -sw - r.sit * 1.45;
+  r.armL.rotation.x = -sw * 0.8;
+  r.armR.rotation.x = r.wave > 0 ? -2.6 : sw * 0.8;
+  r.armR.rotation.z = r.wave > 0 ? 0.35 + Math.sin(G.time * 12) * 0.35 : 0.1;
+  r.wave = Math.max(0, r.wave - dt);
+  r.torso.position.y = 0.76 - r.sit * 0.42 + Math.abs(Math.sin(r.walk)) * 0.04 * k + Math.sin(G.time * 2 + r.t0) * 0.006;
+  r.torso.rotation.x = -0.12 * k + r.sit * 0.1;
+  // göz kırpma
+  r.blinkT -= dt;
+  const closed = r.blinkT < 0.12;
+  for (const e of r.eyes) e.scale.y = closed ? 0.12 : 1;
+  if (r.blinkT <= 0) r.blinkT = 1.8 + Math.random() * 3.4;
+  // konuşurken ağız
+  r.talkT = Math.max(0, r.talkT - dt);
+  r.mouth.scale.y = r.talkT > 0 ? 1 + Math.abs(Math.sin(G.time * 18)) * 4 : 1;
 };
 function placePerson(zone, p, x, z, yaw, y) {
   p.position.set(x, y === undefined ? zone.ground(x, z) : y, z);
   p.rotation.y = yaw || 0;
   zone.group.add(p);
-  const t0 = Math.random() * 6;
-  visuals.push(() => { if (G.zone === zone && p.visible) p.children.forEach((c, i) => { if (i > 1) c.position.y += Math.sin(G.time * 2 + t0) * 0.0006; }); });
+  const r = p.userData.rig;
+  visuals.push(dt => {
+    if (G.zone !== zone || !p.visible) return;
+    // Yakındaki oyuncuya başını çevirir (yürürken değil)
+    if (r.speed === 0) {
+      const dx = player.pos.x - p.position.x, dz = player.pos.z - p.position.z;
+      let want = 0;
+      if (dx * dx + dz * dz < 36) {
+        want = Math.atan2(-dx, -dz) - p.rotation.y;
+        want = Math.atan2(Math.sin(want), Math.cos(want));
+        want = Math.max(-0.9, Math.min(0.9, want));
+      }
+      r.headG.rotation.y += (want - r.headG.rotation.y) * Math.min(1, dt * 5);
+    }
+    W.animPerson(p, dt);
+  });
   return p;
 }
 W.placePerson = placePerson;
@@ -1074,7 +1239,18 @@ function escapePod(zone, x, z, h) {
   win.rotation.y = Math.PI;
   const light = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), basic(0xff3b3b));
   light.position.set(0.3, 2.15, 0);
-  g.add(body, band, win, light);
+  // Yan kapak (+z, iniş aracına bakan taraf): üst kenarından menteşeli, mürettebat buradan çıkar
+  const hinge = new THREE.Group();
+  hinge.position.set(0, 1.55, 1.08);
+  const hatch = new THREE.Mesh(new THREE.CircleGeometry(0.5, 18), std(0xcbd5e1));
+  hatch.position.y = -0.5;
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.05, 6, 18), std(0xf97316));
+  rim.position.y = -0.5;
+  hinge.add(hatch, rim);
+  const dark = new THREE.Mesh(new THREE.CircleGeometry(0.47, 18), basic(0x0b0f14));
+  dark.position.set(0, 1.05, 1.075);
+  g.add(body, band, win, light, dark, hinge);
+  g.userData.hinge = hinge;
   g.position.set(x, h(x, z), z);
   zone.group.add(g);
   addCollider(zone, x - 2, x + 2, z - 1.1, z + 1.1);
