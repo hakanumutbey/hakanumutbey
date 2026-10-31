@@ -25,6 +25,9 @@ const gameTitles = {
   "make-city": "Make City",
   "ejderha-ucus": "Ejderha Uçuşu",
   "karanlik-labirent": "Karanlık Labirent",
+  "in-a-space": "IN A SPACE",
+  "kayip-odalar": "Kayıp Odalar",
+  "vipend-3d": "VIPEND 3D",
 };
 
 const keyBindings = {
@@ -118,6 +121,19 @@ const mobileControlConfigs = {
       { label: "Turbo", code: "ShiftLeft", hold: true },
     ],
   },
+  "in-a-space": {
+    hint: "Sol taraf yürü, sağ taraf bakış. E etkileşim, Zıpla havada tekrar: süzül. Çanta envanter.",
+    look: true,
+    actions: [
+      { label: "Ateş", event: "hakorocks:fire" },
+      { label: "E", code: "KeyE" },
+      { label: "Zıpla", code: "Space" },
+      { label: "Koş", code: "ShiftLeft", hold: true },
+      { label: "Fener", code: "KeyF" },
+      { label: "Alet", code: "KeyQ" },
+      { label: "Çanta", code: "KeyI" },
+    ],
+  },
   "isin-savasi": {
     hint: "Sol tarafla hareket et. Ateşe basılı tut; nişan en yakın düşmana otomatik kilitlenir.",
     look: false,
@@ -128,6 +144,10 @@ const mobileControlConfigs = {
 };
 
 localStorage.setItem(sessionKey, sessionId);
+
+// Telefonlarda fare kilidi (pointer lock) yok: oyunlar "Yeni oyun"da requestPointerLock çağırınca
+// hata verip duruyordu (iPhone'da fonksiyon hiç yok). Kilit desteklenmiyorsa sessizce geç.
+guardPointerLock();
 
 if (slug) {
   markPlayedGame(slug);
@@ -856,6 +876,22 @@ function releaseAllVirtualKeys() {
   for (const code of [...activeVirtualKeys]) {
     releaseVirtualKey(code);
   }
+}
+
+function guardPointerLock() {
+  const proto = Element.prototype;
+  const original = proto.requestPointerLock;
+  proto.requestPointerLock = function (...args) {
+    if (!original) return Promise.resolve();
+    try {
+      const result = original.apply(this, args);
+      if (result && typeof result.catch === "function") result.catch(() => {});
+      return result;
+    } catch {
+      return Promise.resolve();
+    }
+  };
+  if (!document.exitPointerLock) document.exitPointerLock = () => {};
 }
 
 function dispatchKeyboard(type, code) {

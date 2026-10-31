@@ -194,12 +194,26 @@ addEventListener("keyup", e => {
 addEventListener("blur", () => { for (const k in keys) keys[k] = false; altGrHeld = false; });
 
 const canvas = $("gameCanvas");
+// Telefon/tablet: fare kilidi yok (iPhone'da fonksiyon hiç yok, Android'de hata fırlatıyordu → oyun açılmıyordu).
+// Dokunmatikte kilit istenmez; bakış ve ateş sitenin mobil kontrollerinden gelir (hakorocks:look / hakorocks:fire).
+const TOUCH = matchMedia("(pointer: coarse)").matches || "ontouchstart" in window;
+function lockPointer() {
+  if (TEST || TOUCH || !canvas.requestPointerLock) return;
+  try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* desteklenmiyor */ }
+}
 canvas.addEventListener("click", () => {
-  if (G.running && !G.uiOpen && !player.dead && !G.ended && document.pointerLockElement !== canvas) canvas.requestPointerLock();
+  if (G.running && !G.uiOpen && !player.dead && !G.ended && document.pointerLockElement !== canvas) lockPointer();
 });
 addEventListener("mousedown", e => {
   if (e.button === 0 && G.running && !G.uiOpen && !player.dead && document.pointerLockElement === canvas && onShoot) onShoot();
 });
+addEventListener("hakorocks:look", e => {
+  if (!G.running || G.uiOpen || !e.detail) return;
+  player.yaw -= e.detail.dx * mouseSens;
+  player.pitch -= e.detail.dy * mouseSens * (SET.invertY ? -1 : 1);
+  player.pitch = Math.max(-1.45, Math.min(1.45, player.pitch));
+});
+addEventListener("hakorocks:fire", () => { if (G.running && !G.uiOpen && !player.dead && onShoot) onShoot(); });
 addEventListener("mousemove", e => {
   if (document.pointerLockElement !== canvas || G.uiOpen) return;
   player.yaw -= e.movementX * mouseSens;
@@ -224,8 +238,8 @@ function closeUI() {
   if (!G.uiOpen) return;
   $(G.uiOpen).style.display = "none";
   G.uiOpen = null;
-  if (G.running && !TEST) {
-    canvas.requestPointerLock();
+  if (G.running && !TEST && !TOUCH) {
+    lockPointer();
     // Tarayıcı tıklamasız kilidi reddederse ipucu görünsün
     setTimeout(() => { if (document.pointerLockElement !== canvas && !G.uiOpen && G.running) $("clickHint").style.display = "block"; }, 150);
   }

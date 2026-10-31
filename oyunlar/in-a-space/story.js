@@ -979,7 +979,7 @@ $("btnFree").onclick = () => {
   $("endScreen").style.display = "none";
   G.ended = false;
   nova("Serbest uçuş açık! Köprüdeki haritadan istediğin gezegene gidebilirsin.", "Ama dikkat: uzay hâlâ tehlikeli. Meteorlar, uzaylılar, arızalar…");
-  if (!TEST) canvas.requestPointerLock();
+  lockPointer();
 };
 
 // ---------------------------------------------------------------- serbest uçuş
@@ -1677,7 +1677,7 @@ function beginPlay() {
   G.ended = false;
   startMusic();
   later(300, () => fadeTo(0));
-  if (!TEST) canvas.requestPointerLock();
+  lockPointer();
 }
 
 function startNewGame() {
@@ -1733,7 +1733,7 @@ function respawn() {
     G.escapeT = ESCAPE_TIME;
   } else { const sp = z.spawn; setZone(z.name, sp[0], sp[2] === 0 ? 1.5 : sp[2], z === W.mother ? -Math.PI / 2 : 0); resetCans(z.name); }
   toast("Tekrar deniyorsun. Dikkatli ol!", 2000);
-  if (!TEST) canvas.requestPointerLock();
+  lockPointer();
 }
 
 $("btnNew").onclick = startNewGame;
