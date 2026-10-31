@@ -195,6 +195,11 @@
     #choiceOpts .opt:hover { border-color: var(--sheikah); background: rgba(79,212,255,0.1); color: #fff; }
     #choiceOpts .n { width: 24px; height: 24px; border-radius: 50%; background: var(--cream); color: #1a1a1a; font-weight: 800; font-size: 13px;
       display: inline-flex; align-items: center; justify-content: center; flex: none; }
+    /* ---- admin atlama menüsü */
+    #ajList { max-height: 66vh; overflow: auto; padding-right: 6px; }
+    #ajList h3 { font-family: var(--serif); font-size: 15px; letter-spacing: 2px; color: var(--gold); margin: 14px 0 6px; }
+    .ajGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .ajGrid .btn { margin: 0; font-size: 14px; padding: 8px 10px; text-align: left; }
     /* ---- atölye */
     #wsOres { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 14px; margin-bottom: 12px; color: #d9d2bf; }
     #wsOres b { color: var(--gold); }
@@ -295,6 +300,7 @@
       <h2>Duraklatıldı</h2>
       <p>Fare hassasiyeti: <input type="range" id="sens" min="0.6" max="3" step="0.1" value="1.4"></p>
       <button class="btn" id="btnMusic">🎵 Müzik: Açık (M)</button>
+      <button class="btn" id="btnAdminJump" style="display:none">🛠️ İstediğin yere atla (J)</button>
       <button class="btn" id="btnResume">Devam</button>
       <button class="btn" id="btnMainMenu">Ana menü</button>
     </div>
@@ -325,6 +331,15 @@
       <h2 id="padTitle"></h2>
       <div id="padText"></div>
       <button class="btn" id="btnPadClose">Kapat (E)</button>
+    </div>
+  </div>
+
+  <!-- ADMIN: İSTEDİĞİN YERE ATLA -->
+  <div class="overlay" id="adminJump">
+    <div class="panel" style="max-width:760px">
+      <h2>🛠️ İstediğin yere atla</h2>
+      <div id="ajList"></div>
+      <button class="btn" id="btnAjClose">Kapat (J / Esc)</button>
     </div>
   </div>
 

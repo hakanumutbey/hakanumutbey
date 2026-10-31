@@ -512,6 +512,128 @@ function syncPodCrew() {
   }
 }
 
+// ---------------------------------------------------------------- admin: istediğin yere anında atla (J)
+// Hakan: "istediğimiz yere anında atlayabildiğimiz: bir felaket olayına, bir dünyaya, birini kurtardığımız ana".
+// Her durak o ana kadarki hikâye bayraklarını kurar, bölümü başlatır ve oyuncuyu yerine koyar. Kazma, madenler ve
+// atölye geliştirmeleri atlarken korunur.
+const ALL = (prefix, n) => Object.fromEntries([...Array(n)].map((_, i) => [prefix + i, true]));
+const J = {};
+J.p1 = { powerFixed: true, fuseTaken: true, fuseIn: true };
+J.p2 = { breach: true, sealed: true, welded: true };
+J.gun = { gun: true, armoryOpen: true, code: true };
+J.cores = { cores: 3, core_kizil: true, core_buz: true, core_mor: true };
+J.logs = { log1: true, log2: true, log3: true, log4: true, log5: true, log6: true };
+J.a2 = Object.assign({}, J.cores, J.p1, J.p2, J.gun, J.logs, { attackDone: true, act: 2 });
+J.arda = Object.assign(ALL("tower_kum_", 3), { arda_found: true, crew_arda: true, kumgorev_done: true });
+J.elif = { elif_found: true, medkit: true, elif_healed: true, crew_elif: true, batakgorev_done: true };
+J.deniz = Object.assign(ALL("cell_", 3), ALL("cblock_", 4), { deniz_found: true, crew_deniz: true, kristalgorev_done: true, act: 3 });
+J.ana = Object.assign(ALL("node_", 3), { core_sabotaged: true, mother_escaped: true, anagemi_done: true, act: 4 });
+J.ay = Object.assign(ALL("fuel_", 3), { relay: true, aygorev_done: true });
+J.free = { finalDone: true, met_crew: true, dunyainis_done: true, free: true };
+const upTo = (...parts) => Object.assign({}, ...parts.map(p => J[p] || p));
+const pod = id => { const p = W.pods[RESCUE[id]].position; return [p.x, p.z + 5, 0]; };
+const JUMPS = [
+  ["📖 Bölümler", [
+    ["Uyanış (yeni oyun)", { newGame: true }],
+    ["Kızıl Gezegen", { flags: upTo("p1", { at: "kizil" }), stage: "gezegen1", planet: "kizil" }],
+    ["Buz Gezegeni", { flags: upTo("p1", "p2", { cores: 1, core_kizil: true, at: "buz" }), stage: "gezegen2", planet: "buz" }],
+    ["Mor Gezegen", { flags: upTo("p1", "p2", "gun", { cores: 2, core_kizil: true, core_buz: true, attackDone: true, at: "mor" }), stage: "gezegen3", planet: "mor" }],
+    ["Rota sapması (2. perde)", { flags: upTo("cores", "p1", "p2", "gun", { attackDone: true }), stage: "sapma", ship: [35, 0, Math.PI / 2] }],
+    ["Uzaylı ana gemisi (3. perde)", { flags: upTo("a2", "arda", "elif", "deniz"), stage: "anagemi", planet: "anagemi" }],
+    ["Ay üssü (4. perde)", { flags: upTo("a2", "arda", "elif", "deniz", "ana"), stage: "aygorev", planet: "ay" }],
+    ["Dünya'ya iniş", { flags: upTo("a2", "arda", "elif", "deniz", "ana", "ay", { finalDone: true }), stage: "dunyainis", planet: "dunya" }],
+    ["Serbest uçuş (oyun sonu)", { flags: upTo("a2", "arda", "elif", "deniz", "ana", "ay", "free"), stage: "serbest", ship: [35, 0, Math.PI / 2] }]]],
+  ["🔥 Felaketler", [
+    ["Elektrik kesintisi", { flags: {}, stage: "elektrik", ship: [-18, 0, Math.PI / 2] }],
+    ["Gövde deliği", { flags: upTo("p1", { cores: 1, core_kizil: true }), stage: "delik", ship: [16, 0, Math.PI / 2] }],
+    ["Uzaylı saldırısı", { flags: upTo("p1", "p2", "gun", { cores: 2, core_kizil: true, core_buz: true }), stage: "saldiri", ship: [22, 0, Math.PI / 2] }],
+    ["Meteor yağmuru", { flags: upTo("a2", "arda", "elif", "deniz", "ana", { travelDest: "ay" }), stage: "meteor", ship: [35, 0, -Math.PI / 2] }],
+    ["Son saldırı (dev uzaylı)", { flags: upTo("a2", "arda", "elif", "deniz", "ana", "ay", { travelDest: "dunya" }), stage: "finalsaldiri", ship: [30, 0, Math.PI / 2] }]]],
+  ["🧑‍🚀 Kurtarmalar", [
+    ["Arda'nın kapsülü", { flags: upTo("a2", ALL("tower_kum_", 3)), stage: "kumgorev", planet: "kum", spot: () => pod("arda") }],
+    ["Elif'in kapsülü", { flags: upTo("a2", "arda"), stage: "batakgorev", planet: "bataklik", spot: () => pod("elif") }],
+    ["Elif'i tedavi et", { flags: upTo("a2", "arda", { elif_found: true, medkit: true }), stage: "batakgorev", planet: "bataklik", spot: () => pod("elif") }],
+    ["Deniz'in kapsülü", { flags: upTo("a2", "arda", "elif", ALL("cell_", 3), ALL("cblock_", 4)), stage: "kristalgorev", planet: "kristal", spot: () => pod("deniz") }],
+    ["Köyde mürettebat", { flags: upTo("a2", "arda", "elif", "deniz", "ana", "ay", "free"), stage: "serbest", planet: "dunya", spot: () => [0, -72, 0] }]]],
+  ["🪐 Dünyalar", Object.keys(W.planets).map(pid => [W.planets[pid].name,
+    { flags: upTo("a2", "arda", "elif", "deniz", "ana", "ay", "free", { at: pid }), stage: "serbest", planet: pid }])]
+];
+// Kayaya/duvara denk gelmeyen en yakın boş nokta
+function freeSpot(zone, x, z) {
+  if (!blockedAt(zone, x, z, 0.5)) return [x, z];
+  for (let r = 0.5; r < 12; r += 0.5) for (let a = 0; a < Math.PI * 2; a += 0.4) {
+    const nx = x + Math.cos(a) * r, nz = z + Math.sin(a) * r;
+    if (!blockedAt(zone, nx, nz, 0.5)) return [nx, nz];
+  }
+  return [x, z];
+}
+function adminJump(label, cp) {
+  closeUI();
+  // sürmekte olan sahne, soru ve konuşmalar biter
+  wake = null;
+  G.cutscene = false;
+  canvas.style.filter = "";
+  $("lids").style.display = "none";
+  $("frost").style.opacity = 0;
+  askQueue.length = 0;
+  sayQueue.length = 0;
+  $("deathScreen").style.display = "none";
+  $("endScreen").style.display = "none";
+  if (cp.newGame) return startNewGame();
+  const keep = {};
+  for (const k of ["pickaxe", "ore", "up", "oreHint", "pickHint"]) if (G.flags[k] !== undefined) keep[k] = G.flags[k];
+  G.flags = Object.assign({ cores: 0 }, cp.flags, keep);
+  G.travel = null;
+  G.ended = false;
+  resetPlayer();
+  clearAliens(null);
+  applyFlags();
+  const s = cp.ship || [35, 0, Math.PI / 2];
+  setZone("ship", s[0], s[1], s[2]);
+  goStage(cp.stage, {});
+  if (cp.planet) {
+    const Z = G.zones[cp.planet];
+    const sp = cp.spot ? cp.spot() : [Z.spawn[0], Z.spawn[2] === 0 ? 1.5 : Z.spawn[2], cp.planet === "anagemi" ? -Math.PI / 2 : 0];
+    const [x, z] = freeSpot(Z, sp[0], sp[1]);
+    player.suit = !!Z.vacuum || cp.planet === "anagemi";
+    player.suitO2 = 100;
+    W.suitMesh.visible = !player.suit;
+    setZone(cp.planet, x, z, sp[2]);
+    resetCans(cp.planet);
+  }
+  beginPlay();
+  showBanner("ADMİN", label.toLocaleUpperCase("tr"), true);
+  sfx("warp");
+  saveGame();
+}
+function openAdminJump() {
+  const box = $("ajList");
+  box.innerHTML = "";
+  for (const [group, items] of JUMPS) {
+    const h = document.createElement("h3");
+    h.textContent = group;
+    const grid = document.createElement("div");
+    grid.className = "ajGrid";
+    for (const [label, cp] of items) {
+      const b = document.createElement("button");
+      b.className = "btn";
+      b.textContent = label;
+      b.onclick = () => adminJump(label, cp);
+      grid.appendChild(b);
+    }
+    box.append(h, grid);
+  }
+  openUI("adminJump");
+}
+$("btnAjClose").onclick = () => closeUI();
+$("btnAdminJump").onclick = () => { closeUI(); openAdminJump(); };
+addEventListener("keydown", e => {
+  if (e.code !== "KeyJ" || e.repeat || !G.running || !G.admin) return;
+  if (G.uiOpen === "adminJump") closeUI();
+  else if (!G.uiOpen || G.uiOpen === "pauseMenu") { if (G.uiOpen) closeUI(); openAdminJump(); }
+});
+visuals.push(() => { $("btnAdminJump").style.display = G.admin ? "inline-block" : "none"; });
+
 // ---------------------------------------------------------------- elde alet görünümü, sallanma, geri tepme
 const _shootBase = onShoot;
 onShoot = () => holdingPick() ? swing() : _shootBase();
