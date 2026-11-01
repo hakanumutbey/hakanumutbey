@@ -2853,7 +2853,11 @@ function streamFile(filePath, response, size) {
   // İndirilen oyun paketleri: tarayıcı boyutu ve ilerlemeyi göstersin, dosyayı kaydetsin.
   if (extname(filePath) === ".zip") {
     headers["Content-Disposition"] = `attachment; filename="${basename(filePath)}"`;
-    if (size) headers["Content-Length"] = size;
+    if (size) {
+      headers["Content-Length"] = size;
+      // Cloudflare Content-Length'i silip parça parça gönderiyor; ilerleme çubuğu bunu okur.
+      headers["X-Download-Size"] = String(size);
+    }
   }
   response.writeHead(200, headers);
   createReadStream(filePath).pipe(response);

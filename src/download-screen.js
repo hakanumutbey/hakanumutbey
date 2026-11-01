@@ -8,6 +8,11 @@ function formatMB(bytes) {
   return `${(bytes / 1048576).toFixed(1)} MB`;
 }
 
+// Cloudflare Content-Length'i siliyor; sunucu boyutu X-Download-Size ile de gönderir.
+function sizeOf(response) {
+  return Number(response.headers.get("Content-Length")) || Number(response.headers.get("X-Download-Size")) || 0;
+}
+
 function fileNameOf(href) {
   return decodeURIComponent(new URL(href, location.href).pathname.split("/").pop() || "oyun.zip");
 }
@@ -90,7 +95,7 @@ function openScreen(link) {
 
   fetch(href, { method: "HEAD" })
     .then((response) => {
-      const size = Number(response.headers.get("Content-Length"));
+      const size = sizeOf(response);
       overlay.querySelector("[data-dl-size]").textContent = response.ok && size ? formatMB(size) : response.ok ? "Zip dosyası" : "Paket hazırlanıyor";
     })
     .catch(() => {
@@ -140,7 +145,7 @@ async function startDownload() {
   try {
     const response = await fetch(href, { signal: controller.signal });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const total = Number(response.headers.get("Content-Length")) || 0;
+    const total = sizeOf(response);
     if (!response.body || !total) {
       // İlerleme okunamıyor: tarayıcının kendi indirmesine bırak.
       setStatus("İndirme tarayıcıda başladı…");
