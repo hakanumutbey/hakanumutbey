@@ -1,4 +1,7 @@
 import "./styles.css";
+import "./polish.css";
+import "./polish.js";
+import "./download-screen.js";
 import {
   BUILD_VERSION,
   communityEvents,
@@ -21,15 +24,17 @@ const games = [
     title: "IN A SPACE 2",
     path: "/oyunlar/in-a-space-2/",
     type: "3D Hikâye Macerası",
-    status: "Oynanabilir",
+    status: "Bilgisayar oyunu",
+    download: "/indir/in-a-space-2.zip?v=20261101",
+    downloadSize: "",
     description: "Ay'daki anteni onarmaya giderken gemin bir ışınla parçalanır; 1000 km/s hızla savrulup bilinmeyen Tahra gezegenine çakılırsın. Seçimlerin hikâyeyi değiştirir!",
-    longDescription: "IN A SPACE 2: Tahra'nın Gölgesi. 22 bölümlük, seçimli diyaloglu uzay macerası, beş farklı son. Manyetik Balyozla vur, fırlat, geri çağır; Vorak'lara karşı savaş, mürettebatını kurtar, Lumi yerlilerine yardım et, Kara Kale'ye sız, asteroit kuşağında kovalamaca yap ve Ay'da Hükümdar Vorakh ile yüzleş. ATLAS'ın içine gir, oyun bitince Tahra, Ay ve Dünya arasında uç.",
+    longDescription: "IN A SPACE 2: Tahra'nın Gölgesi. 22 bölümlük, seçimli diyaloglu uzay macerası, beş farklı son. Manyetik Balyozla vur, fırlat, geri çağır; Vorak'lara karşı savaş, mürettebatını kurtar, Lumi yerlilerine yardım et, Kara Kale'ye sız, asteroit kuşağında kovalamaca yap ve Ay'da Hükümdar Vorakh ile yüzleş. ATLAS'ın içine gir, oyun bitince Tahra, Ay ve Dünya arasında uç. Godot ile yapılmış bilgisayar sürümü: indir, zip'i aç, oyna.",
     accent: "cosmos",
-    controls: "WASD, Shift koş, Space zıpla, G basılı süzül, sol tık vur, sağ tık nişan + sol tık fırlat, R çağır, C yuvarlan, V Aşırı Yük, Q BİP, E etkileşim, I çanta, 1/2/3 seçim",
-    mobileStatus: "Mobil uyumlu",
-    mobileNote: "Telefonda solda joystick, sağda kaydırarak bakış, küçük aksiyon tuşları.",
+    controls: "WASD, Shift koş, Space zıpla, G basılı süzül, sol tık vur, sağ tık nişan + sol tık fırlat, R çağır, C yuvarlan, V Aşırı Yük, Q BİP, E etkileşim, I çanta, 1/2/3 seçim, F11 tam ekran",
+    mobileStatus: "Mobilde oynanmaz",
+    mobileNote: "Bilgisayar oyunu: İndir'e bas, zip'i aç, IN A SPACE 2.exe'ye çift tıkla. Tarayıcıda değil, Windows'ta çalışır.",
     achievements: ["Tahra'ya çakıl ve hayatta kal", "Üç mürettebatı kurtar", "Beş sondan birini gör"],
-    updates: ["22 bölüm ve serbest dolaşma", "Seçimler hikâyeyi değiştirir: 5 farklı son", "ATLAS'ın içine gir, kokpitten uç", "Roblox tarzı mobil kontroller"],
+    updates: ["Godot ile bilgisayar sürümü: indir ve oyna", "22 bölüm ve serbest dolaşma", "Seçimler hikâyeyi değiştirir: 5 farklı son", "ATLAS'ın içine gir, kokpitten uç"],
     stockBase: 175,
   },
   {
@@ -37,15 +42,17 @@ const games = [
     title: "IN A SPACE",
     path: "/oyunlar/in-a-space/",
     type: "3D Uzay Macerası",
-    status: "Oynanabilir",
+    status: "Bilgisayar oyunu",
+    download: "/indir/in-a-space.zip?v=20261101",
+    downloadSize: "",
     description: "ARGO-7 gemisinde tek başına uyan, mürettebatını kurtar ve eve dön! Elektrik kesintileri, uzaylı saldırıları, gövde delikleri ve oksijeni azalan uzay giysisi seni bekliyor.",
-    longDescription: "IN A SPACE — Breath of the Wild tarzında 4 perdelik uzay macerası. Geminin yapay zekâsı NOVA ile üç gezegenden enerji çekirdeği topla, kaçış kapsüllerine düşen mürettebatı kurtar, uzaylı ana gemisini patlatıp 75 saniyede kaç, Ay üssünden yakıt al ve Dünya'ya in. Kayalara tırman, jetpack ile süzül, meteorları gemi topuyla vur. Oyun bitince Dünya'da ve uzayda serbestçe dolaş.",
+    longDescription: "IN A SPACE — Breath of the Wild tarzında 4 perdelik uzay macerası. Geminin yapay zekâsı NOVA ile üç gezegenden enerji çekirdeği topla, kaçış kapsüllerine düşen mürettebatı kurtar, uzaylı ana gemisini patlatıp 75 saniyede kaç, Ay üssünden yakıt al ve Dünya'ya in. Kayalara tırman, jetpack ile süzül, meteorları gemi topuyla vur. Oyun bitince Dünya'da ve uzayda serbestçe dolaş. Godot ile yapılmış bilgisayar sürümü: indir, zip'i aç, oyna.",
     accent: "cosmos",
-    controls: "WASD, Shift koş, Space zıpla / havada süzül, E etkileşim, F fener, sol tık ateş",
-    mobileStatus: "Masaüstü önerilir",
-    mobileNote: "Fare ile bakış (pointer lock) ve klavye gerektirdiği için masaüstünde oynanır.",
+    controls: "WASD, Shift koş, Space zıpla / havada süzül, E etkileşim, F fener, sol tık ateş, F11 tam ekran",
+    mobileStatus: "Mobilde oynanmaz",
+    mobileNote: "Bilgisayar oyunu: İndir'e bas, zip'i aç, IN A SPACE.exe'ye çift tıkla. Tarayıcıda değil, Windows'ta çalışır.",
     achievements: ["Kriyo uykusundan uyan", "Üç mürettebatı kurtar", "Dünya'ya in"],
-    updates: ["4 perdelik hikâye: çekirdekler, kayıp mürettebat, ana gemi, eve dönüş", "Kalpler, dayanıklılık çarkı, tırmanma ve jetpack süzülme", "Serbest uçuş: meteor yağmuru ve gemi topu", "Oyun bitince Dünya'da dolaş"],
+    updates: ["Godot ile bilgisayar sürümü: indir ve oyna", "4 perdelik hikâye: çekirdekler, kayıp mürettebat, ana gemi, eve dönüş", "Kalpler, dayanıklılık çarkı, tırmanma ve jetpack süzülme", "Serbest uçuş: meteor yağmuru ve gemi topu", "Oyun bitince Dünya'da dolaş"],
     stockBase: 170,
   },
   {
@@ -464,6 +471,22 @@ const games = [
 ];
 
 const FUSION_GAME_PATH = "/oyunlar/birlesim-arenasi/";
+// Godot paketleri (zip) siteye konana dek indirilen oyunlar tarayıcıda oynanmaya devam eder.
+const PC_DOWNLOADS_READY = false;
+if (!PC_DOWNLOADS_READY) {
+  for (const game of games) {
+    if (!game.download) continue;
+    delete game.download;
+    game.status = "Oynanabilir";
+    game.mobileStatus = game.slug === "in-a-space-2" ? "Mobil uyumlu" : "Masaüstü önerilir";
+    game.mobileNote = game.slug === "in-a-space-2"
+      ? "Telefonda solda joystick, sağda kaydırarak bakış, küçük aksiyon tuşları."
+      : "Fare ile bakış (pointer lock) ve klavye gerektirdiği için masaüstünde oynanır.";
+    game.longDescription = game.longDescription.replace(/ Godot ile yapılmış bilgisayar sürümü.*$/, " Bilgisayar sürümü (Godot) yakında indirilebilir olacak.");
+    game.updates = game.updates.filter((item) => !item.startsWith("Godot"));
+  }
+}
+
 const NEW_GAME_SLUGS = new Set(["in-a-space-2", "in-a-space","kayip-odalar", "vipend-3d", "karanlik-labirent", "ejderha-ucus", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "2d-car-simulator", "yaris-sehri", "hako-vurus", "uzay-yarisi", "isin-savasi", "beyaz-bardak", "make-city"]);
 /** Only games the Birleşim Arenası client actually implements. */
 const FUSION_GAME_SLUGS = new Set([
@@ -1081,13 +1104,17 @@ document.querySelector("#app").innerHTML = `
           <h1 id="hero-title">Hakorocks Studio</h1>
           <p class="hero-copy">
             Ben Hakan Umut Akadal. Oyunlar burada, hemen altında.
-            Bir karta bas, tarayıcıda oyna.
+            Bir karta bas: tarayıcıda oyna ya da bilgisayarına indir.
           </p>
           <div class="hero-actions">
             <button class="button primary" type="button" data-random-game>Rastgele oyun</button>
             <a class="button secondary" href="#launcher">Launcher'ı aç</a>
             <a class="button secondary" href="#bot">HakoBot'a sor</a>
           </div>
+          ${isPhoneOrTablet() ? "" : `<div class="download-strip" aria-label="Bilgisayar oyunları">
+            <span class="download-strip-label">💻 Bilgisayara indir</span>
+            ${games.filter((game) => game.download).map((game) => renderPlayAction(game, "download-chip", "", `aria-label="${game.title} indir"`).replace("İndir", game.title)).join("")}
+          </div>`}
         </div>
         <aside class="hero-panel" aria-label="Stüdyo özeti">
           <strong>${games.length} oyun</strong>
@@ -1736,7 +1763,7 @@ function renderLauncherHub() {
           <p>${recommended.description}</p>
           <div class="launcher-actions">
             <button class="button primary" type="button" data-game-open="${recommended.slug}" data-launcher-use>Detayını aç</button>
-            <a class="button secondary" href="${recommended.path}" data-play-game="${recommended.slug}" data-launcher-use>Oyuna gir</a>
+            ${renderPlayAction(recommended, "button secondary", "Oyuna gir", "data-launcher-use")}
             <button class="button secondary" type="button" data-continue-game data-launcher-use>Devam et: ${continueGame.title}</button>
           </div>
         </div>
@@ -1824,7 +1851,29 @@ function renderLauncherMissions() {
 }
 
 function renderNewBadge(game) {
-  return NEW_GAME_SLUGS.has(game.slug) ? '<span class="new-badge">YENİ</span>' : "";
+  const pc = game.download ? '<span class="pc-badge">💻 Bilgisayar</span>' : "";
+  return (NEW_GAME_SLUGS.has(game.slug) ? '<span class="new-badge">YENİ</span>' : "") + pc;
+}
+
+// Telefon/tablet: genişliğe değil cihaza bakar (iPadOS kendini Mac gibi tanıtır).
+function isPhoneOrTablet() {
+  const ua = navigator.userAgent || "";
+  if (/Android|iPhone|iPad|iPod|Mobile|Tablet|Silk|Kindle/i.test(ua)) return true;
+  if (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) return true;
+  return Boolean(window.matchMedia?.("(pointer: coarse)").matches && !window.matchMedia?.("(any-pointer: fine)").matches);
+}
+
+// İndirilen (Godot) oyunlarda "Oyna" yerine "İndir" çıkar; zip tek dosyada her şeyi taşır.
+// Telefon ve tablette indirme yerine "Mobilde oynanmaz" yazar.
+function renderPlayAction(game, className, label, extraAttrs = "") {
+  if (game.download && isPhoneOrTablet()) {
+    return `<span class="${className} no-mobile-link" aria-disabled="true">📵 Mobilde oynanmaz</span>`;
+  }
+  if (game.download) {
+    const size = game.downloadSize ? ` <small>${game.downloadSize}</small>` : "";
+    return `<a class="${className} download-link" href="${game.download}" download data-play-game="${game.slug}" data-download-title="${game.title}" ${extraAttrs}><i class="download-icon" aria-hidden="true"></i>İndir${size}</a>`;
+  }
+  return `<a class="${className}" href="${game.path}" data-play-game="${game.slug}" ${extraAttrs}>${label}</a>`;
 }
 
 function getDailyGame() {
@@ -1834,13 +1883,13 @@ function getDailyGame() {
 function renderDailyGame() {
   const game = getDailyGame();
   return `
-    <a class="daily-game-card" href="${game.path}" data-play-game="${game.slug}">
+    <a class="daily-game-card" href="${game.download ? (isPhoneOrTablet() ? "#oyunlar" : game.download) : game.path}" ${game.download && !isPhoneOrTablet() ? `download data-download-title="${game.title}"` : ""} data-play-game="${game.slug}">
       <span class="daily-game-label">🎮 Günün Oyunu</span>
       <span class="daily-game-body">
         <strong>${game.title}</strong>
         <span>${game.description}</span>
       </span>
-      <span class="daily-game-cta">Oyna →</span>
+      <span class="daily-game-cta">${game.download ? (isPhoneOrTablet() ? "📵 Mobilde oynanmaz" : "İndir ↓") : "Oyna →"}</span>
     </a>
   `;
 }
@@ -1872,7 +1921,7 @@ function renderLauncherGameCard(game) {
         ${renderProgressBar(extra.progress, "Hazırlık")}
         <div class="launcher-game-actions">
           <button class="button primary" type="button" data-game-open="${game.slug}" data-launcher-use>Detay</button>
-          <a class="button secondary" href="${game.path}" data-play-game="${game.slug}" data-launcher-use>Oyna</a>
+          ${renderPlayAction(game, "button secondary", "Oyna", "data-launcher-use")}
           <button class="favorite-button ${isFavorite ? "is-active" : ""}" type="button" data-favorite-game="${game.slug}" aria-pressed="${isFavorite ? "true" : "false"}">
             ${isFavorite ? "Favoride" : "Favori"}
           </button>
@@ -2680,7 +2729,7 @@ function renderGameCard(game, index) {
     : `<div class="game-poster poster-${game.accent}" aria-hidden="true"><span>${String(index + 1).padStart(2, "0")}</span></div>`;
   const playAction = removal
     ? `<span class="play-link is-removed" aria-disabled="true">${removal.mode === "permanent" ? "Kalıcı olarak kaldırıldı" : "Geçici olarak kaldırıldı"}</span>`
-    : `<a class="play-link" href="${game.path}" data-play-game="${game.slug}">Oyunu aç</a>`;
+    : renderPlayAction(game, "play-link", "Oyunu aç");
 
   return `
     <article class="game-card${removal ? " is-removed" : ""}">
@@ -2791,7 +2840,7 @@ function renderMobileStatus(game) {
       </div>
       <h3>${game.title}</h3>
       <p>${game.mobileNote}</p>
-      <a href="${game.path}" data-play-game="${game.slug}">Oyna</a>
+      ${renderPlayAction(game, "", "Oyna")}
     </article>
   `;
 }
@@ -3747,9 +3796,14 @@ function renderModal(game) {
       </div>
       <div class="modal-actions">
         ${renderGamepadBadge(game, "large")}
-        <a class="button primary" href="${game.path}" data-play-game="${game.slug}">Oyunu aç</a>
+        ${renderPlayAction(game, "button primary", "Oyunu aç")}
       </div>
     </div>
+    ${game.download
+      ? isPhoneOrTablet()
+        ? `<p class="download-note is-mobile">📵 <b>Mobilde oynanmaz.</b> ${game.title} artık bilgisayar oyunu: Windows bir bilgisayardan siteye girip İndir'e bas.</p>`
+        : `<p class="download-note">💻 ${game.mobileNote} Windows "bilinmeyen yayıncı" uyarısı verirse <b>Ek bilgi → Yine de çalıştır</b>'a bas.</p>`
+      : ""}
     <section class="modal-section full modal-progress">
       <h3>Oyun ilerlemesi</h3>
       ${renderProgressBar(extra.progress, "Tamamlama yüzdesi")}

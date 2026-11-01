@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import { createHash, randomBytes } from "node:crypto";
-import { extname, join, normalize, resolve } from "node:path";
+import { basename, extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 
@@ -137,6 +137,7 @@ const mimeTypes = {
   ".wav": "audio/wav",
   ".mp3": "audio/mpeg",
   ".m4a": "audio/mp4",
+  ".zip": "application/zip",
 };
 
 await mkdir(dataRoot, { recursive: true });
@@ -2825,7 +2826,7 @@ async function serveStatic(request, response) {
   try {
     const fileStat = await stat(filePath);
     if (fileStat.isFile()) {
-      streamFile(filePath, response);
+      streamFile(filePath, response, fileStat.size);
       return;
     }
     if (fileStat.isDirectory()) {
@@ -2844,11 +2845,17 @@ async function serveStatic(request, response) {
   response.end("Not found");
 }
 
-function streamFile(filePath, response) {
-  response.writeHead(200, {
+function streamFile(filePath, response, size) {
+  const headers = {
     "Content-Type": mimeTypes[extname(filePath)] || "application/octet-stream",
     "Cache-Control": extname(filePath) === ".html" ? "no-cache" : "public, max-age=2592000",
-  });
+  };
+  // İndirilen oyun paketleri: tarayıcı boyutu ve ilerlemeyi göstersin, dosyayı kaydetsin.
+  if (extname(filePath) === ".zip") {
+    headers["Content-Disposition"] = `attachment; filename="${basename(filePath)}"`;
+    if (size) headers["Content-Length"] = size;
+  }
+  response.writeHead(200, headers);
   createReadStream(filePath).pipe(response);
 }
 
