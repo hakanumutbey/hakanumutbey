@@ -1336,18 +1336,33 @@ function drawCompass() {
   const dirs = [["K", 0], ["B", Math.PI / 2], ["G", Math.PI], ["D", -Math.PI / 2]];
   for (const [n, a] of dirs) put(wrapAngle(a - player.camYaw), "c", n);
   for (let a = 0; a < 16; a++) { const ang = a * Math.PI / 8; if (a % 4) put(wrapAngle(ang - player.camYaw), "tick", ""); }
-  if (G.marker) {
-    const rel = compassX(G.marker.x, G.marker.z);
-    const d = Math.round(Math.hypot(G.marker.x - player.pos.x, G.marker.z - player.pos.z));
-    const clampRel = clamp(rel, -Math.PI / 2 + 0.05, Math.PI / 2 - 0.05);
-    put(clampRel, "m", `<b>${d}m</b><i></i>`);
-  }
+  // görev yeri artık şeritte değil, ekranda tam yerinde gösteriliyor (drawMarker)
   for (const e of G.enemies) {
     if (e.dead || e.zone !== G.zone || !e.alerted) continue;
     if (e.pos.distanceTo(player.pos) > 30) continue;
     put(compassX(e.pos.x, e.pos.z), "m enemy", "<i></i>");
   }
   if (html !== compassCache) { inner.innerHTML = html; compassCache = html; }
+}
+// Görev işareti (1. oyundaki gibi): hedefin tam üstünde elmas + mesafe; ekran dışındaysa kenara yapışır,
+// arkadaysa altta görünür ki hangi yöne dönüleceği anlaşılsın.
+function drawMarker() {
+  const m = $("marker");
+  if (!G.marker || G.cutscene || G.uiOpen || G.zone.name === "chase") { m.style.display = "none"; return; }
+  _proj.copy(G.marker);
+  camera.getWorldDirection(_fw);
+  const front = _v1.copy(G.marker).sub(camera.position).dot(_fw) > 0;
+  _proj.project(camera);
+  let x = (_proj.x * 0.5 + 0.5) * innerWidth, y = (-_proj.y * 0.5 + 0.5) * innerHeight;
+  if (!front) { x = innerWidth - x; y = innerHeight - 60; }
+  const pad = 46, top = TOUCH ? 120 : 90;
+  const cx = clamp(x, pad, innerWidth - pad), cy = clamp(y, top, innerHeight - 50);
+  m.classList.toggle("edge", !front || cx !== x || cy !== y);
+  m.style.left = cx + "px";
+  m.style.top = cy + "px";
+  $("markerDist").innerText = Math.round(Math.hypot(G.marker.x - player.pos.x, G.marker.z - player.pos.z)) + " m";
+  if ($("markerLabel").innerText !== G.markerLabel) $("markerLabel").innerText = G.markerLabel || "";
+  m.style.display = "block";
 }
 let hpGhostT = 0;
 function updateHUD(dt) {
@@ -1376,6 +1391,7 @@ function updateHUD(dt) {
   $("reticle").style.display = player.aiming && player.hammer.state === "hand" ? "block" : "none";
   $("dot").style.display = player.aiming ? "none" : "block";
   drawCompass();
+  drawMarker();
   // düşman can çubukları
   let n = 0;
   for (const e of G.enemies) {
