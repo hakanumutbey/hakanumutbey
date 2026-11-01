@@ -88,7 +88,7 @@ function ch9() {
   const [kx, kz] = W.keremPod;
   checkpoint(() => setZone("tahra", kx + 30, kz, Math.PI / 2));
   goal("Kızıl Kumlar: Kerem'in kapsülüne git", kx, kz);
-  later(1.5, () => say([["Kerem", "(telsiz) ...Kaptan? Kaptan! Sesini duymak ne güzel. Kapsülün kapısı sıkıştı ve dışarıda bir şeyler kapıyı tırmalıyor!"]]));
+  later(0.5, () => establish(kx, W.tahraGround(kx, kz) + 2, kz, [["Kerem", "(telsiz) ...Kaptan? Kaptan! Sesini duymak ne güzel. Kapsülün kapısı sıkıştı ve dışarıda bir şeyler kapıyı tırmalıyor!"]]));
   onReach("tahra", kx, kz, 30, () => {
     say([["Kaptan", "Dayan Kerem, geliyorum!"], ["BİP", "Sıcaklık 46 derece. Bir de Vorak'lar. Harika bir tatil."]]);
     fight([
@@ -140,19 +140,25 @@ function openKerem() {
   addInteract(tahra, { pos: V3(kx, tahra.ground(kx, kz) + 1.2, kz - 1.6), r: 3.2, label: () => G.chapter === 9 && !G.flags.kerem ? "Kapsül kapısını zorla" : null, hold: 2, act: () => {
     G.flags.kerem = 1;
     sfx("hiss");
-    const k = makeNPC(tahra, { helmet: false, skin: 0xd8a27a, hair: 0x1a1410 }, kx + 1.5, kz - 3, 0);
-    faceTo(k, player.pos.x, player.pos.z);
+    // kapı açılır, Kerem kapsülden sendeleyerek çıkar
+    const k = makeNPC(tahra, { helmet: false, skin: 0xd8a27a, hair: 0x1a1410 }, kx, kz - 1.2, 0);
+    const out = V3(kx + 1.5, 0, kz - 3.2);
+    const stepOut = { dur: 2.2, cam: () => ({ pos: V3(kx + 4, tahra.ground(kx, kz) + 2.2, kz - 6), look: V3(kx + 0.5, tahra.ground(kx, kz) + 1.3, kz - 1.5) }),
+      start: () => { k.st.moving = true; flashWhite(60); },
+      tick: dt => { const p = k.root.position; p.lerp(out.setY(tahra.ground(out.x, out.z)), Math.min(1, dt * 1.6)); faceTo(k, out.x + (out.x - kx), out.z + (out.z - kz)); },
+      lines: [["Kerem", "Öhö öhö... Hava! Gerçek hava!"]] };
     const kshaLine = G.flags.c_ksha === "kill"
       ? [["Kerem", "Camdan gördüm. O yaratık yalvarıyordu, Kaptan. Bilmiyorum... Belki doğrusu buydu."]]
       : [["Kerem", "Camdan gördüm, o yaralıyı bıraktın. Bilmiyorum akıllıca mıydı... ama insanca."]];
-    talkChoice(k, [["Kerem", "Kaptan! Hah! Biliyordum, biliyordum geleceğini!"]].concat(kshaLine), [
+    cinematic([stepOut], () => talkChoice(k, [["Kerem", "Kaptan! Hah! Biliyordum, biliyordum geleceğini!"]].concat(kshaLine), [
       ["\"Seni merak ettim, Kerem. İyi misin?\"", [["Kerem", "Biraz ezik, biraz kızarmış. Ama uçabilirim. ATLAS'ı bana bırak."]], () => bond("kerem", 1)],
       ["\"Geciktin pilot. Kapsülünü yanlış yere indirmişsin.\"", [["Kerem", "Yanlış yer mi? Çölün TAM ortasına indim! Bu bir yetenek!"]], () => bond("kerem", -1)]
     ], () => {
-      k.root.visible = false;
+      k.st.talk = false;
+      walkAway(k, tahra, W.camp[0], W.camp[1], 7);
       showCampCrew();
       say([["Kerem", "Kampa gidiyorum, motoru incelerim. Selin ile Bora'yı bul!"], ["BİP", "Sıradaki sinyal kuzeydoğuda. Buzlu bir ova. Selin'in kapsülü."]], () => startChapter(10));
-    });
+    }));
   } });
 }
 
@@ -165,7 +171,7 @@ function ch10() {
   const tahra = G.zones.tahra;
   checkpoint(() => setZone("tahra", sx + 30, sz + 40, Math.PI));
   goal("Ayaz Ovası: Selin'in kapsülüne git", sx, sz);
-  later(1.5, () => say([["BİP", "Kuzeydoğu çok soğuk: eksi otuz sekiz. Ateşlerin yanında ısın, yoksa giysi dayanmaz."]]));
+  later(0.5, () => establish(sx, W.tahraGround(sx, sz) + 2, sz, [["BİP", "Kuzeydoğu çok soğuk: eksi otuz sekiz. Ateşlerin yanında ısın, yoksa giysi dayanmaz."]]));
   // soğuk: ateşten uzaktayken can yakar
   watch(dt => {
     if (G.zone !== tahra || G.admin) return false;
@@ -215,7 +221,7 @@ function ch10() {
       G.flags.selin = 1;
       player.maxHealth += 20; heal(999);
       acquired("Selin'in serumu: azami can +20");
-      selin.root.visible = false;
+      walkAway(selin, tahra, W.camp[0], W.camp[1], 7);
       showCampCrew();
       say([["Selin", "Kampa gidiyorum. Bora'yı bul, o adam yalnız kalırsa bir ormanı söker."], ["BİP", "Son sinyal güneyde, Fener Ormanı'nda!"]], () => startChapter(11));
     });
@@ -230,11 +236,11 @@ function ch11() {
   const tahra = G.zones.tahra;
   const [bx, bz] = W.boraCage;
   checkpoint(() => setZone("tahra", bx, bz - 40, Math.PI));
-  W.cageGroup.visible = true; W.cageCol.on = true;
+  W.cageGroup.visible = true; W.cageCol.on = true; W.cageGroup.scale.y = 1;
   const bora = W.boraNpc || (W.boraNpc = makeNPC(tahra, { helmet: false, skin: 0xb8865e, hair: 0x2a2a2a, hairStyle: "bald" }, bx, bz, Math.PI));
   bora.root.visible = true;
   goal("Fener Ormanı: Bora'yı bul", bx, bz);
-  later(1.5, () => say([["Bora", "(telsiz) Kaptan? Bir bitki beni yuttu. Yani yutmadı, kafes oldu. Bitki kafes. Bilim bunu bilmiyor!"]]));
+  later(0.5, () => establish(bx, W.tahraGround(bx, bz) + 2, bz, [["Bora", "(telsiz) Kaptan? Bir bitki beni yuttu. Yani yutmadı, kafes oldu. Bitki kafes. Bilim bunu bilmiyor!"]]));
   const flowers = W.flowers.map(([x, z, h], i) => {
     const y = h ? tahra.ground(x, z) + h : tahra.ground(x, z);
     const g = W["flower" + i] || (W["flower" + i] = (() => {
@@ -264,8 +270,16 @@ function ch11() {
     fight([[["brute", W.flowers[2][0] + 4, W.flowers[2][1] - 6], ["shooter", W.flowers[2][0] - 8, W.flowers[2][1] - 2]]], null, { quiet: true });
   });
   function freeBora() {
-    W.cageGroup.visible = false; W.cageCol.on = false; G.hitTargets = [];
-    sfx("power");
+    // sarmaşıklar toprağa geri çekilir
+    W.cageCol.on = false; G.hitTargets = [];
+    let ct = 0;
+    visuals.push(function shrink(dt) {
+      ct += dt;
+      W.cageGroup.scale.y = Math.max(0.01, 1 - ct / 1.4);
+      W.cageGroup.rotation.y += dt * 1.5;
+      if (ct > 1.4) { W.cageGroup.visible = false; visuals.splice(visuals.indexOf(shrink), 1); }
+    });
+    sfx("power"); sfx("rumble");
     const mila = NPC.lostSeen || (NPC.lostSeen = placeLumi(tahra, bx + 6, bz + 5, 0x6ff0d2, 0.75));
     mila.root.visible = true;
     faceTo(bora, player.pos.x, player.pos.z);
@@ -276,7 +290,7 @@ function ch11() {
       ["\"Geri çekil! Kimsin sen?\"", [["Mila", "(geri kaçar, sonra döner) \"...Oru görmek ister. Mila götürür. Ama yaklaşma.\""]], () => { G.flags.c_mila = "wary"; }]
     ], () => {
       G.flags.bora = 1;
-      bora.root.visible = false;
+      walkAway(bora, tahra, W.camp[0], W.camp[1], 7);
       showCampCrew();
       if (G.flags.c_mila === "gentle") remember("Mila sana güveniyor.");
       say([["Bora", "Ben kampa gidip iletişim modülünü toplarım. Sen yerlilerle tanış, Kaptan. Tarih yazıyorsun!"]], () => { mila.root.visible = false; startChapter(12); });
@@ -396,9 +410,18 @@ function ch13() {
     e.shieldHp = 0;
     bossBase(e, "BEKÇİ GRAX");
     e.yaw = 0;
-    e.intro = 3;
+    e.intro = 999;      // giriş sahnesi bitince 0.3'e iner (tekrar denemede sahne yok)
     let summoned = false, aided = false;
-    say([["Grax", "GRAAAH! Küçük gökten düşen! Grax seni ezer, Lumi'leri ezer!"], ["BİP", "Kaptan, tokmağı yere vurunca bir an saplanıyor. O an saldır! Şok dalgasının üstünden zıpla!"]]);
+    // giriş: geçitten yere tokmağını vurarak çıkar, kamera aşağıdan bakar
+    if (W.graxIntro) e.intro = 1;
+    else W.graxIntro = 1, e.pos.z -= 10, cinematic([
+      { dur: 3.2, lines: [["Grax", "GRAAAH! Küçük gökten düşen! Grax seni ezer, Lumi'leri ezer!"]],
+        start: () => { sfx("roar"); e.state = "move"; },
+        tick: (dt, t) => { e.pos.z += dt * 3; e.yaw = 0; e.pos.y = tahra.ground(e.pos.x, e.pos.z); if (t > 2.6 && !e.slammed) { e.slammed = true; e.lunge = 0.4; shake = 1.2; sfx("heavy"); } },
+        cam: (t, k) => ({ pos: V3(gt.x + 5, tahra.ground(gt.x, gt.z) + 1.2, gt.z + 8 - k * 2), look: V3(e.pos.x, e.pos.y + 5, e.pos.z), fov: 55 }) },
+      { wait: "say", lines: [["BİP", "Kaptan, tokmağı yere vurunca bir an saplanıyor. O an saldır! Şok dalgasının üstünden zıpla!"]],
+        cam: () => ({ pos: V3(player.pos.x + 2, player.pos.y + 2.4, player.pos.z + 4), look: V3(e.pos.x, e.pos.y + 3, e.pos.z) }) }
+    ], () => { e.intro = 0.3; });
     tutorial("BOSS: GRAX", "Tokmak yere saplanınca <b>daha fazla hasar</b> alır. Halka şeklindeki şok dalgasından <kbd>Space</kbd> ile zıpla. Hücumunu <kbd>C</kbd> ile atla.");
     if (helped) { lumiAid(16); say([["Oru", "(BİP) \"Lumi'ler! Gökten düşene ışık verin!\""]]); }
     e.ai = (e, dt) => {
@@ -726,9 +749,18 @@ function ch17() {
   goal("Komutan Zhal'ı yen", ax, az);
   const e = spawnEnemy(tahra, "hunter", ax, az - 5, { rig: makeZhal(), hp: 1800, r: 0.8, h: 3.2, name: "Zhal", scrap: 200 });
   bossBase(e, "KOMUTAN ZHAL");
-  e.intro = 2.5;
+  e.intro = 999;
   const allies = choice("village") === "help" && choice("rescue") === "prisoners";
-  say([["Zhal", "Grax'ı devirdin. Etkileyici. Grax aptaldı."], ["BİP", "Kaptan, ışınlanıyor! Arkanı kolla. Kırmızı halkalar gelince zıpla!"]]);
+  // giriş: kırmızı bir ışık patlamasıyla platformda belirir (tekrar denemede sahne yok)
+  if (W.zhalIntro) e.intro = 1;
+  else W.zhalIntro = 1, e.hidden = true, cinematic([
+    { dur: 1.4, start: () => sfx("warp"), cam: () => ({ pos: V3(ax + 6, 3.2, az + 4), look: V3(ax, 2, az - 5) }) },
+    { wait: "say", lines: [["Zhal", "Grax'ı devirdin. Etkileyici. Grax aptaldı."]],
+      start: () => { e.hidden = false; flashWhite(120); shake = 0.6; },
+      cam: (t) => ({ pos: V3(ax + 3 - t * 0.2, 2.2, az - 1), look: V3(e.pos.x, e.pos.y + 3.4, e.pos.z), fov: 50 }) },
+    { wait: "say", lines: [["BİP", "Kaptan, ışınlanıyor! Arkanı kolla. Kırmızı halkalar gelince zıpla!"]],
+      cam: () => ({ pos: V3(player.pos.x + 2, player.pos.y + 2.4, player.pos.z + 4), look: V3(e.pos.x, e.pos.y + 2, e.pos.z) }) }
+  ], () => { e.intro = 0.3; });
   tutorial("BOSS: ZHAL", "Zhal ışınlanıp arkana geçer: gözü parlayınca <kbd>C</kbd> ile yuvarlan. Takip eden kırmızı kürelerden kaç. Halkalardan zıpla.");
   if (allies) { lumiAid(14); later(5, () => say([["Oru", "(BİP) \"Kurtardığın gençler burada! Işık seninle, gökten düşen!\""]])); }
   let summon66 = false, summon33 = false;
@@ -819,6 +851,21 @@ function ch18() {
   G.flags.smokeOff = 1;
   music("calm");
   checkpoint(() => setZone("tahra", 10, 18, Math.PI * 0.8));
+  // ATLAS'ın birleşmesi: kanatlar ve motor çekici ışınla havadan gelip yerine oturur
+  const parts = ["wingL", "wingR", "engine"].map((k, i) => ({ g: W.wreck.parts[k], off: [V3(-14, 18, 6), V3(14, 20, 4), V3(0, 24, 18)][i] }));
+  for (const p of parts) p.g.position.copy(p.off);
+  cinematic([{
+    dur: 5.5, lines: [["Bora", "Motor, kanatlar, iletişim, hiper sürücü... Hepsi yerine! Kerem, kapat dediğimde çekici ışını kapat!"], ["Kerem", "Kapatıyorum! ...Şimdi mi? Şimdi mi?"]],
+    start: () => sfx("warp"),
+    tick: (dt, t) => {
+      parts.forEach((p, i) => {
+        const k = clamp((t - i * 0.8) / 2.6, 0, 1), e = 1 - Math.pow(1 - k, 3);
+        p.g.position.copy(p.off).multiplyScalar(1 - e);
+        if (k >= 1 && !p.done) { p.done = true; sfx("clang"); shake = 0.4; }
+      });
+    },
+    cam: (t, k) => ({ pos: V3(Math.cos(0.8 + k * 0.9) * 22, tahra.ground(0, 0) + 8 + k * 2, Math.sin(0.8 + k * 0.9) * 22), look: V3(0, tahra.ground(0, 0) + 2, 0) })
+  }], () => { for (const p of parts) p.g.position.set(0, 0, 0); });
   const helped = choice("village") === "help";
   const O = NPC.oru, M = NPC.mila;
   O.root.position.set(6, tahra.ground(6, 6), 6); M.root.position.set(4, tahra.ground(4, 8), 8);

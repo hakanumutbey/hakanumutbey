@@ -25,7 +25,7 @@ const games = [
     description: "Ay'daki anteni onarmaya giderken gemin bir ışınla parçalanır; 1000 km/s hızla savrulup bilinmeyen Tahra gezegenine çakılırsın. Seçimlerin hikâyeyi değiştirir!",
     longDescription: "IN A SPACE 2: Tahra'nın Gölgesi. 22 bölümlük, seçimli diyaloglu uzay macerası, beş farklı son. Manyetik Balyozla vur, fırlat, geri çağır; Vorak'lara karşı savaş, mürettebatını kurtar, Lumi yerlilerine yardım et, Kara Kale'ye sız, asteroit kuşağında kovalamaca yap ve Ay'da Hükümdar Vorakh ile yüzleş. ATLAS'ın içine gir, oyun bitince Tahra, Ay ve Dünya arasında uç.",
     accent: "cosmos",
-    controls: "WASD, Shift koş, Space zıpla / havada süzül, sol tık vur, sağ tık nişan + sol tık fırlat, R çağır, C yuvarlan, V Aşırı Yük, Q BİP, E etkileşim, 1/2/3 seçim",
+    controls: "WASD, Shift koş, Space zıpla, G basılı süzül, sol tık vur, sağ tık nişan + sol tık fırlat, R çağır, C yuvarlan, V Aşırı Yük, Q BİP, E etkileşim, I çanta, 1/2/3 seçim",
     mobileStatus: "Mobil uyumlu",
     mobileNote: "Telefonda solda joystick, sağda kaydırarak bakış, küçük aksiyon tuşları.",
     achievements: ["Tahra'ya çakıl ve hayatta kal", "Üç mürettebatı kurtar", "Beş sondan birini gör"],

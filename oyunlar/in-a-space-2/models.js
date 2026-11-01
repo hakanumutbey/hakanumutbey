@@ -155,6 +155,11 @@ function animateHuman(r, st, dt) {
     else if (a.idx === 5) { armR = p < 0.35 ? 2.9 : 1.3; foreR = 0.1; armL = 1.3; torsoY = p < 0.35 ? 0.5 : -0.4; }
     else { armR = lerp(0.3, 1.55, e); foreR = lerp(1.6, 0.05, e); torsoY = -0.3; }
   }
+  if (st.work) {
+    // eğilmiş, iki eli önde çalışıyor; eller hafifçe titrer
+    armR = 1.25 + Math.sin(r.t * 14) * 0.08; armL = 1.15 - Math.sin(r.t * 14) * 0.08; armRz = 0.1; armLz = -0.1;
+    foreR = 0.7; foreL = 0.7; torsoX = 0.45; legL = 0.5; legR = 0.2; shinL = -0.9; shinR = -0.5; hipsY = 0.82; headX = 0.25;
+  }
   if (st.hurt > 0) { torsoX -= 0.3; headX -= 0.2; }
   if (st.talk) { headY = Math.sin(r.t * 1.3) * 0.15; armR = 0.4 + Math.sin(r.t * 3) * 0.15; foreR = 1.0; }
   if (st.wave) { armR = 2.8; armRz = 0.4 + Math.sin(r.t * 9) * 0.35; foreR = 0.3; }

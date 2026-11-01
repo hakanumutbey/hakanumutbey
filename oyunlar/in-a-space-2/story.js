@@ -46,7 +46,7 @@ function fight(waves, done, opts) {
     const w = waves[i++];
     for (const s of w) {
       const [type, x, z, o] = s;
-      later(s[4] || 0, () => { if (!opts.quiet) spawnFx(x, z); spawnEnemy(G.zone, type, x, z, Object.assign({ tag, alerted: !opts.quiet }, o || {})); });
+      later(s[4] || 0, () => { if (!opts.quiet) spawnFx(x, z); spawnEnemy(G.zone, type, x, z, Object.assign({ tag, alerted: !opts.quiet, drop: !opts.quiet }, o || {})); });
     }
   };
   if (!opts.quiet) music("battle");
@@ -54,6 +54,11 @@ function fight(waves, done, opts) {
   let wait = 1.5;
   watch(dt => {
     wait -= dt;
+    // takılıp kalmış (çok uzakta, kayaya sıkışmış) düşman bölümü kilitlemesin
+    for (const e of aliveEnemies(tag)) {
+      e.farT = e.pos.distanceTo(player.pos) > 90 && e.zone === G.zone ? (e.farT || 0) + dt : 0;
+      if (e.farT > 8) { e.dead = true; e.deadT = 9; e.rig.root.visible = false; }
+    }
     if (wait > 0 || aliveEnemies(tag).length) return false;
     if (i < waves.length) { if (opts.between) opts.between(i); next(); wait = 2; return false; }
     music(opts.after || "calm");
@@ -61,6 +66,48 @@ function fight(waves, done, opts) {
     return true;
   });
   return tag;
+}
+// Çekici ışın: parça mavi bir ışın sütununda göğe yükselir, kamera onu izler (kısa sinematik)
+function beamUp(obj, lines, done) {
+  const zone = G.zone;
+  const p = obj.getWorldPosition(V3());
+  const col = mesh(CYL(1.8, 1.8, 90, 16, 1, true), new THREE.MeshBasicMaterial({ color: 0x7fd8ff, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }), p.x, p.y + 45, p.z, zone.group);
+  col.castShadow = false;
+  const y0 = obj.position.y, from = V3(player.pos.x, player.pos.y, player.pos.z);
+  const side = V3(p.x - from.x, 0, p.z - from.z).normalize();
+  sfx("warp");
+  cinematic([{
+    dur: 3.4, lines,
+    cam: (t, k) => ({ pos: V3(from.x - side.x * 5 + side.z * 4, from.y + 2.5 + k * 3, from.z - side.z * 5 - side.x * 4), look: V3(p.x, p.y + 1 + k * 16, p.z) }),
+    tick: (dt, t) => {
+      col.material.opacity = Math.min(0.4, t * 0.5) * (t > 2.8 ? Math.max(0, (3.4 - t) / 0.6) : 1);
+      obj.position.y = y0 + Math.pow(Math.max(0, t - 0.5), 2) * 3.2;
+      obj.rotation.y += dt * 0.7;
+      if (t > 3) obj.visible = false;
+    }
+  }], () => { zone.group.remove(col); obj.visible = false; obj.position.y = y0; if (done) done(); });
+}
+// Bölüm başında hedefi gösteren çekim: kamera oyuncunun üstünden yükselip hedefe döner, sonra oyuna geri gelir
+function establish(x, y, z, lines) {
+  const from = V3(player.pos.x, player.pos.y + 2, player.pos.z), tgt = V3(x, y, z);
+  cinematic([{
+    dur: 5, lines,
+    cam: (t, k) => {
+      const e = k * k * (3 - 2 * k);
+      return { pos: from.clone().lerp(tgt, 0.12 * e).add(V3(0, 3 + e * 12, 0)), look: from.clone().lerp(tgt, 0.25 + 0.75 * e) };
+    }
+  }]);
+}
+// Kurtarılan biri kampa doğru yürüyerek uzaklaşır (birden kaybolmasın)
+function walkAway(npc, zone, tx, tz, sec) {
+  npc.st = { onGround: true, moving: true };
+  let t = 0;
+  visuals.push(function w(dt) {
+    t += dt;
+    const p = npc.root.position, dx = tx - p.x, dz = tz - p.z, d = Math.hypot(dx, dz);
+    if (d > 0.5) { p.x += dx / d * 1.7 * dt; p.z += dz / d * 1.7 * dt; p.y = zone.ground(p.x, p.z); npc.root.rotation.y = Math.atan2(-dx, -dz); }
+    if (t > sec) { npc.root.visible = false; npc.st.moving = false; visuals.splice(visuals.indexOf(w), 1); }
+  });
 }
 // Vorak'ların iniş ışını
 function spawnFx(x, z) {
@@ -493,8 +540,8 @@ function ch2() {
         if (player.pos.y < 6.5 || Math.hypot(player.pos.x - T.wall[0], player.pos.z - T.wall[1]) > 3) return false;
         acquired("Tırmanma");
         goal("Süzülme kulesine tırman, halkaya süzül", T.tower[0], T.tower[1], 15);
-        say([["Bora", "Şimdi kuleye. Tepeden atla, havadayken Space'e tekrar bas: jetpack süzülmesi. Turuncu halkaya in!"]]);
-        tutorial("SÜZÜLME", "Havadayken <kbd>Space</kbd>'e tekrar bas: süzül. Tekrar basarsan bırakırsın. Süzülmek dayanıklılık harcar.");
+        say([["Bora", "Şimdi kuleye. Tepede G tuşunu basılı tut: zıplarsın, sonra jetpack seni süzdürür. Turuncu halkaya in!"]]);
+        tutorial("SÜZÜLME", "<kbd>G</kbd> basılı tut: yerdeysen zıplar, havada süzülürsün. Bırakınca süzülme biter. Süzülmek dayanıklılık harcar.");
         step3();
         return true;
       });
@@ -749,7 +796,7 @@ function ch6() {
   const [mx, mz] = W.mountBase;
   checkpoint(() => setZone("tahra", mx + 4, mz + 12, 0));
   goal("Demir Zirve'ye git: motor dağın tepesinde", mx, mz);
-  later(2, () => say([["BİP", "Motorun sinyali kuzeyden geliyor. Yüksekten. Çok yüksekten. Umarım tırmanmayı seviyorsun."]]));
+  later(0.5, () => establish(W.engineSpot[0], W.engineSpot[2] + 2, W.engineSpot[1], [["BİP", "Motorun sinyali kuzeyden geliyor. Şu zirveden. Umarım tırmanmayı seviyorsun."]]));
   onReach("tahra", mx, mz + 25, 30, () => {
     say([["BİP", "Dağın eteğinde Vorak var! Üç tane. Biri uzaktan ateş ediyor, dikkat!"]]);
     fight([[["shooter", mx - 10, mz + 4], ["hunter", mx + 8, mz + 8], ["hunter", mx, mz + 14, 0, 0.5]]], () => {
@@ -766,14 +813,12 @@ function ch6() {
   eng.visible = true;
   addInteract(tahra, { pos: V3(ex, ey + 1.3, ez + 1), r: 4, label: () => G.chapter === 6 && !G.flags.engine && player.pos.y > ey - 1 ? "Motoru çekici ışına bağla" : null, hold: 2, act: () => {
     G.flags.engine = 1;
-    eng.visible = false;
-    sfx("warp");
     acquired("ATLAS motoru");
-    say([["BİP", "Bağladım! Çekici ışın motoru kampa taşıyor. Bip bip!"], ["BİP", "Ah. Ah hayır. Gözcü dronlar! Zirvede! Üç tane!"]], () => {
+    beamUp(eng, [["BİP", "Bağladım! Çekici ışın motoru kampa taşıyor. Bip bip!"]], () => say([["BİP", "Ah. Ah hayır. Gözcü dronlar! Zirvede! Üç tane!"]], () => {
       fight([[["drone", ex + 10, ez - 6], ["drone", ex - 10, ez - 4], ["drone", ex, ez - 14, 0, 0.6]]], () => {
-        say([["BİP", "Bitti! Aşağı inmek için tepeden atla ve süzül. Yürüyerek inmek... bacaklarına yazık."]], () => startChapter(7));
+        say([["BİP", "Bitti! Aşağı inmek için G'yi basılı tut ve süzül. Yürüyerek inmek... bacaklarına yazık."]], () => startChapter(7));
       });
-    });
+    }));
   } });
 }
 
@@ -786,7 +831,7 @@ function ch7() {
   checkpoint(() => setZone("tahra", cx - 8, cz + 6, -Math.PI / 2));
   goal("Rüzgâr Kanyonu'na git", cx - 6, cz);
   W.engineProp && (W.engineProp.visible = false);
-  later(1.5, () => say([["BİP", "Kanat doğuda. Kanyonun ortasındaki kayalık adanın üstünde. Altında... hiçbir şey yok. Dipsiz."]]));
+  later(0.5, () => establish(W.wingSpot[0], W.wingSpot[2] + 1, W.wingSpot[1], [["BİP", "Kanat doğuda. Kanyonun ortasındaki kayalık adanın üstünde. Altında... hiçbir şey yok. Dipsiz."]]));
   onReach("tahra", cx - 6, cz, 12, () => {
     say([["Kaptan", "Uçurumun kenarındaki şu sütun. Tepesinden süzülürsem adaya ulaşırım."], ["BİP", "Rüzgâr akımlarını görüyor musun? Mavi sütunlar. İçinden süzülürsen seni yukarı iter!"]]);
     goal("Sütuna tırman ve adaya süzül", W.wingSpot[0], W.wingSpot[1], W.wingSpot[2] + 1.5);
@@ -809,15 +854,23 @@ function ch7() {
   });
   const tahra = G.zones.tahra;
   const [wx, wz, wy] = W.wingSpot;
-  const wing = W.wingProp || (W.wingProp = (() => { const g = makeAtlas().parts.wingL; g.position.set(wx + 3, wy + 0.4, wz); g.rotation.set(0.2, 0.4, 0.3); tahra.group.add(g); return g; })());
+  // Kanadın kendisi parça grubunun 3.1 m solunda duruyor; eskiden grup eğik konduğu için kanat adanın zeminine
+  // gömülüyordu (görünmüyordu). Grup kaydırılıp hafif eğimle yerleştirildi: kanat zeminin üstünde, adanın ortasında.
+  const wing = W.wingProp || (W.wingProp = (() => {
+    const g = makeAtlas().parts.wingL;
+    g.position.set(wx + 3.1, wy + 0.75, wz - 0.6); g.rotation.set(0.04, 0, -0.08); tahra.group.add(g);
+    const glow = new THREE.PointLight(0x7fd8ff, 0, 10); glow.position.set(-3.1, 1.5, 0.6); g.add(glow); g.glow = glow;
+    return g;
+  })());
   wing.visible = true;
+  wing.glow.intensity = 1.2;
   addInteract(tahra, { pos: V3(wx, wy + 1, wz), r: 4, label: () => G.chapter === 7 && fought && !aliveEnemies().length && !G.flags.wing ? "Kanadı çekici ışına bağla" : null, hold: 2, act: () => {
-    G.flags.wing = 1; wing.visible = false; sfx("warp"); acquired("ATLAS kanadı");
-    say([["BİP", "Kanat yolda! Şimdi geri dönmeliyiz. Adadaki yüksek kayaya tırman, oradan kenara süzül."]], () => {
+    G.flags.wing = 1; acquired("ATLAS kanadı");
+    beamUp(wing, [["BİP", "Kanat yolda! Şimdi geri dönmeliyiz."]], () => say([["BİP", "Adadaki yüksek kayaya tırman, oradan G'yi basılı tutup kenara süzül."]], () => {
       goal("Adadaki kayaya tırman ve kanyondan çık", 222, 0);
       onReach("tahra", 222, 0, 12, () => startChapter(8));
       watch(() => { if (G.zone.name === "tahra" && (player.pos.x < 92 || player.pos.x > 218) && player.onGround) { startChapter(8); return true; } return false; });
-    });
+    }));
   } });
 }
 
@@ -830,13 +883,14 @@ function ch8() {
   const [ex, ez] = W.caveEntry;
   checkpoint(() => setZone("tahra", ex, ez + 4, 0));
   goal("Işıltı Mağarası'na git", ex, ez);
-  later(1.5, () => say([["BİP", "İletişim modülü güneybatıdaki mağarada. İçerisi karanlık. Fenerin var, değil mi? F."]]));
+  later(0.5, () => establish(ex, W.tahraGround(ex, ez) + 4, ez - 8, [["BİP", "İletişim modülü güneybatıdaki mağarada. İçerisi karanlık. Fenerin var, değil mi? F."]]));
   onReach("tahra", ex, ez, 8, () => {
     tutorial("FENER", "<kbd>F</kbd> feneri açar/kapar. Mağarada kristaller de biraz ışık verir.");
     say([["Kaptan", "Kristaller parlıyor... ve bir şey hırlıyor."], ["BİP", "Gölge avcıları. Karanlıkta çok hızlılar. Gözlerine dikkat et!"]]);
     const C = W.cave;
     fight([[["stalker", C.minX + 10, C.maxZ - 8], ["stalker", C.minX + 18, C.minZ + 6, 0, 0.3]], [["stalker", C.maxX - 12, C.minZ + 8], ["stalker", C.maxX - 6, C.maxZ - 10, 0, 0.5]]], () => {
-      goal("İletişim modülünü al", W.commSpot[0], W.commSpot[1]);
+      // modül zaten alındıysa görevi geri alma (eskiden burada "al" yazıp oyunu kilitliyordu)
+      if (!G.flags.comm) goal("İletişim modülünü al", W.commSpot[0], W.commSpot[1]);
     }, { quiet: true });
     goal("Mağarayı keşfet", W.commSpot[0], W.commSpot[1]);
   });
@@ -849,14 +903,17 @@ function ch8() {
     return g;
   })());
   comm.visible = true;
-  addInteract(tahra, { pos: V3(cx, tahra.ground(cx, cz) + 1, cz), r: 3, label: () => G.chapter === 8 && !G.flags.comm && !aliveEnemies().length ? "İletişim modülünü bağla" : null, hold: 2, act: () => {
-    G.flags.comm = 1; comm.visible = false; sfx("warp"); acquired("İletişim modülü");
-    say([["BİP", "Üçü de tamam! Motor, kanat, iletişim. Şimdi mürettebat!"], ["BİP", "Dışarıda... nişancılar bekliyor. Pusu!"]], () => {
-      const [ox, oz] = W.caveEntry;
+  // Modül, yanında saldırgan bir düşman yokken alınır (mağaranın öbür ucunda uyuyan gölge avcıları engel olmaz)
+  const nearFoe = () => aliveEnemies().some(e => e.alerted && e.pos.distanceTo(player.pos) < 14);
+  addInteract(tahra, { pos: V3(cx, tahra.ground(cx, cz) + 1, cz), r: 3, label: () => G.chapter === 8 && !G.flags.comm && !nearFoe() ? "İletişim modülünü bağla" : null, hold: 2, act: () => {
+    G.flags.comm = 1; acquired("İletişim modülü");
+    const [ox, oz] = W.caveEntry;
+    goal("Mağaradan çık: dışarıdaki pusuyu püskürt", ox, oz + 12);
+    beamUp(comm, [["BİP", "Üçü de tamam! Motor, kanat, iletişim. Şimdi mürettebat!"]], () => say([["BİP", "Dışarıda... nişancılar bekliyor. Pusu! Mağaradan çık!"]], () => {
       fight([[["shooter", ox - 8, oz + 12], ["shooter", ox + 8, oz + 14], ["hunter", ox, oz + 18, 0, 0.6]]], () => {
         say([["BİP", "En yakın kapsül batıda, Kızıl Kumlar'da. Kerem'in sinyali!"]], () => startChapter(9));
       });
-    });
+    }));
   } });
 }
 

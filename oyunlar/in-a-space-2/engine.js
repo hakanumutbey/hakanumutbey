@@ -197,7 +197,8 @@ const mouse = { left: false, right: false };
 addEventListener("keydown", e => {
   if (handleAdminCombo(e)) return;
   if (G.uiOpen) {
-    if (e.code === "Escape" || (e.code === "KeyE" && (G.uiOpen === "upgradeScreen" || G.uiOpen === "travelScreen"))) closeUI();
+    if (e.code === "Escape" || (e.code === "KeyE" && (G.uiOpen === "upgradeScreen" || G.uiOpen === "travelScreen")) ||
+        ((e.code === "KeyI" || e.code === "Tab") && G.uiOpen === "invScreen")) { e.preventDefault(); closeUI(); }
     return;
   }
   if (choiceActive && /^Digit[1-3]$/.test(e.code)) { pickChoice(+e.code.slice(5) - 1); return; }
@@ -210,6 +211,8 @@ addEventListener("keydown", e => {
   if (e.code === "KeyC" && !e.repeat) startDodge();
   if (e.code === "KeyV" && !e.repeat) activateOvercharge();
   if (e.code === "KeyQ" && !e.repeat) bipCommand();
+  if (e.code === "KeyH" && !e.repeat) useSeed();
+  if ((e.code === "KeyI" || e.code === "Tab") && !e.repeat && window.openInventory) { e.preventDefault(); openInventory(); }
   if (e.code === "Tab") e.preventDefault();
 });
 addEventListener("keyup", e => {
@@ -641,18 +644,18 @@ function movePlayer(dt) {
       }
     }
   }
-  // Zıplama; havada ikinci basış jetpack süzülmesini açıp kapatır (1'den)
-  if (spaceTap) {
-    if (player.onGround && zone.jump > 0 && !player.exhausted && player.stamina > 0) {
-      player.vy = zone.jump;
-      player.onGround = false;
-      useStamina(5);
-    } else if (!player.onGround && G.flags.jetpack !== false && !player.exhausted && player.stamina > 0) {
-      player.gliding = !player.gliding;
-      if (player.gliding) { player.glidedRecently = true; sfx("jet"); }
-    }
+  // Zıplama Space'te. Süzülme ayrı tuşta (Hakan: "basılı tutunca otomatik zıplayıp süzülelim"): G (telefonda SÜZÜL)
+  // basılıyken yerdeysen zıplar, yükseliş bitince süzülürsün; bırakınca süzülme biter.
+  const glideKey = !!keys.KeyG && G.flags.jetpack !== false;
+  if ((spaceTap || glideKey) && player.onGround && zone.jump > 0 && !player.exhausted && player.stamina > 0) {
+    player.vy = zone.jump;
+    player.onGround = false;
+    useStamina(5);
   }
   spaceTap = false;
+  const wantGlide = glideKey && !player.onGround && !player.exhausted && player.stamina > 0 && player.vy < 1.5;
+  if (wantGlide && !player.gliding) { player.glidedRecently = true; sfx("jet"); tutorialOnce("glide2", "SÜZÜLME", "<kbd>G</kbd> basılı kaldıkça süzülürsün. Bırakınca düşersin; yüksekten süzülmeden düşmek can yakar."); }
+  player.gliding = wantGlide;
   if (player.gliding) { useStamina(10 * dt); if (Math.random() < dt * 5) sfx("jet"); }
   const ground = groundAt(zone, player.pos.x, player.pos.z, player.pos.y);
   player.vy -= zone.gravity * dt;
@@ -990,6 +993,7 @@ function spawnEnemy(zone, type, x, z, opts) {
   e.y = (e.fly ? flyBase(e) : e.pos.y) + (e.fly || 0);
   e.rig = o.rig || makeEnemyModel(type);
   rememberMats(e.rig.root);
+  if (o.drop && !e.fly) e.dropY = 14;
   zone.group.add(e.rig.root);
   e.rig.root.position.copy(e.pos);
   G.enemies.push(e);
@@ -1048,6 +1052,13 @@ function dropHealth(zone, x, z) {
   zone.group.add(m);
   pickups.push({ zone, mesh: m, t: 0 });
 }
+const SEED_MAX = 5;
+function useSeed() {
+  if (!(G.flags.seeds > 0)) { toast("Çantanda şifa tohumu yok.", 1500); return false; }
+  if (player.health >= player.maxHealth) { toast("Canın zaten dolu.", 1200); return false; }
+  G.flags.seeds--; heal(45); sfx("pickup"); acquired("Şifa tohumu kullanıldı");
+  return true;
+}
 function updatePickups(dt) {
   for (let i = pickups.length - 1; i >= 0; i--) {
     const p = pickups[i];
@@ -1056,9 +1067,15 @@ function updatePickups(dt) {
     p.mesh.position.y += Math.sin(p.t * 3) * 0.004;
     if (p.zone !== G.zone) continue;
     const d = Math.hypot(p.mesh.position.x - player.pos.x, p.mesh.position.z - player.pos.z);
-    if (d < 4 && player.health < player.maxHealth) {
+    // can eksikse hemen iyileştirir; can doluysa çantaya girer (en çok SEED_MAX), sonra H ile kullanılır
+    const seeds = G.flags.seeds || 0;
+    if (d < 4 && (player.health < player.maxHealth || seeds < SEED_MAX)) {
       p.mesh.position.lerp(V3(player.pos.x, player.pos.y + 1, player.pos.z), Math.min(1, dt * 6));
-      if (d < 0.8) { heal(25); acquired("Şifa tohumu"); p.zone.group.remove(p.mesh); pickups.splice(i, 1); }
+      if (d < 0.8) {
+        if (player.health < player.maxHealth) { heal(25); acquired("Şifa tohumu"); }
+        else { G.flags.seeds = seeds + 1; acquired(`Şifa tohumu → çanta (${G.flags.seeds}/${SEED_MAX})`); }
+        p.zone.group.remove(p.mesh); pickups.splice(i, 1);
+      }
     }
     if (p.t > 60) { p.zone.group.remove(p.mesh); pickups.splice(i, 1); }
   }
@@ -1078,6 +1095,14 @@ function updateEnemies(dt) {
     }
     if (e.hidden) { e.rig.root.visible = false; continue; }
     e.rig.root.visible = true;
+    // gökten iniş ışınıyla iner; yere değene kadar saldırmaz
+    if (e.dropY > 0) {
+      e.dropY = Math.max(0, e.dropY - dt * (8 + e.dropY));
+      animateEnemy(e, dt);
+      e.rig.root.position.y += e.dropY;
+      if (e.dropY === 0) { shake = Math.max(shake, e.pos.distanceTo(player.pos) < 15 ? 0.25 : 0); sfx("step"); }
+      continue;
+    }
     e.flash = Math.max(0, e.flash - dt);
     if (e.ai) e.ai(e, dt);
     else basicAI(e, dt);
@@ -1493,7 +1518,9 @@ function playerAnimState() {
   return {
     moving: player.moving, running: player.running, onGround: player.onGround, climbing: !!player.climbing,
     gliding: player.gliding, attack: player.attack, dodge: player.dodge, aiming: player.aiming,
-    hurt: player.hurtT, dead: player.dead, vy: player.vy, holding: player.hammer.state === "hand" && player.hasHammer, over: player.overT > 0
+    hurt: player.hurtT, dead: player.dead, vy: player.vy, holding: player.hammer.state === "hand" && player.hasHammer, over: player.overT > 0,
+    // basılı tutulan bir işte (kaynak, kapı zorlama, bağlama) eğilip elleriyle çalışır
+    work: !!(keys.KeyE && target && target.hold && holdT > 0)
   };
 }
 

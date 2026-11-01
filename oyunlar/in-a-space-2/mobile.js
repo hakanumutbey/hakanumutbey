@@ -32,6 +32,12 @@
     #tbOver { right: 120px; bottom: 64px; color: var(--amber) !important; border-color: var(--amber) !important; }
     #tbBip { right: 14px; bottom: 134px; width: 42px !important; height: 42px !important; color: var(--ice) !important; }
     #tbLight { right: 64px; bottom: 134px; width: 42px !important; height: 42px !important; }
+    #tbGlide { right: 116px; bottom: 120px; color: var(--ice) !important; }
+    #tbSeed { right: 118px; bottom: 176px; width: 44px !important; height: 44px !important; color: #6fe37a !important; border-color: #6fe37a !important; }
+    #tbBag { position: fixed; top: max(10px, env(safe-area-inset-top)); right: calc(max(10px, env(safe-area-inset-right)) + 46px); z-index: 22; height: 38px;
+      padding: 0 12px; border-radius: 19px; background: rgba(8,10,13,0.55); border: 1.5px solid rgba(233,228,216,0.45); color: var(--ink);
+      font-family: var(--cond); font-weight: 700; font-size: 13px; letter-spacing: 1px; touch-action: none; }
+    body.touch.ctlHide #tbBag { display: none; }
     #tbUse { position: fixed; right: max(14px, env(safe-area-inset-right)); bottom: 214px; z-index: 22; display: none; align-items: center; gap: 8px;
       background: rgba(8,10,13,0.75); border: 1.5px solid var(--amber); border-radius: 26px; padding: 6px 14px 6px 6px; color: var(--ink);
       font-family: var(--sans); font-weight: 600; font-size: 14px; touch-action: none; max-width: 60vw; }
@@ -70,11 +76,13 @@
   const pad = el("div", "pad");
   const btn = (id, text) => { const b = el("button", id, text, pad); b.className = "tb"; b.type = "button"; return b; };
   const bJump = btn("tbJump", "ZIPLA"), bHit = btn("tbHit", "VUR"), bAim = btn("tbAim", "NİŞAN"), bDodge = btn("tbDodge", "KAÇ"),
-    bRecall = btn("tbRecall", "ÇAĞIR"), bOver = btn("tbOver", "GÜÇ"), bBip = btn("tbBip", "BİP"), bLight = btn("tbLight", "IŞIK");
+    bRecall = btn("tbRecall", "ÇAĞIR"), bOver = btn("tbOver", "GÜÇ"), bBip = btn("tbBip", "BİP"), bLight = btn("tbLight", "IŞIK"),
+    bGlide = btn("tbGlide", "SÜZÜL"), bSeed = btn("tbSeed", "ŞİFA");
+  const bBag = el("button", "tbBag", "ÇANTA");
   const bUse = el("button", "tbUse", "<b>E</b><span></span>");
   const bPause = el("button", "tbPause", "❚❚");
   const knob = document.getElementById("stickKnob");
-  document.querySelector("#titleScreen .note").innerHTML = "Sol yarı: dokun ve sürükle — yürü (sonuna kadar itersen koşarsın)<br>Sağ yarı: kaydır — etrafa bak · VUR, ZIPLA, NİŞAN (açıkken VUR fırlatır), KAÇ<br>ÇAĞIR, GÜÇ ve E gerektiğinde çıkar";
+  document.querySelector("#titleScreen .note").innerHTML = "Sol yarı: dokun ve sürükle — yürü (sonuna kadar itersen koşarsın)<br>Sağ yarı: kaydır — etrafa bak · VUR, ZIPLA, SÜZÜL (basılı tut), NİŞAN (açıkken VUR fırlatır), KAÇ<br>ÇAĞIR, GÜÇ, ŞİFA ve E gerektiğinde çıkar · ÇANTA sağ üstte";
 
   // ---- joystick ve bakış (sol yarı joystick, sağ yarı bakış; ikisi aynı anda çalışır)
   const R = 50;
@@ -126,6 +134,10 @@
   press(bOver, () => activateOvercharge());
   press(bBip, () => bipCommand());
   press(bLight, () => toggleFlashlight());
+  // SÜZÜL basılı kaldıkça G tuşu basılı sayılır: yerdeyken zıplar, havada süzülür
+  press(bGlide, () => { keys.KeyG = true; }, () => { keys.KeyG = false; });
+  press(bSeed, () => useSeed());
+  bBag.addEventListener("pointerdown", e => { e.preventDefault(); if (window.openInventory) openInventory(); });
   press(bUse, () => { interactRequested = true; keys.KeyE = true; }, () => { keys.KeyE = false; });
   bPause.addEventListener("pointerdown", e => { e.preventDefault(); if (G.running && !G.uiOpen && !player.dead) openUI("pauseMenu"); });
 
@@ -142,6 +154,8 @@
     show(bOver, player.over >= 100 && player.overT <= 0);
     show(bBip, !!G.flags.bip);
     show(bAim, player.hasHammer);
+    show(bGlide, G.flags.jetpack !== false);
+    show(bSeed, (G.flags.seeds || 0) > 0 && player.health < player.maxHealth * 0.7);
     bAim.classList.toggle("on", !!mouse.right);
     const pr = $("prompt");
     const visible = pr.style.display === "flex";
