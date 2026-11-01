@@ -44,7 +44,7 @@ const games = [
     type: "3D Uzay Macerası",
     status: "Bilgisayar oyunu",
     download: "/indir/in-a-space.zip?v=20261101",
-    downloadSize: "",
+    downloadSize: "39 MB",
     description: "ARGO-7 gemisinde tek başına uyan, mürettebatını kurtar ve eve dön! Elektrik kesintileri, uzaylı saldırıları, gövde delikleri ve oksijeni azalan uzay giysisi seni bekliyor.",
     longDescription: "IN A SPACE — Breath of the Wild tarzında 4 perdelik uzay macerası. Geminin yapay zekâsı NOVA ile üç gezegenden enerji çekirdeği topla, kaçış kapsüllerine düşen mürettebatı kurtar, uzaylı ana gemisini patlatıp 75 saniyede kaç, Ay üssünden yakıt al ve Dünya'ya in. Kayalara tırman, jetpack ile süzül, meteorları gemi topuyla vur. Oyun bitince Dünya'da ve uzayda serbestçe dolaş. Godot ile yapılmış bilgisayar sürümü: indir, zip'i aç, oyna.",
     accent: "cosmos",
@@ -472,10 +472,10 @@ const games = [
 
 const FUSION_GAME_PATH = "/oyunlar/birlesim-arenasi/";
 // Godot paketleri (zip) siteye konana dek indirilen oyunlar tarayıcıda oynanmaya devam eder.
-const PC_DOWNLOADS_READY = false;
-if (!PC_DOWNLOADS_READY) {
+const PC_DOWNLOADS_READY = new Set(["in-a-space"]);
+{
   for (const game of games) {
-    if (!game.download) continue;
+    if (!game.download || PC_DOWNLOADS_READY.has(game.slug)) continue;
     delete game.download;
     game.status = "Oynanabilir";
     game.mobileStatus = game.slug === "in-a-space-2" ? "Mobil uyumlu" : "Masaüstü önerilir";
