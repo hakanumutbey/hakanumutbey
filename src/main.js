@@ -26,7 +26,7 @@ const games = [
     type: "3D Hikâye Macerası",
     status: "Bilgisayar oyunu",
     download: "/indir/in-a-space-2.zip?v=20261101b",
-    downloadSize: "",
+    downloadSize: "37 MB",
     description: "Ay'daki anteni onarmaya giderken gemin bir ışınla parçalanır; 1000 km/s hızla savrulup bilinmeyen Tahra gezegenine çakılırsın. Seçimlerin hikâyeyi değiştirir!",
     longDescription: "IN A SPACE 2: Tahra'nın Gölgesi. 22 bölümlük, seçimli diyaloglu uzay macerası, beş farklı son. Manyetik Balyozla vur, fırlat, geri çağır; Vorak'lara karşı savaş, mürettebatını kurtar, Lumi yerlilerine yardım et, Kara Kale'ye sız, asteroit kuşağında kovalamaca yap ve Ay'da Hükümdar Vorakh ile yüzleş. ATLAS'ın içine gir, oyun bitince Tahra, Ay ve Dünya arasında uç. Godot ile yapılmış bilgisayar sürümü: indir, zip'i aç, oyna.",
     accent: "cosmos",
@@ -472,7 +472,7 @@ const games = [
 
 const FUSION_GAME_PATH = "/oyunlar/birlesim-arenasi/";
 // Godot paketleri (zip) siteye konana dek indirilen oyunlar tarayıcıda oynanmaya devam eder.
-const PC_DOWNLOADS_READY = new Set(["in-a-space"]);
+const PC_DOWNLOADS_READY = new Set(["in-a-space", "in-a-space-2"]);
 {
   for (const game of games) {
     if (!game.download || PC_DOWNLOADS_READY.has(game.slug)) continue;
