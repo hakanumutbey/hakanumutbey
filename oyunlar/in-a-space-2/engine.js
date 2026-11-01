@@ -987,7 +987,7 @@ function spawnEnemy(zone, type, x, z, opts) {
   e.maxHp = e.hp = (o.hp || T.hp || 100) * (o.hpMul || 1);
   if (T.shield) e.shieldHp = T.shield;
   e.pos.y = groundAt(zone, x, z, o.spawnY !== undefined ? o.spawnY : 999);
-  e.y = e.pos.y + (e.fly || 0);
+  e.y = (e.fly ? flyBase(e) : e.pos.y) + (e.fly || 0);
   e.rig = o.rig || makeEnemyModel(type);
   rememberMats(e.rig.root);
   zone.group.add(e.rig.root);
@@ -1089,7 +1089,7 @@ function updateEnemies(dt) {
       e.vel.multiplyScalar(Math.max(0, 1 - dt * 5));
     }
     if (!e.boss) e.pos.y = enemyGround(e, e.pos.x, e.pos.z);
-    if (e.fly) e.y = lerp(e.y, e.pos.y + e.fly + Math.sin(G.time * 2 + e.pos.x) * 0.3, Math.min(1, dt * 3));
+    if (e.fly) e.y = lerp(e.y, flyBase(e) + e.fly + Math.sin(G.time * 2 + e.pos.x) * 0.3, Math.min(1, dt * 3));
     animateEnemy(e, dt);
   }
   G.enemies = G.enemies.filter(e => !(e.dead && e.deadT > 3 && !e.keep && (e.rig.root.parent && e.rig.root.parent.remove(e.rig.root), true)));
@@ -1163,6 +1163,9 @@ function moveEnemyTo(e, x, z, dt, k) {
   }
   if (e.state !== "windup") e.yaw += wrapAngle(Math.atan2(-dx, -dz) - e.yaw) * Math.min(1, dt * 6);
 }
+// Dronlar seni fark edince senin yüksekliğinde uçar. Altlarındaki zemine göre uçunca, Demir Zirve'nin tepesinde
+// 26 m aşağıda, kayaların içinde kalıyor; görünmeden ateş ediyorlardı (Hakan'ın bildirdiği hata).
+function flyBase(e) { return e.alerted && !player.dead && e.zone === G.zone ? Math.max(e.pos.y, player.pos.y) : e.pos.y; }
 // Düşmanlar platformların (kanyondaki ada, kale) üstünde de yürür; uçurumdan aşağı atlamaz
 function enemyGround(e, x, z) { return groundAt(e.zone, x, z, e.pos.y + 0.5); }
 function enemySlope(e, x, z) { return !e.fly && Math.abs(enemyGround(e, x, z) - e.pos.y) > 1.2; }
