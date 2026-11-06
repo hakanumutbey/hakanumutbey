@@ -20,6 +20,24 @@ import {
 
 const games = [
   {
+    slug: "uc-topragin-atesi",
+    title: "Üç Toprağın Ateşi",
+    path: "/oyunlar/uc-topragin-atesi/",
+    type: "3D Aksiyon Macera",
+    status: "Bilgisayar oyunu",
+    download: "/indir/uc-topragin-atesi.zip?v=20261106",
+    downloadSize: "37 MB",
+    description: "Ana Ocak söndü; Orman çürüyor, Çöl kavruluyor, Buzulda zaman durdu. Son koru fenerine al, ustanın peşine düş ve üç toprağın ateşini geri getir!",
+    longDescription: "Üç Toprağın Ateşi: 7 bölümlük hikâyeli aksiyon macerası, iki farklı son. Kılıçla kombo, ağır vuruş, savuşturma ve yuvarlanma; yay ile nişan. 15 yetenekli ağaç: Ateş Topu, Hızlı Seri, Alev Halkası, Üçlü Ok ve dahası, her biri kendi tuşunda. Kor Fener her bölümde yeni bir güç kazanır: dikenleri yakar, sisi dağıtır, kanca ile uçurumları geçer, taş kapıları kırar, buzu eritir. Sima, Leyla ve Tuna ile tanış; Çürük Ana, Kızıl Akrep Kraliçesi, Kum Bekçisi, Ak Dev ve Ayaz Kurdu ile savaş; sonunda ustan Orhun ile yüzleş. Godot ile yapılmış bilgisayar sürümü: indir, zip'i aç, oyna.",
+    accent: "amber",
+    controls: "WASD, Shift koş, Space yuvarlan, sol tık saldırı (basılı: ağır vuruş), sağ tık blok/savuşturma, 1/2 kılıç/yay, F fener gücü, 3 Üç Renk, Q R T G Z X C V yetenekler, H çay, B matara, E etkileşim, TAB menü, F11 tam ekran",
+    mobileStatus: "Mobilde oynanmaz",
+    mobileNote: "Bilgisayar oyunu: İndir'e bas, zip'i aç, Uc Topragin Atesi.exe'ye çift tıkla. Tarayıcıda değil, Windows'ta çalışır.",
+    achievements: ["Son koru fenerine al", "Üç toprağın bossunu yen", "İki sondan birini gör"],
+    updates: ["7 bölüm: Son Kor'dan Üç Toprağın Ateşi'ne", "15 yetenekli ağaç, her yetenek kendi tuşunda", "Kor Fener: alev, ışık, kanca, patlama, eritme, Üç Renk", "İki farklı son ve serbest dolaşım", "Düşük/Orta/Yüksek grafik ayarı"],
+    stockBase: 180,
+  },
+  {
     slug: "in-a-space-2",
     title: "IN A SPACE 2",
     path: "/oyunlar/in-a-space-2/",
@@ -472,7 +490,7 @@ const games = [
 
 const FUSION_GAME_PATH = "/oyunlar/birlesim-arenasi/";
 // Godot paketleri (zip) siteye konana dek indirilen oyunlar tarayıcıda oynanmaya devam eder.
-const PC_DOWNLOADS_READY = new Set(["in-a-space", "in-a-space-2"]);
+const PC_DOWNLOADS_READY = new Set(["in-a-space", "in-a-space-2", "uc-topragin-atesi"]);
 {
   for (const game of games) {
     if (!game.download || PC_DOWNLOADS_READY.has(game.slug)) continue;
@@ -487,7 +505,7 @@ const PC_DOWNLOADS_READY = new Set(["in-a-space", "in-a-space-2"]);
   }
 }
 
-const NEW_GAME_SLUGS = new Set(["in-a-space-2", "in-a-space","kayip-odalar", "vipend-3d", "karanlik-labirent", "ejderha-ucus", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "2d-car-simulator", "yaris-sehri", "hako-vurus", "uzay-yarisi", "isin-savasi", "beyaz-bardak", "make-city"]);
+const NEW_GAME_SLUGS = new Set(["uc-topragin-atesi", "in-a-space-2", "in-a-space","kayip-odalar", "vipend-3d", "karanlik-labirent", "ejderha-ucus", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "2d-car-simulator", "yaris-sehri", "hako-vurus", "uzay-yarisi", "isin-savasi", "beyaz-bardak", "make-city"]);
 /** Only games the Birleşim Arenası client actually implements. */
 const FUSION_GAME_SLUGS = new Set([
   "annenden-kac",
