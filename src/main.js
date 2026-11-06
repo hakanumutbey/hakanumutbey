@@ -25,7 +25,7 @@ const games = [
     path: "/oyunlar/uc-topragin-atesi/",
     type: "3D Aksiyon Macera",
     status: "Bilgisayar oyunu",
-    download: "/indir/uc-topragin-atesi.zip?v=2",
+    download: "/indir/uc-topragin-atesi.zip?v=3",
     downloadSize: "37 MB",
     description: "Ana Ocak söndü; Orman çürüyor, Çöl kavruluyor, Buzulda zaman durdu. Son koru fenerine al, ustanın peşine düş ve üç toprağın ateşini geri getir!",
     longDescription: "Üç Toprağın Ateşi: 7 bölümlük hikâyeli aksiyon macerası, iki farklı son. Kılıçla kombo, ağır vuruş, savuşturma ve yuvarlanma; yay ile nişan. 15 yetenekli ağaç: Ateş Topu, Hızlı Seri, Alev Halkası, Üçlü Ok ve dahası, her biri kendi tuşunda. Kor Fener her bölümde yeni bir güç kazanır: dikenleri yakar, sisi dağıtır, kanca ile uçurumları geçer, taş kapıları kırar, buzu eritir. Sima, Leyla ve Tuna ile tanış; Çürük Ana, Kızıl Akrep Kraliçesi, Kum Bekçisi, Ak Dev ve Ayaz Kurdu ile savaş; sonunda ustan Orhun ile yüzleş. Godot ile yapılmış bilgisayar sürümü: indir, zip'i aç, oyna.",
