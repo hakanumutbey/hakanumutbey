@@ -20,6 +20,24 @@ import {
 
 const games = [
   {
+    slug: "ultimate-car-drive",
+    title: "Ultimate Car Drive",
+    path: "/oyunlar/ultimate-car-drive/",
+    type: "3D Araba Yarışı",
+    status: "Bilgisayar oyunu",
+    download: "/indir/ultimate-car-drive.zip?v=1",
+    downloadSize: "41 MB",
+    description: "Neon Liman şehrinde nitro, drift ve rampalar! Tanımadığın sürücülerle yarış, yıldızı kap ve kaptırma, serbestçe dolaş ya da portaldan düşen PORTA-X ile 10 bölümlük hikâyeye başla.",
+    longDescription: "Ultimate Car Drive: Blender'da sıfırdan yapılmış 6 araba, gerçek süspansiyonlu arcade fizik. Drift at, nitroyu doldur, rampalardan uç, rakiplerini arkadan vurup devir. Modlar: Yarış (5 rakip, 3 tur), Kovalamaca (yıldız kimde kalırsa o kazanır), Serbest (arenada ve şehirde 25 gizli jeton) ve Hikaye: Portal Kristali (10 bölüm). Gündüz, gün batımı, gece ve yağmurlu gece. Garajda yükseltme, boya, jant ve neon; günlük ödül, sandıklar, başarımlar ve lig tablosu; tekrar izleme ve fotoğraf modu. Godot ile yapılmış bilgisayar sürümü: indir, zip'i aç, exe'ye çift tıkla; oyun kendini kurar, masaüstüne simgesini koyar ve güncellemeleri kendisi alır.",
+    accent: "cosmos",
+    controls: "W/S gaz-fren, A/D direksiyon, Boşluk drift, Shift nitro, C kamera, R piste dön, P fotoğraf, ESC duraklat · oyun kolu desteklenir",
+    mobileStatus: "Mobilde oynanmaz",
+    mobileNote: "Bilgisayar oyunu: İndir'e bas, zip'i aç, Ultimate Car Drive.exe'ye çift tıkla. Oyun kendini kurar ve masaüstüne simgesini koyar. Tarayıcıda değil, Windows'ta çalışır.",
+    achievements: ["İlk yarışını birinci bitir", "Kovalamacada yıldızı sonuna kadar tut", "Hikâyede portalı aç"],
+    updates: ["6 araba, Blender'da sıfırdan", "Yarış, Kovalamaca, Serbest ve 10 bölümlük Hikaye", "Drift, nitro, rampalar ve rakip devirme", "Garaj: yükseltme, boya, jant, neon", "Tekrar izleme, fotoğraf modu, Düşük/Orta/Yüksek grafik"],
+    stockBase: 200,
+  },
+  {
     slug: "uc-topragin-atesi",
     title: "Üç Toprağın Ateşi",
     path: "/oyunlar/uc-topragin-atesi/",
@@ -490,7 +508,7 @@ const games = [
 
 const FUSION_GAME_PATH = "/oyunlar/birlesim-arenasi/";
 // Godot paketleri (zip) siteye konana dek indirilen oyunlar tarayıcıda oynanmaya devam eder.
-const PC_DOWNLOADS_READY = new Set(["in-a-space", "in-a-space-2", "uc-topragin-atesi"]);
+const PC_DOWNLOADS_READY = new Set(["in-a-space", "in-a-space-2", "uc-topragin-atesi", "ultimate-car-drive"]);
 {
   for (const game of games) {
     if (!game.download || PC_DOWNLOADS_READY.has(game.slug)) continue;
@@ -505,7 +523,7 @@ const PC_DOWNLOADS_READY = new Set(["in-a-space", "in-a-space-2", "uc-topragin-a
   }
 }
 
-const NEW_GAME_SLUGS = new Set(["uc-topragin-atesi", "in-a-space-2", "in-a-space","kayip-odalar", "vipend-3d", "karanlik-labirent", "ejderha-ucus", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "2d-car-simulator", "yaris-sehri", "hako-vurus", "uzay-yarisi", "isin-savasi", "beyaz-bardak", "make-city"]);
+const NEW_GAME_SLUGS = new Set(["ultimate-car-drive", "uc-topragin-atesi", "in-a-space-2", "in-a-space","kayip-odalar", "vipend-3d", "karanlik-labirent", "ejderha-ucus", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "2d-car-simulator", "yaris-sehri", "hako-vurus", "uzay-yarisi", "isin-savasi", "beyaz-bardak", "make-city"]);
 /** Only games the Birleşim Arenası client actually implements. */
 const FUSION_GAME_SLUGS = new Set([
   "annenden-kac",
