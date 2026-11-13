@@ -25,7 +25,7 @@ const games = [
     path: "/oyunlar/ultimate-car-drive/",
     type: "3D Araba Yarışı",
     status: "Bilgisayar oyunu",
-    download: "/indir/ultimate-car-drive.zip?v=9",
+    download: "/indir/ultimate-car-drive.zip?v=10",
     downloadSize: "41 MB",
     description: "Nitro, drift, rampalar ve 9 mod! Yarış, Kovalamaca, Polis Kaçışı, Eleme, Zamana Karşı, Drift Yarışması, Yıkım Arenası, Serbest ve 10 bölümlük Hikaye. Neon Liman ve Çöl Otoyolu haritaları.",
     longDescription: "Ultimate Car Drive: Blender'da sıfırdan yapılmış 8 araba (ralli arabası Toz Fırtınası ve kas kamyoneti Boğa dahil), gerçek süspansiyonlu arcade fizik. Drift at, nitroyu doldur, rampalardan uçup havada takla at, trafikte makas geç, rakiplerini devir. Modlar: Yarış, Kovalamaca, Serbest, Polis Kaçışı (aranma yıldızları ve barikatlar), Eleme, Zamana Karşı (kendi hayaletinle), Drift Yarışması, Yıkım Arenası ve Hikaye: Portal Kristali (10 bölüm). İki harita: Neon Liman ve Çöl Otoyolu; gündüz, gün batımı, gece ve yağmur. Garajda yükseltme, boya, jant, neon ve çıkartmalar; hasar, hız radarları, 3 radyo istasyonu, günlük görevler, sandıklar, başarımlar, lig tablosu ve istatistikler; tekrar izleme ve fotoğraf modu. Godot ile yapılmış bilgisayar sürümü: indir, zip'i aç, exe'ye çift tıkla; oyun kendini kurar, masaüstüne simgesini koyar ve güncellemeleri kendisi alır.",
