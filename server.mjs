@@ -576,6 +576,145 @@ beyazBardakSocketServer.on("connection", (socket) => {
   });
 });
 
+// --- Ultimate Car Drive online (PC oyunu, Godot) ---
+// Oda kodlu hafif relay: fizik ve yarış oyuncuların bilgisayarında, sunucu sadece iletir.
+// Kontrol mesajları JSON; araba konumları ikili (binary) paket: [hedef id][...] gelir, [gönderen id][...] olarak iletilir.
+// Hedef 0 = odadaki herkes (gönderen hariç). Kurucu (id 1) çıkarsa oda kapanır.
+const ucdRooms = new Map();
+const UCD_MAX_PLAYERS = 6;
+const UCD_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+const UCD_MAX_BIN = 1200;
+const UCD_MAX_RATE = 80; // saniyede en çok ikili paket (oyuncu başına)
+
+function ucdSend(socket, obj) {
+  if (socket.readyState === 1) socket.send(JSON.stringify(obj));
+}
+
+function ucdPlayers(room) {
+  const list = {};
+  for (const [id, s] of room.members) list[id] = { name: s.ucdName, car: s.ucdCar };
+  return list;
+}
+
+function ucdBroadcast(room, obj, except = null) {
+  const text = JSON.stringify(obj);
+  for (const s of room.members.values()) {
+    if (s !== except && s.readyState === 1) s.send(text);
+  }
+}
+
+function ucdLeave(socket) {
+  const room = ucdRooms.get(socket.ucdRoom);
+  socket.ucdRoom = "";
+  if (!room) return;
+  room.members.delete(socket.ucdId);
+  if (socket.ucdId === 1 || room.members.size === 0) {
+    ucdBroadcast(room, { type: "closed" });
+    for (const s of room.members.values()) s.ucdRoom = "";
+    ucdRooms.delete(room.code);
+    return;
+  }
+  ucdBroadcast(room, { type: "players", players: ucdPlayers(room) });
+}
+
+const ultimateCarDriveSocketServer = new WebSocketServer({ noServer: true, maxPayload: 8192 });
+ultimateCarDriveSocketServer.on("connection", (socket) => {
+  socket.ucdRoom = "";
+  socket.ucdId = 0;
+  socket.ucdAlive = true;
+  socket.ucdRate = 0;
+  socket.ucdRateAt = Date.now();
+  socket.on("pong", () => { socket.ucdAlive = true; });
+
+  socket.on("message", (data, isBinary) => {
+    if (isBinary) {
+      // konum paketi: en hızlı yol, ayrıştırma yok
+      const room = ucdRooms.get(socket.ucdRoom);
+      if (!room || data.length < 2 || data.length > UCD_MAX_BIN) return;
+      const now = Date.now();
+      if (now - socket.ucdRateAt > 1000) { socket.ucdRateAt = now; socket.ucdRate = 0; }
+      if (++socket.ucdRate > UCD_MAX_RATE) return;
+      const to = data[0];
+      const out = Buffer.from(data);
+      out[0] = socket.ucdId;
+      if (to === 0) {
+        for (const s of room.members.values()) if (s !== socket && s.readyState === 1) s.send(out, { binary: true });
+      } else {
+        const s = room.members.get(to);
+        if (s && s.readyState === 1) s.send(out, { binary: true });
+      }
+      return;
+    }
+    if (data.length > 6000) return;
+    let msg;
+    try { msg = JSON.parse(data.toString()); } catch { return; }
+    const name = String(msg?.name || "Oyuncu").slice(0, 14);
+    const car = String(msg?.car || "kivilcim").slice(0, 20);
+    if (msg?.type === "ping") {
+      ucdSend(socket, { type: "pong", t: msg.t });
+      return;
+    }
+    if (msg?.type === "create") {
+      ucdLeave(socket);
+      let code = "";
+      do {
+        code = "";
+        for (let i = 0; i < 5; i++) code += UCD_CODE_ALPHABET[Math.floor(Math.random() * UCD_CODE_ALPHABET.length)];
+      } while (ucdRooms.has(code));
+      const room = { code, members: new Map(), nextId: 2, started: false, createdAt: Date.now() };
+      ucdRooms.set(code, room);
+      socket.ucdRoom = code;
+      socket.ucdId = 1;
+      socket.ucdName = name;
+      socket.ucdCar = car;
+      room.members.set(1, socket);
+      ucdSend(socket, { type: "room", code, id: 1, players: ucdPlayers(room) });
+      return;
+    }
+    if (msg?.type === "join") {
+      ucdLeave(socket);
+      const code = String(msg.code || "").toUpperCase().trim();
+      const room = ucdRooms.get(code);
+      if (!room) { ucdSend(socket, { type: "error", text: "Bu kodla bir oda yok." }); return; }
+      if (room.members.size >= UCD_MAX_PLAYERS) { ucdSend(socket, { type: "error", text: "Oda dolu." }); return; }
+      if (room.started) { ucdSend(socket, { type: "error", text: "Yarış başladı, biraz bekle." }); return; }
+      const id = room.nextId++;
+      socket.ucdRoom = code;
+      socket.ucdId = id;
+      socket.ucdName = name;
+      socket.ucdCar = car;
+      room.members.set(id, socket);
+      ucdSend(socket, { type: "room", code, id, players: ucdPlayers(room) });
+      ucdBroadcast(room, { type: "players", players: ucdPlayers(room) }, socket);
+      return;
+    }
+    const room = ucdRooms.get(socket.ucdRoom);
+    if (!room) return;
+    if (msg?.type === "msg") {
+      // oyun mesajı (yarış başlat, devirme...): hedefe ya da herkese
+      const out = { type: "msg", from: socket.ucdId, data: msg.data };
+      if (socket.ucdId === 1 && msg.data?.k === "start") room.started = true;
+      if (socket.ucdId === 1 && msg.data?.k === "lobby") room.started = false;
+      const to = Number(msg.to || 0);
+      if (to === 0) ucdBroadcast(room, out, socket);
+      else { const s = room.members.get(to); if (s) ucdSend(s, out); }
+      return;
+    }
+    if (msg?.type === "leave") ucdLeave(socket);
+  });
+
+  socket.on("close", () => ucdLeave(socket));
+});
+
+// Ultimate Car Drive: ölü bağlantıları temizle
+setInterval(() => {
+  for (const socket of ultimateCarDriveSocketServer.clients) {
+    if (socket.ucdAlive === false) { socket.terminate(); continue; }
+    socket.ucdAlive = false;
+    socket.ping();
+  }
+}, 20000);
+
 // --- Karanlik Labirent (oyunlar/karanlik-labirent) ---
 // Zifiri karanlik 3D labirentten kacis: 3 ORTAK altin anahtar kilitli cikis
 // kapisini acar, kapsidan gecen kazanir. Labirent seed ile istemcide uretilir.
@@ -1350,6 +1489,12 @@ server.on("upgrade", (request, socket, head) => {
   if (pathname === "/karanlik-labirent") {
     karanlikLabirentSocketServer.handleUpgrade(request, socket, head, (ws) => {
       karanlikLabirentSocketServer.emit("connection", ws, request);
+    });
+    return;
+  }
+  if (pathname === "/ultimate-car-drive") {
+    ultimateCarDriveSocketServer.handleUpgrade(request, socket, head, (ws) => {
+      ultimateCarDriveSocketServer.emit("connection", ws, request);
     });
     return;
   }
