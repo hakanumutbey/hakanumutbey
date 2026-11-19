@@ -20,6 +20,24 @@ import {
 
 const games = [
   {
+    slug: "zaman-saati",
+    title: "Zaman Saati",
+    path: "/oyunlar/zaman-saati/",
+    type: "3D Hikâye Macerası",
+    status: "Bilgisayar oyunu",
+    download: "/indir/zaman-saati.zip?v=1",
+    downloadSize: "40 MB",
+    description: "Bir Canavar Zaman Saati'nin peşinde. Robot arkadaşın Robo ile 10 dünyayı gez, bossları yen, anahtarları ve kostümleri topla. İlk dünya: Yeşil Vadi!",
+    longDescription: "Zaman Saati: üçüncü şahıs kameralı 3D hikâye macerası. Saat Kulesi Adası'nda uyanıyorsun; yanında oyun boyu seninle gelen robot Robo var. Zaman Saati'ni almak için Zaman Kalesi'nin dokuz anahtarlı kapısını açman lazım, ama Canavar anahtarları dokuz dünyanın bosslarına dağıtmış. Kılıçla kombo, ışın, zıplama ve kayma; seçmeli diyaloglar; her bosstan kostüm ve anahtar düşer, her kostümün kendi gücü var (Yaprak Gizlenmesi, Tırmık Fırtınası...). İlk dünya Yeşil Vadi: Muhtar Dede'nin kayıp kuzuları, nehir adacığı, dev mantarlar, ağaç ev ve hasta orman bekçisi Kökkıran. Modeller Blender'da sıfırdan çizildi. Godot ile yapılmış bilgisayar sürümü: indir, zip'i aç, exe'ye çift tıkla; oyun kendini kurar, masaüstüne simgesini koyar ve güncellemeleri kendisi alır.",
+    accent: "cosmos",
+    controls: "WASD yürü, fare kamera, Space zıpla, Shift kay (basılı: koş), sol tık kılıç, sağ tık ışın, Q kostüm gücü, E konuş/al, Tab kostüm dolabı, 1-2-3 diyalog seçimi, Esc duraklat, F11 tam ekran",
+    mobileStatus: "Mobilde oynanmaz",
+    mobileNote: "Bilgisayar oyunu: İndir'e bas, zip'i aç, Zaman Saati.exe'ye çift tıkla. Oyun kendini kurar ve masaüstüne simgesini koyar. Tarayıcıda değil, Windows'ta çalışır.",
+    achievements: ["Kökkıran'ın kalbini temizle", "Muhtar Dede'nin beş kuzusunu bul", "Yeşil Vadi'nin üç gizli sandığını aç"],
+    updates: ["İlk sürüm: Saat Kulesi Adası ve Yeşil Vadi", "Robo: oyun boyu yanında uçan robot arkadaş", "Kostüm dolabı: 3 kostüm, her birinin kendi gücü", "Seçmeli diyaloglar", "Boss: Kökkıran"],
+    stockBase: 160,
+  },
+  {
     slug: "ultimate-car-drive",
     title: "Ultimate Car Drive",
     path: "/oyunlar/ultimate-car-drive/",
@@ -507,7 +525,7 @@ const games = [
 
 const FUSION_GAME_PATH = "/oyunlar/birlesim-arenasi/";
 // Godot paketleri (zip) siteye konana dek indirilen oyunlar tarayıcıda oynanmaya devam eder.
-const PC_DOWNLOADS_READY = new Set(["in-a-space", "in-a-space-2", "uc-topragin-atesi", "ultimate-car-drive"]);
+const PC_DOWNLOADS_READY = new Set(["zaman-saati", "in-a-space", "in-a-space-2", "uc-topragin-atesi", "ultimate-car-drive"]);
 {
   for (const game of games) {
     if (!game.download || PC_DOWNLOADS_READY.has(game.slug)) continue;
@@ -522,7 +540,7 @@ const PC_DOWNLOADS_READY = new Set(["in-a-space", "in-a-space-2", "uc-topragin-a
   }
 }
 
-const NEW_GAME_SLUGS = new Set(["ultimate-car-drive", "uc-topragin-atesi", "in-a-space-2", "in-a-space","kayip-odalar", "vipend-3d", "karanlik-labirent", "ejderha-ucus", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "2d-car-simulator", "yaris-sehri", "hako-vurus", "uzay-yarisi", "isin-savasi", "beyaz-bardak", "make-city"]);
+const NEW_GAME_SLUGS = new Set(["zaman-saati", "ultimate-car-drive", "uc-topragin-atesi", "in-a-space-2", "in-a-space","kayip-odalar", "vipend-3d", "karanlik-labirent", "ejderha-ucus", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "2d-car-simulator", "yaris-sehri", "hako-vurus", "uzay-yarisi", "isin-savasi", "beyaz-bardak", "make-city"]);
 /** Only games the Birleşim Arenası client actually implements. */
 const FUSION_GAME_SLUGS = new Set([
   "annenden-kac",
