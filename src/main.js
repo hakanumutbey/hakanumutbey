@@ -20,6 +20,24 @@ import {
 
 const games = [
   {
+    slug: "zaman-saati-2",
+    title: "Zaman Saati 2: Parçalanma",
+    path: "/oyunlar/zaman-saati-2/",
+    type: "3D Hikâye Macerası",
+    status: "Bilgisayar oyunu",
+    download: "/indir/zaman-saati-2.zip?v=1",
+    downloadSize: "40 MB",
+    description: "Dark-Time yenildi ama evrenler parça parça kopuyor: PARÇALANMA! Yarıktan geç, üstün teknolojili zeki varyantınla tanış ve Robo'nun hiç anlatmadığı sırrını öğren.",
+    longDescription: "Zaman Saati 2: Parçalanma, Zaman Saati'nin devam oyunu. Dark-Time öldükten sonra evrenlerin dengesi bozuldu: gökyüzü çatladı, Büyük Usta geri geri yürüyor, Çırak tersten konuşuyor. Meydanda açılan Parçalanma yarığından Tekno Saatköy'e geçiyorsun: cam kule, uçan arabalar, dronlar ve kendi ZEKİ VARYANTIN. Zeki Sen'in Tekno Kostümü'yle jet zıplaması yapıp uçan adalara çık, glitch bölgesinde Parça Devi'ni yen, üç enerji hücresini bul. Evren Tarayıcı Robo'nun çipinde bir sinyal yakalar: Robo'nun Anısı'nda Robo'yu sen oynarsın! Zaman Fabrikası'ndan kaç, Gözcülerin kırmızı ışıklarına yakalanma. Anıdaki dev makine Parçalanma'nın çaresini gösterir: ZAMAN ÇAPASI. Godot ile yapılmış bilgisayar oyunu: indir, zip'i aç, exe'ye çift tıkla; kendini kurar, masaüstüne simgesini koyar ve güncellemeleri kendisi alır. Zaman Saati 1 ayrı oyun olarak kalır.",
+    accent: "cosmos",
+    controls: "WASD yürü, fare kamera, Space zıpla, Shift kay (basılı: koş), sol tık kılıç, sağ tık ışın, Q kostüm gücü (Tekno Kostümü: jet zıplaması), E konuş/al, Tab kostüm dolabı, 1-2-3 diyalog seçimi, Esc duraklat, F11 tam ekran. Xbox ve PlayStation kolu da olur: sol çubuk yürü, sağ çubuk kamera, A zıpla, B kay/koş, X kılıç, RT ışın, RB kostüm gücü, Y konuş/al",
+    mobileStatus: "Mobilde oynanmaz",
+    mobileNote: "Bilgisayar oyunu: İndir'e bas, zip'i aç, Zaman Saati 2.exe'ye çift tıkla. Oyun kendini kurar ve masaüstüne simgesini koyar. Tarayıcıda değil, Windows'ta çalışır.",
+    achievements: ["Parçalanma'ya adını ver", "Yarıktan Tekno Saatköy'e geç", "Zeki Sen ile tanış", "Jetle kulenin terasına çık", "Uçan adaların tepesine ulaş", "Parça Devi'ni yen", "Robo'nun Anısı'nda Gözcülere yakalanmadan kaç", "Mini Zaman Çapası'nı kur"],
+    updates: ["İlk sürüm (v1): 1. Bölüm Parçalanma! Çatlak Eski Saatköy, Parçalanma yarığı, Tekno Saatköy, Zeki Sen ve dronları, Tekno Kostümü (jet zıplaması), üç enerji hücresi, glitch bölgesi ve Parça Devi, Evren Tarayıcı, Robo'nun Anısı (Robo'yu sen oynarsın: Zaman Fabrikası'ndan kaçış), Zaman Çapası. Sıradaki: Zaman Fabrikası"],
+    stockBase: 160,
+  },
+  {
     slug: "zaman-saati",
     title: "Zaman Saati",
     path: "/oyunlar/zaman-saati/",
@@ -525,7 +543,7 @@ const games = [
 
 const FUSION_GAME_PATH = "/oyunlar/birlesim-arenasi/";
 // Godot paketleri (zip) siteye konana dek indirilen oyunlar tarayıcıda oynanmaya devam eder.
-const PC_DOWNLOADS_READY = new Set(["zaman-saati", "in-a-space", "in-a-space-2", "uc-topragin-atesi", "ultimate-car-drive"]);
+const PC_DOWNLOADS_READY = new Set(["zaman-saati-2", "zaman-saati","in-a-space", "in-a-space-2", "uc-topragin-atesi", "ultimate-car-drive"]);
 {
   for (const game of games) {
     if (!game.download || PC_DOWNLOADS_READY.has(game.slug)) continue;
@@ -540,7 +558,7 @@ const PC_DOWNLOADS_READY = new Set(["zaman-saati", "in-a-space", "in-a-space-2",
   }
 }
 
-const NEW_GAME_SLUGS = new Set(["zaman-saati", "ultimate-car-drive", "uc-topragin-atesi", "in-a-space-2", "in-a-space","kayip-odalar", "vipend-3d", "karanlik-labirent", "ejderha-ucus", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "2d-car-simulator", "yaris-sehri", "hako-vurus", "uzay-yarisi", "isin-savasi", "beyaz-bardak", "make-city"]);
+const NEW_GAME_SLUGS = new Set(["zaman-saati-2", "zaman-saati","ultimate-car-drive", "uc-topragin-atesi", "in-a-space-2", "in-a-space","kayip-odalar", "vipend-3d", "karanlik-labirent", "ejderha-ucus", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "2d-car-simulator", "yaris-sehri", "hako-vurus", "uzay-yarisi", "isin-savasi", "beyaz-bardak", "make-city"]);
 /** Only games the Birleşim Arenası client actually implements. */
 const FUSION_GAME_SLUGS = new Set([
   "annenden-kac",
