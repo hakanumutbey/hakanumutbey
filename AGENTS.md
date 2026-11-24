@@ -45,6 +45,7 @@ Bu repo `hakanumutbey` GitHub profil reposu ve ayni zamanda `https://hakorocks.a
 - PC oyunu `ultimate-car-drive` (Godot, indirme `/indir/ultimate-car-drive/`): online yaris relay'i `server.mjs` icinde, WebSocket yolu `/ultimate-car-drive` (oda kodlu; JSON kontrol + ikili konum paketleri, ilk bayt hedef/gonderen id).
 - PC oyunu `zaman-saati` (Godot 3D hikaye macerasi; indirme `/indir/zaman-saati.zip`, otomatik guncelleme `/indir/zaman-saati/`).
 - PC oyunu `zaman-saati-2` (Zaman Saati 2: Parcalanma, devam oyunu; indirme `/indir/zaman-saati-2.zip`, otomatik guncelleme `/indir/zaman-saati-2/`).
+- PC oyunu `in-a-space-3` (IN A SPACE 3: Oteki Evren; Godot, kokpitten ucus + it dalasi + gezegene inis; indirme `/indir/in-a-space-3.zip`, otomatik guncelleme `/indir/in-a-space-3/`).
 - Mevcut projeler: `sesli-parti` (yakinlik sesli sohbet; WebSocket yolu `/sesli-parti`, canli adres `/projeler/sesli-parti/`).
 - Oyunlarin browser erisimi bozulmamalidir.
 - Root `README.md` GitHub profil karşılama ekranidir; sik, Turkce ve proje durumunu anlatan bir vitrin olarak korunmalidir.

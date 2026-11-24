@@ -20,6 +20,24 @@ import {
 
 const games = [
   {
+    slug: "in-a-space-3",
+    title: "IN A SPACE 3: Öteki Evren",
+    path: "/oyunlar/in-a-space-3/",
+    type: "3D Uzay Savaşı",
+    status: "Bilgisayar oyunu",
+    download: "/indir/in-a-space-3.zip?v=1",
+    downloadSize: "39 MB",
+    description: "ATLAS'ın yeni hiper sürücüsü kontrolden çıkar, uzay yırtılır ve başka bir evrene düşersin. Kokpitten uç, Yankı Avcılarıyla it dalaşına gir, gezegenlere kendin in!",
+    longDescription: "IN A SPACE 3: Öteki Evren. Bu sefer dümen sende: ATLAS'ı kokpitten uçuruyorsun. Ay yörüngesinde uçuş dersi, test halkaları ve hedef dronları; sonra hiper sürücü denemesi ters gider ve uzay yırtılır. Öteki Evren'de ikiye bölünmüş dev bir gezegen, mor-yeşil bulutsu ve mavi bir güneş var. Kırık Kuşak'ın asteroitleri arasında mor gözlü Yankı Avcılarıyla it dalaşına gir: lazerle öncü noktasına ateş et, kilitlen ve füze at. Veyra gezegeninin atmosferine alevler içinde gir, dev ışıklı mantarların üstünden uç ve Eski Platform'a in. Yürüyerek Veyralı Nuri ile tanış, halkını Yankı Vorak'ların kafeslerinden kurtar, Işık Yarığı'nda Yıldız Kristali'ni al ve Gölge Bekçi'yi yen. Kalkışta yörüngede seni dev Gölge Avcı bekliyor: önce üç motoru, sonra çekirdeği! Ve sonunda... kapkara bir ATLAS. Godot ile yapılmış bilgisayar oyunu: indir, zip'i aç, exe'ye çift tıkla; güncellemeleri kendisi alır.",
+    accent: "cosmos",
+    controls: "Uçuş: fare burun, W/S gaz, A/D yuvarlan, Shift hız patlaması, sol tık lazer, sağ tık füze (kilitlenince), E iniş, H basılı hiper sürücü. Yürüyüş: WASD, Shift koş, Space zıpla, G süzül, sol tık balyoz, sağ tık nişan + sol tık fırlat, R çağır, C yuvarlan, Q BİP, E etkileşim, 1/2 seçim, Esc duraklat, F11 tam ekran",
+    mobileStatus: "Mobilde oynanmaz",
+    mobileNote: "Bilgisayar oyunu: İndir'e bas, zip'i aç, IN A SPACE 3.exe'ye çift tıkla. Tarayıcıda değil, Windows'ta çalışır.",
+    achievements: ["Beş test halkasından geç", "Hiper sürücüyle uzayı yırt", "Kırık Kuşak'ta Yankı Avcılarını düşür", "Veyra'ya in", "Nuri'nin halkını kurtar", "Yıldız Kristali'ni al", "Gölge Bekçi'yi yen", "Gölge Avcı'yı yen", "Gölge ATLAS'ı gör"],
+    updates: ["İlk sürüm (v1): 1. Bölüm YIRTIK! Kokpitten serbest uçuş, uçuş dersi, hiper sürücü kazası, Öteki Evren, Kırık Kuşak'ta it dalaşı, Veyra'ya atmosfer girişi ve iniş, Nuri ve kafesler, Işık Yarığı, Gölge Bekçi, Gölge Avcı ve Gölge ATLAS. Sıradaki: 2. Bölüm"],
+    stockBase: 160,
+  },
+  {
     slug: "zaman-saati-2",
     title: "Zaman Saati 2: Parçalanma",
     path: "/oyunlar/zaman-saati-2/",
@@ -543,7 +561,7 @@ const games = [
 
 const FUSION_GAME_PATH = "/oyunlar/birlesim-arenasi/";
 // Godot paketleri (zip) siteye konana dek indirilen oyunlar tarayıcıda oynanmaya devam eder.
-const PC_DOWNLOADS_READY = new Set(["zaman-saati-2", "zaman-saati","in-a-space", "in-a-space-2", "uc-topragin-atesi", "ultimate-car-drive"]);
+const PC_DOWNLOADS_READY = new Set(["in-a-space-3", "zaman-saati-2", "zaman-saati","in-a-space", "in-a-space-2", "uc-topragin-atesi", "ultimate-car-drive"]);
 {
   for (const game of games) {
     if (!game.download || PC_DOWNLOADS_READY.has(game.slug)) continue;
@@ -558,7 +576,7 @@ const PC_DOWNLOADS_READY = new Set(["zaman-saati-2", "zaman-saati","in-a-space",
   }
 }
 
-const NEW_GAME_SLUGS = new Set(["zaman-saati-2", "zaman-saati","ultimate-car-drive", "uc-topragin-atesi", "in-a-space-2", "in-a-space","kayip-odalar", "vipend-3d", "karanlik-labirent", "ejderha-ucus", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "2d-car-simulator", "yaris-sehri", "hako-vurus", "uzay-yarisi", "isin-savasi", "beyaz-bardak", "make-city"]);
+const NEW_GAME_SLUGS = new Set(["in-a-space-3", "zaman-saati-2", "zaman-saati","ultimate-car-drive", "uc-topragin-atesi", "in-a-space-2", "in-a-space","kayip-odalar", "vipend-3d", "karanlik-labirent", "ejderha-ucus", "hentw", "hentw2", "hentw3", "hentw-premium", "siber-polis", "2d-car-simulator", "yaris-sehri", "hako-vurus", "uzay-yarisi", "isin-savasi", "beyaz-bardak", "make-city"]);
 /** Only games the Birleşim Arenası client actually implements. */
 const FUSION_GAME_SLUGS = new Set([
   "annenden-kac",
